@@ -1,0 +1,248 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [btree_gist, pg_stat_statements, pgcrypto, supabase_vault, uuid_ossp(map: "uuid-ossp")]
+}
+
+// -------------------------------------------------------------
+// ENUMS
+// -------------------------------------------------------------
+
+enum VehicleStatus {
+  available
+  rented
+  maintenance
+  moved
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+}
+
+enum DriverStatus {
+  available
+  on_trip
+  off_duty
+}
+
+enum RentalType {
+  self_drive
+  with_driver
+}
+
+enum DriverAssignmentStatus {
+  unassigned
+  assigned
+  confirmed
+}
+
+enum BookingStatus {
+  pending_payment
+  confirmed
+  ongoing
+  completed
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+  refunded
+}
+
+enum UserRole {
+  staff_cabang
+  admin_cabang
+  admin_pusat
+}
+
+// -------------------------------------------------------------
+// MODELS
+// -------------------------------------------------------------
+
+model Branch {
+  id        String   @id @default(uuid())
+  name      String
+  city      String
+  address   String
+  phone     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vehicles Vehicle[]
+  drivers  Driver[]
+  users    User[]
+  pickups  Booking[] @relation("PickupBranch")
+  returns  Booking[] @relation("ReturnBranch")
+
+  @@index([city])
+}
+
+model VehicleCategory {
+  id           String   @id @default(uuid())
+  name         String
+  capacity     Int
+  transmission String
+  features     Json // Menyimpan fitur spesifik (misal AC, GPS)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vehicles Vehicle[]
+}
+
+model Vehicle {
+  id          String        @id @default(uuid())
+  branchId    String
+  categoryId  String
+  plateNumber String        @unique
+  // Decimal, bukan Float — hindari rounding error pada nilai uang
+  dailyRate   Decimal       @db.Decimal(12, 2)
+  status      VehicleStatus @default(available)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  branch   Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  category VehicleCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+
+  // Query paling sering: "mobil tersedia di cabang X" -> filter branchId + status
+  @@index([branchId, status])
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  // NB: samakan manual dengan Supabase Auth user ID saat register — pass id
+  // secara eksplisit di call create(), jangan andalkan default di bawah.
+  name      String
+  email     String   @unique
+  phone     String
+  ktpNumber String?  @unique
+  simNumber String?  @unique
+
+  verificationStatus VerificationStatus @default(pending)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  bookings  Booking[]
+  documents Document[]
+}
+
+model Driver {
+  id            String       @id @default(uuid())
+  branchId      String
+  name          String
+  phone         String
+  licenseNumber String       @unique
+  status        DriverStatus @default(available)
+  dailyFee      Decimal      @db.Decimal(12, 2)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  branch   Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+
+  // Query paling sering: "sopir tersedia di cabang X" -> filter branchId + status
+  @@index([branchId, status])
+}
+
+model Booking {
+  id             String  @id @default(uuid())
+  customerId     String
+  vehicleId      String
+  pickupBranchId String
+  returnBranchId String
+
+  startDate DateTime
+  endDate   DateTime
+
+  rentalType             RentalType
+  driverId               String?
+  driverAssignmentStatus DriverAssignmentStatus?
+
+  status BookingStatus @default(pending_payment)
+  // Total termasuk vehicle_price + driver_fee jika with_driver
+  totalPrice Decimal   @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  pickupBranch Branch   @relation("PickupBranch", fields: [pickupBranchId], references: [id], onDelete: Restrict)
+  returnBranch Branch   @relation("ReturnBranch", fields: [returnBranchId], references: [id], onDelete: Restrict)
+  // SetNull: driver bisa "dilepas" dari booking tanpa menghapus booking-nya
+  driver       Driver?  @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  payments  Payment[]
+  documents Document[]
+
+  // Dipakai untuk cek ketersediaan mobil per rentang tanggal
+  @@index([vehicleId, startDate, endDate])
+  // Dipakai untuk cek jadwal sopir per rentang tanggal
+  @@index([driverId, startDate, endDate])
+}
+
+model Payment {
+  id        String @id @default(uuid())
+  bookingId String
+  method    String
+  amount    Decimal @db.Decimal(12, 2)
+  status    PaymentStatus @default(pending)
+
+  // Unique — webhook Midtrans/Xendit bisa retry & kirim event yang sama 2x,
+  // constraint ini mencegah payment diproses dobel.
+  gatewayReference String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+}
+
+model Document {
+  id         String    @id @default(uuid())
+  type       String // 'ktp', 'sim', 'kontrak'
+  fileUrl    String
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Dipecah jadi 2 FK nullable (bukan 1 kolom ownerId polymorphic) karena
+  // satu foreign key tidak bisa merujuk ke 2 tabel berbeda sekaligus.
+  // Tepat satu dari keduanya wajib terisi — ditegakkan via CHECK constraint
+  // di migration SQL (lihat 002_add_constraints.sql).
+  customerId String?
+  bookingId  String?
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  booking  Booking?  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([customerId])
+  @@index([bookingId])
+}
+
+model User {
+  id   String @id @default(uuid())
+  // NB: sama seperti Customer — id ini dipetakan ke Supabase Auth User ID,
+  // pass secara eksplisit saat create(), default di atas cuma fallback.
+  name String
+  email String   @unique
+  role  UserRole @default(staff_cabang)
+
+  // null = admin_pusat (akses semua cabang), terisi = staff/admin 1 cabang
+  branchId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // SetNull: kalau cabang dihapus, staff tidak ikut terhapus — cukup jadi unassigned
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
