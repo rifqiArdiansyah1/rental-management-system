@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Prestige Motion - Vehicle Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Playfair+Display:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-container": "#dab36a",
+                        "surface-container": "#1e2020",
+                        "surface-container-high": "#282a2b",
+                        "primary-fixed": "#d6e3ff",
+                        "surface-container-lowest": "#0c0f0f",
+                        "on-surface-variant": "#c5c6cd",
+                        "on-tertiary-container": "#838281",
+                        "tertiary-fixed-dim": "#c8c6c6",
+                        "error-container": "#93000a",
+                        "secondary-fixed": "#ffdea5",
+                        "surface-dim": "#121414",
+                        "outline": "#8f9097",
+                        "on-primary-fixed": "#0d1c32",
+                        "on-primary": "#233148",
+                        "secondary-container": "#604403",
+                        "surface-container-low": "#1a1c1c",
+                        "tertiary-container": "#191919",
+                        "primary": "#b9c7e4",
+                        "outline-variant": "#44474d",
+                        "inverse-primary": "#515f78",
+                        "on-secondary": "#412d00",
+                        "primary-container": "#0a192f",
+                        "surface-tint": "#b9c7e4",
+                        "secondary": "#e9c176",
+                        "on-primary-container": "#74829d",
+                        "on-primary-fixed-variant": "#39475f",
+                        "primary-fixed-dim": "#b9c7e4",
+                        "error": "#ffb4ab",
+                        "surface": "#121414",
+                        "on-tertiary-fixed": "#1b1c1c",
+                        "inverse-surface": "#e2e2e2",
+                        "on-background": "#e2e2e2",
+                        "inverse-on-surface": "#2f3131",
+                        "on-secondary-fixed": "#261900",
+                        "secondary-fixed-dim": "#e9c176",
+                        "surface-variant": "#333535",
+                        "tertiary-fixed": "#e4e2e1",
+                        "on-surface": "#e2e2e2",
+                        "on-tertiary": "#303030",
+                        "background": "#121414",
+                        "on-tertiary-fixed-variant": "#474747",
+                        "on-secondary-fixed-variant": "#5d4201",
+                        "tertiary": "#c8c6c6",
+                        "surface-bright": "#37393a",
+                        "surface-container-highest": "#333535"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "8px",
+                        "margin-desktop": "64px",
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "margin-mobile": "20px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Playfair Display"],
+                        "label-caps": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Playfair Display"],
+                        "body-md": ["Inter"],
+                        "button": ["Inter"],
+                        "headline-md": ["Playfair Display"],
+                        "display-lg-mobile": ["Playfair Display"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "button": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "display-lg-mobile": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .filled-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Subtle ambient glow effect */
+        .ambient-glow {
+            box-shadow: 0 20px 40px -10px rgba(10, 25, 47, 0.4);
+        }
+        
+        /* Smooth image scaling on hover for cards */
+        .card-img-wrapper {
+            overflow: hidden;
+        }
+        .card-img-wrapper img {
+            transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .group:hover .card-img-wrapper img {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex flex-col">
+<!-- Top Navigation from Shared Components JSON -->
+<header class="w-full top-0 sticky z-50 bg-background/80 backdrop-blur-md">
+<nav class="flex justify-between items-center h-20 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
+<div class="flex items-center gap-gutter">
+<a class="font-display-lg text-headline-md tracking-tighter text-secondary dark:text-secondary-fixed" href="#">
+                    Prestige Motion
+                </a>
+</div>
+<ul class="hidden md:flex gap-gutter font-label-caps text-label-caps">
+<li><a class="text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer active:scale-95" href="#">Home</a></li>
+<li><a class="text-secondary border-b-2 border-secondary pb-1 cursor-pointer active:scale-95" href="#">Vehicles</a></li>
+<li><a class="text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer active:scale-95" href="#">About</a></li>
+</ul>
+<div class="flex items-center gap-base">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors" href="#">Login</a>
+<button class="md:hidden text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+</div>
+</nav>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col">
+<!-- Hero Section -->
+<section class="relative w-full h-[614px] md:h-[768px] flex items-end">
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover object-center" data-alt="A dramatic, high-contrast photograph of a sleek, dark grey Mercedes-Benz S-Class parked in a pristine, minimalist concrete hangar. The lighting is cinematic, featuring soft spotlights that highlight the car's reflective curves against a deep navy blue background. The aesthetic is ultra-luxurious, capturing a sense of high-net-worth sophistication and quiet luxury, perfectly framed for a luxury car rental service header." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6l0EPuESVvtVEobcCqWzWKd5lm6mqdYG_oClhPd666OVoirzXagmlZDObyfQyS8sRpwt5hqemyAvyoCa4M2oLMstOLh0hQSfCnCwxFezXR3H2yl89oAGdJB1WKr3m93EtuegjNbOh17pcQH-xbgWFbuBmzAr9SU3FwqQcNcMunapBe37sfCUe0Ua95S5tuffSIZI5GG-npW0A-BlarGS79DFaoR8oZ5KaEcD4p7A_aIvFnIInkfqT"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
+</div>
+<div class="relative z-10 w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto pb-12">
+<div class="flex flex-col md:flex-row justify-between items-end gap-gutter">
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-secondary mb-2 tracking-widest uppercase">Executive Sedan</span>
+<h1 class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-2">Mercedes-Benz S-Class</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">The pinnacle of automotive engineering, offering unmatched comfort, cutting-edge technology, and a commanding presence on the road. Perfect for executive travel and special occasions.</p>
+</div>
+<div class="flex flex-col items-start md:items-end mt-6 md:mt-0">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1 uppercase">Daily Rate</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-lg text-headline-lg text-secondary">$850</span>
+<span class="font-body-md text-body-md text-on-surface-variant">/ day</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Specifications & Booking Grid -->
+<section class="w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto py-16 md:py-24">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+<!-- Left Column: Specs & Features -->
+<div class="lg:col-span-8 flex flex-col gap-16">
+<!-- Specifications Bento Grid -->
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Vehicle Specifications</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<div class="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
+<span class="material-symbols-outlined text-secondary opacity-80" data-icon="settings">settings</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Transmission</span>
+<span class="font-body-lg text-body-lg text-on-surface">9-Speed Auto</span>
+</div>
+<div class="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
+<span class="material-symbols-outlined text-secondary opacity-80" data-icon="local_gas_station">local_gas_station</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Fuel Type</span>
+<span class="font-body-lg text-body-lg text-on-surface">Premium Hybrid</span>
+</div>
+<div class="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
+<span class="material-symbols-outlined text-secondary opacity-80" data-icon="group">group</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Capacity</span>
+<span class="font-body-lg text-body-lg text-on-surface">4 Passengers</span>
+</div>
+<div class="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
+<span class="material-symbols-outlined text-secondary opacity-80" data-icon="speed">speed</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Engine</span>
+<span class="font-body-lg text-body-lg text-on-surface">3.0L V6 Turbo</span>
+</div>
+</div>
+</div>
+<!-- Features -->
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Premium Features</h2>
+<ul class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<li class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary" data-icon="light_mode">light_mode</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Panoramic Sunroof</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary" data-icon="airline_seat_recline_extra">airline_seat_recline_extra</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Massaging Leather Seats</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary" data-icon="speaker">speaker</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Burmester 3D Surround Sound</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary" data-icon="explore">explore</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Augmented Reality Navigation</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary" data-icon="ac_unit">ac_unit</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface">4-Zone Climate Control</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary" data-icon="shield">shield</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Advanced Driver Assistance</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Right Column: Booking Widget -->
+<div class="lg:col-span-4">
+<div class="bg-surface-container rounded-lg p-8 sticky top-28 border border-white/5 ambient-glow flex flex-col gap-6">
+<div class="flex justify-between items-center mb-2">
+<h3 class="font-headline-md text-headline-md text-on-surface">Reservation</h3>
+</div>
+<!-- Progress line -->
+<div class="w-full h-[1px] bg-surface-variant relative mb-4">
+<div class="absolute left-0 top-0 h-full w-1/3 bg-secondary"></div>
+</div>
+<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase">Pick-up Date</label>
+<input class="bg-background border border-surface-variant rounded text-on-surface px-4 py-3 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary font-body-md text-body-md" type="date" value="2024-05-15"/>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase">Return Date</label>
+<input class="bg-background border border-surface-variant rounded text-on-surface px-4 py-3 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary font-body-md text-body-md" type="date" value="2024-05-18"/>
+</div>
+</div>
+<div class="flex justify-between items-center py-4 border-t border-surface-variant mt-2">
+<span class="font-body-lg text-body-lg text-on-surface-variant">Estimated Total</span>
+<span class="font-headline-md text-headline-md text-on-surface">$2,550</span>
+</div>
+<button class="w-full bg-secondary text-on-secondary font-button text-button py-4 rounded hover:bg-secondary-fixed transition-all duration-300 transform hover:-translate-y-1 shadow-[0_10px_20px_-10px_rgba(233,193,118,0.3)]">
+                            Rent This Car
+                        </button>
+<p class="font-label-caps text-label-caps text-on-surface-variant text-center lowercase tracking-normal">Requires security deposit and insurance verification.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Related Vehicles -->
+<section class="w-full bg-surface-container-low py-20 mt-12">
+<div class="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
+<div class="flex justify-between items-end mb-12 border-b border-surface-variant pb-4">
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Similar Class Vehicles</h2>
+<a class="font-label-caps text-label-caps text-secondary hover:text-secondary-fixed flex items-center gap-1 uppercase" href="#">
+                        View All <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Vehicle Card 1 -->
+<a class="group bg-surface-container rounded overflow-hidden border border-white/5 ambient-glow flex flex-col h-full hover:-translate-y-1 transition-transform duration-300" href="#">
+<div class="card-img-wrapper h-64 w-full bg-surface-variant relative">
+<img class="w-full h-full object-cover" data-alt="A side-profile shot of a sleek, black BMW 7 Series parked against a minimal, modern architectural wall in a city environment. The lighting is moody and low-key, enhancing the metallic reflections and luxury aesthetic of the dark theme design system." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdn4EhS4Co4A4fSasJD0Z40iJq6mJ2Vf0MRO1STdkylTaCMVgOrjAniQZg2E76f0MVFRdMa2cjlnXgcRR3v6MrqNc6iVH5tF-cHxRT7b-G4hBN06WwDmQYMcex8ZxaNBQ0YjIBUpLhAmFDyHWlzzB7zKsHO9Q84jjlzPeE3A2W5-8yF841A9_n1VbnN9-1VV3hc_2y2y-hJ3o3eKRigif6aAcjCltSBckBlCh9xMnI5pZjmjgVwfq9"/>
+<div class="absolute top-4 right-4 bg-background/80 backdrop-blur px-3 py-1 rounded font-label-caps text-label-caps text-secondary">$800/d</div>
+</div>
+<div class="p-6 flex flex-col flex-grow">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">Executive Sedan</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-6">BMW 7 Series</h3>
+<div class="mt-auto grid grid-cols-3 gap-2 border-t border-surface-variant pt-4">
+<div class="flex flex-col items-center">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1">Seats</span>
+<span class="font-body-md text-body-md text-on-surface">4</span>
+</div>
+<div class="flex flex-col items-center border-l border-surface-variant">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1">Trans</span>
+<span class="font-body-md text-body-md text-on-surface">Auto</span>
+</div>
+<div class="flex flex-col items-center border-l border-surface-variant">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1">0-60</span>
+<span class="font-body-md text-body-md text-on-surface">4.1s</span>
+</div>
+</div>
+</div>
+</a>
+<!-- Vehicle Card 2 -->
+<a class="group bg-surface-container rounded overflow-hidden border border-white/5 ambient-glow flex flex-col h-full hover:-translate-y-1 transition-transform duration-300" href="#">
+<div class="card-img-wrapper h-64 w-full bg-surface-variant relative">
+<img class="w-full h-full object-cover" data-alt="A front 3/4 view of a dark silver Audi A8 L in an underground garage with subtle, cool-toned neon lighting. The image conveys stealth wealth and technical sophistication, fitting the high-contrast, modern luxury aesthetic of the application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuASpNHS1xVK4T4blWBh_Jr5Wuldlt5mSuiYvvi0yOmnPCznPNjF4_rq3-GhMXtW5EpGM7R354GkM4pmZDxojrgKuXEGNz2zfxbvxMrJY8GDn_Schf_ctpk9-0jg2nva3yFElqDowmtewtxwWY0M6eLCQnMDOPzyXZ-Tt4Fvn1tK9MMlTmdhfi7ftEhDJFxH2twnm1qn3N4-p112H13cmgeAFHK8W7VYzMEZtcDFwEa88Lupn_AF1s_m"/>
+<div class="absolute top-4 right-4 bg-background/80 backdrop-blur px-3 py-1 rounded font-label-caps text-label-caps text-secondary">$780/d</div>
+</div>
+<div class="p-6 flex flex-col flex-grow">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">Executive Sedan</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-6">Audi A8 L</h3>
+<div class="mt-auto grid grid-cols-3 gap-2 border-t border-surface-variant pt-4">
+<div class="flex flex-col items-center">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1">Seats</span>
+<span class="font-body-md text-body-md text-on-surface">4</span>
+</div>
+<div class="flex flex-col items-center border-l border-surface-variant">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1">Trans</span>
+<span class="font-body-md text-body-md text-on-surface">Auto</span>
+</div>
+<div class="flex flex-col items-center border-l border-surface-variant">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1">0-60</span>
+<span class="font-body-md text-body-md text-on-surface">4.4s</span>
+</div>
+</div>
+</div>
+</a>
+<!-- Vehicle Card 3 -->
+<a class="group bg-surface-container rounded overflow-hidden border border-white/5 ambient-glow flex flex-col h-full hover:-translate-y-1 transition-transform duration-300 hidden md:flex" href="#">
+<div class="card-img-wrapper h-64 w-full bg-surface-variant relative">
+<img class="w-full h-full object-cover" data-alt="A dynamic shot of a deep blue Porsche Panamera driving on a dark, wet mountain road at dusk. The taillights leave a subtle red trail. The scene emphasizes performance luxury and high-end automotive photography tailored for a premium rental service." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVGKsS4KoTYfbJdsXkSN7WbWA5zRPZMF9MpgI1iOJ2aVJV9MFNqBNvcKi7BVSUh6-cI-0w45tP-e8uku8XHFxR1iW_14C-ICr05COVD_3nCzhNyAO-ufMKtgIVcoqZF2_kBnqZjIOuL636cRe7eIr06Cj7fspc8u0PGhbSgjFRrJFtrGm0_tHe3_bQLrPNYANz4g1GLChkF6C-Gk4NF2p3Dx7c35kywz1G0BxaiF4q48w_3pmEHpF6"/>
+<div class="absolute top-4 right-4 bg-background/80 backdrop-blur px-3 py-1 rounded font-label-caps text-label-caps text-secondary">$950/d</div>
+</div>
+<div class="p-6 flex flex-col flex-grow">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">Performance Sedan</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-6">Porsche Panamera</h3>
+<div class="mt-auto grid grid-cols-3 gap-2 border-t border-surface-variant pt-4">
+<div class="flex flex-col items-center">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1">Seats</span>
+<span class="font-body-md text-body-md text-on-surface">4</span>
+</div>
+<div class="flex flex-col items-center border-l border-surface-variant">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1">Trans</span>
+<span class="font-body-md text-body-md text-on-surface">PDK</span>
+</div>
+<div class="flex flex-col items-center border-l border-surface-variant">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-1">0-60</span>
+<span class="font-body-md text-body-md text-on-surface">3.6s</span>
+</div>
+</div>
+</div>
+</a>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer from Shared Components JSON -->
+<footer class="w-full pt-20 pb-10 bg-surface-container-lowest dark:bg-surface-container-lowest">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
+<div class="col-span-1 md:col-span-1 flex flex-col gap-4">
+<span class="font-display-lg text-headline-md text-secondary">Prestige Motion</span>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 max-w-xs">Elevating your journey with uncompromising luxury and discretion.</p>
+</div>
+<div class="col-span-1 md:col-span-2 flex gap-12 mt-8 md:mt-0">
+<div class="flex flex-col gap-4">
+<span class="font-label-caps text-label-caps text-on-surface uppercase tracking-widest mb-2">Explore</span>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors" href="#">Locations</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors" href="#">Categories</a>
+</div>
+<div class="flex flex-col gap-4">
+<span class="font-label-caps text-label-caps text-on-surface uppercase tracking-widest mb-2">Legal</span>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors" href="#">Terms</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors" href="#">Privacy</a>
+</div>
+<div class="flex flex-col gap-4">
+<span class="font-label-caps text-label-caps text-on-surface uppercase tracking-widest mb-2">Support</span>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors" href="#">Contact</a>
+</div>
+</div>
+<div class="col-span-1 flex flex-col justify-end mt-12 md:mt-0 text-left md:text-right">
+<span class="font-body-md text-body-md text-on-surface-variant">© 2024 Prestige Motion. All rights reserved.</span>
+</div>
+</div>
+</footer>
+</body></html>

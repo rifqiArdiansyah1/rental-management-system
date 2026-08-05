@@ -30,51 +30,77 @@ async function main() {
   console.log(`✅ Branch ensured: ${branchPusat.name}`)
 
   // 2. Kategori Mobil
-  const catSuv = await prisma.vehicleCategory.upsert({
+  const catSedan = await prisma.vehicleCategory.upsert({
     where: { id: '00000000-0000-0000-0000-000000000002' },
     update: {},
     create: {
       id: '00000000-0000-0000-0000-000000000002',
-      name: 'SUV',
-      capacity: 7,
+      name: 'Luxury Sedan',
+      capacity: 5,
       transmission: 'Automatic',
-      features: ['AC', 'Bluetooth', 'Rear Camera'],
+      features: ['AC', 'Bluetooth', 'Rear Camera', 'Leather Seats'],
+      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDpZpPBLzU1rxpGV0bKbDXbxV8EnswjscJacoc6yE3L18Y6kO5zLL83cH2AZ4jOC6Cnnby8qtiKpxUsZypv8NMX1Omtsn63l-RTWtnrnIc-lUBnmH85JlJ5FEpf_VY_Cjv8OVb4T9K6Yek2ffPZ7lLPQzFiI1EvC633glR6E5RLOwGmrcc7sqP61X4idBDKZcTga09Rlyq4In-I2qpgI-XWoPbEuhvidB06ejKa-uG6CvG6yJTODch7',
     },
   })
   
-  const catMpv = await prisma.vehicleCategory.upsert({
+  const catSuv = await prisma.vehicleCategory.upsert({
     where: { id: '00000000-0000-0000-0000-000000000003' },
     update: {},
     create: {
       id: '00000000-0000-0000-0000-000000000003',
-      name: 'MPV',
-      capacity: 7,
-      transmission: 'Manual',
-      features: ['AC', 'Audio System'],
+      name: 'Premium SUV',
+      capacity: 5,
+      transmission: 'Automatic',
+      features: ['AC', 'Audio System', 'AWD', 'Sunroof'],
+      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCGpkp0Kc9IYqLL_Bk2OJuukeIzBKJSW-Pw_bikhhhcZYs2d9TUqq1WcI7J7ayrOAT8ye8sTpj7hMfd9QGEnbXTiDo86SzwABpSFyCDINZJ_uMgxQKlKlf2taCGZPVLyZ3_NzpBCsVrYPY_73P3XzclQ-WLCmMI9mpFvxpny_5QaxJD_6_E_5ZW5xVNPUKCd0WMaTpApbhyz7SHCBU3zRMlE_wueA5b9GR49OilclYFolD823mXBAkg',
     },
   })
-  console.log(`✅ Categories ensured: ${catSuv.name}, ${catMpv.name}`)
+
+  const catSports = await prisma.vehicleCategory.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000004' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000004',
+      name: 'Sports Car',
+      capacity: 2,
+      transmission: 'PDK Auto',
+      features: ['Sport Chrono', 'Bucket Seats', 'Navigation'],
+      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBiqkH4gNqRgxJaZpzyuN5FHO_hjh3Dh0gm48ksTbFhM6u4fH24nQI6goHflnJl47Zghuqv0vHZQPvaVonMh0H55hSrHnkDSJ4NQa6sf42uT30S8-CwLrdK_wPJPUj1WYqqTA2LH0Aiw5pUXE1xbzP-fS_ZSdK_y-rXk5UxyAF42A8zJt6TOGnhmAaKnf7Ie0XgP7Xqhu8xcQc9WIDpuUVhahUG4d52XRT258edWqp0zxdcHfnqgjMF',
+    },
+  })
+  console.log(`✅ Categories ensured`)
 
   // 3. Mobil (Vehicle)
   await prisma.vehicle.upsert({
-    where: { plateNumber: 'B 1234 ABC' },
+    where: { plateNumber: 'B 1 BMW' },
     update: {},
     create: {
-      plateNumber: 'B 1234 ABC',
+      plateNumber: 'B 1 BMW',
       branchId: branchPusat.id,
-      categoryId: catSuv.id,
-      dailyRate: 500000,
+      categoryId: catSedan.id,
+      dailyRate: 4500000,
     },
   })
 
   await prisma.vehicle.upsert({
-    where: { plateNumber: 'B 5678 DEF' },
+    where: { plateNumber: 'B 2 RR' },
     update: {},
     create: {
-      plateNumber: 'B 5678 DEF',
+      plateNumber: 'B 2 RR',
       branchId: branchPusat.id,
-      categoryId: catMpv.id,
-      dailyRate: 350000,
+      categoryId: catSuv.id,
+      dailyRate: 6000000,
+    },
+  })
+
+  await prisma.vehicle.upsert({
+    where: { plateNumber: 'B 911 PC' },
+    update: {},
+    create: {
+      plateNumber: 'B 911 PC',
+      branchId: branchPusat.id,
+      categoryId: catSports.id,
+      dailyRate: 8500000,
     },
   })
   console.log(`✅ Vehicles ensured`)
