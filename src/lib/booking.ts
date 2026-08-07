@@ -2,9 +2,7 @@ import { prisma } from '@/utils/prisma'
 import { calculateDaysDifference } from './utils/date'
 import { RentalType, BookingStatus } from '@prisma/client'
 
-// Fixed flat rate for driver estimation before actual driver assignment
-export const STANDARD_DRIVER_FEE = 150000
-
+import { calculateEstimatedPrice } from './pricing'
 export async function checkVehicleAvailability(vehicleId: string, startDate: Date, endDate: Date): Promise<boolean> {
   // 1. Precondition: Vehicle must be available
   const vehicle = await prisma.vehicle.findUnique({
@@ -37,32 +35,6 @@ export async function checkVehicleAvailability(vehicleId: string, startDate: Dat
   return overlappingBookings === 0
 }
 
-export async function calculateBookingPrice(
-  vehicleId: string, 
-  startDate: Date, 
-  endDate: Date, 
-  rentalType: RentalType
-): Promise<number> {
-  const vehicle = await prisma.vehicle.findUnique({
-    where: { id: vehicleId },
-    select: { dailyRate: true }
-  })
-
-  if (!vehicle) {
-    throw new Error('Vehicle not found')
-  }
-
-  const days = calculateDaysDifference(startDate, endDate)
-  const vehicleRate = Number(vehicle.dailyRate)
-  
-  let totalPrice = vehicleRate * days
-
-  if (rentalType === 'with_driver') {
-    totalPrice += (STANDARD_DRIVER_FEE * days)
-  }
-
-  return totalPrice
-}
 
 export type CreateDraftBookingPayload = {
   customerId: string
@@ -75,9 +47,18 @@ export type CreateDraftBookingPayload = {
 }
 
 export async function createDraftBookingCore(payload: CreateDraftBookingPayload) {
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { id: payload.vehicleId },
+    select: { dailyRate: true }
+  })
+
+  if (!vehicle) {
+    throw new Error('Vehicle not found')
+  }
+
   // Calculate price purely on the server
-  const totalPrice = await calculateBookingPrice(
-    payload.vehicleId,
+  const pricing = calculateEstimatedPrice(
+    Number(vehicle.dailyRate),
     payload.startDate,
     payload.endDate,
     payload.rentalType
@@ -93,7 +74,7 @@ export async function createDraftBookingCore(payload: CreateDraftBookingPayload)
         startDate: payload.startDate,
         endDate: payload.endDate,
         rentalType: payload.rentalType,
-        totalPrice,
+        totalPrice: pricing.grandTotal,
         status: BookingStatus.pending_payment,
         // driverId and driverAssignmentStatus are intentionally left null for 'with_driver' 
         // until a branch staff assigns a real driver.
