@@ -201,6 +201,7 @@ model Payment {
   // Unique — webhook Midtrans/Xendit bisa retry & kirim event yang sama 2x,
   // constraint ini mencegah payment diproses dobel.
   gatewayReference String? @unique
+  snapToken        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
