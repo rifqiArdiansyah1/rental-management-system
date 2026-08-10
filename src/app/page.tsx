@@ -3,6 +3,8 @@ import FilterBar from '@/components/ui/FilterBar'
 import VehicleCard from '@/components/ui/VehicleCard'
 import { getVehicles, getBranches, getCategories } from '@/actions/vehicle'
 
+import { createClient } from '@/utils/supabase/server'
+
 export const dynamic = 'force-dynamic'
 
 export default async function Home({
@@ -13,6 +15,9 @@ export default async function Home({
   const resolvedSearchParams = await searchParams;
   const branchId = typeof resolvedSearchParams.branch === 'string' ? resolvedSearchParams.branch : undefined
   const categoryId = typeof resolvedSearchParams.category === 'string' ? resolvedSearchParams.category : undefined
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   const [vehicles, branches, categories] = await Promise.all([
     getVehicles({ branchId, categoryId }),
@@ -51,9 +56,15 @@ export default async function Home({
           
           {/* Trailing Action */}
           <div className="hidden md:block">
-            <Link href="/login" className="font-button text-button text-secondary border border-secondary px-6 py-2 rounded-DEFAULT hover:bg-secondary hover:text-background transition-colors cursor-pointer active:scale-95 inline-block">
-              Login
-            </Link>
+            {user ? (
+              <Link href="/dashboard" className="font-button text-button text-background bg-secondary px-6 py-2 rounded-DEFAULT hover:bg-secondary-fixed transition-colors cursor-pointer active:scale-95 inline-block">
+                Dashboard
+              </Link>
+            ) : (
+              <Link href="/login" className="font-button text-button text-secondary border border-secondary px-6 py-2 rounded-DEFAULT hover:bg-secondary hover:text-background transition-colors cursor-pointer active:scale-95 inline-block">
+                Login
+              </Link>
+            )}
           </div>
           
           {/* Mobile Menu Toggle */}
