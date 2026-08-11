@@ -34,7 +34,8 @@ export async function updateSession(request: NextRequest) {
 
   // Proteksi rute khusus admin
   if (request.nextUrl.pathname.startsWith('/admin') && !request.nextUrl.pathname.startsWith('/admin/login')) {
-    if (!user || user.app_metadata.role !== 'admin') {
+    const validAdminRoles = ['staff_cabang', 'admin_cabang', 'admin_pusat']
+    if (!user || !validAdminRoles.includes(user.app_metadata.role)) {
       const url = request.nextUrl.clone()
       url.pathname = '/admin/login'
       return NextResponse.redirect(url)
