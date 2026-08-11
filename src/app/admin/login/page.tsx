@@ -1,6 +1,18 @@
 import { adminLogin } from './actions'
+import { createClient } from '@/utils/supabase/server'
+import { redirect } from 'next/navigation'
 
-export default function AdminLoginPage() {
+export default async function AdminLoginPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    const validAdminRoles = ['staff_cabang', 'admin_cabang', 'admin_pusat']
+    if (user.app_metadata && validAdminRoles.includes(user.app_metadata.role)) {
+      redirect('/admin/dashboard')
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#050b14]">
       <div className="max-w-md w-full space-y-8 p-8 bg-[#0a1220] rounded-2xl shadow-2xl border border-gray-800">

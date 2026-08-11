@@ -19,10 +19,11 @@ export async function adminLogin(formData: FormData) {
   }
 
   // Double check the role from app_metadata as per defense in depth strategy
-  if (!authData.user || !authData.user.app_metadata || !authData.user.app_metadata.role?.includes('admin')) {
+  const validAdminRoles = ['staff_cabang', 'admin_cabang', 'admin_pusat']
+  if (!authData.user || !authData.user.app_metadata || !validAdminRoles.includes(authData.user.app_metadata.role)) {
     // Kalo bukan admin, sign out dan tolak
     await supabase.auth.signOut()
-    redirect('/admin/login?message=Akses ditolak. Bukan akun admin.')
+    redirect('/admin/login?message=Akses ditolak. Bukan akun staf atau admin.')
   }
 
   revalidatePath('/admin', 'layout')
