@@ -75,6 +75,33 @@ export async function POST(req: Request) {
           where: { id: payment.id },
           data: { status: PaymentStatus.success }
         })
+
+        // Fetch details for Email
+        const fullBooking = await prisma.booking.findUnique({
+          where: { id: bookingId },
+          include: { 
+            customer: true, 
+            vehicle: { include: { category: true } } 
+          }
+        })
+
+        if (fullBooking) {
+          try {
+            const { sendBookingConfirmedEmail } = await import('@/utils/email')
+            await sendBookingConfirmedEmail({
+              toEmail: fullBooking.customer.email,
+              customerName: fullBooking.customer.name,
+              bookingId: fullBooking.id,
+              vehicleName: fullBooking.vehicle.category.name,
+              startDate: fullBooking.startDate.toLocaleDateString('id-ID'),
+              endDate: fullBooking.endDate.toLocaleDateString('id-ID'),
+              totalPrice: `Rp ${Number(fullBooking.totalPrice).toLocaleString('id-ID')}`
+            })
+          } catch (emailError: any) {
+            console.error('[EMAIL ERROR] Failed to send booking confirmation:', emailError.message)
+            // Error is isolated. Webhook will still return 200 OK.
+          }
+        }
       }
 
     } else if (
