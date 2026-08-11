@@ -164,7 +164,7 @@ async function main() {
         email: adminEmail,
         password: adminPassword,
         email_confirm: true,
-        app_metadata: { role: 'admin' },
+        app_metadata: { role: 'admin_pusat' },
       })
 
       if (authError) {
@@ -175,7 +175,7 @@ async function main() {
     } else {
       console.log('Admin auth user already exists, ensuring app_metadata...')
       await supabaseAdmin.auth.admin.updateUserById(adminUserId, {
-        app_metadata: { role: 'admin' },
+        app_metadata: { role: 'admin_pusat' },
       })
     }
 
