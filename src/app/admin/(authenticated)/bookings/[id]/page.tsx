@@ -3,7 +3,7 @@ import { prisma } from '@/utils/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, FileCheck2, AlertCircle, FileText, CheckCircle2 } from 'lucide-react'
-import { VerifyDocumentButton, AssignDriverForm, CancelBookingButton } from './ClientActions'
+import { VerifyDocumentButton, AssignDriverForm, CancelBookingButton, ViewDocumentButton } from './ClientActions'
 
 export default async function BookingDetailPage({ params }: { params: { id: string } }) {
   const adminUser = await requireAdminSession()
@@ -126,10 +126,7 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
                     
                     {doc ? (
                       <div>
-                        {/* Dummy representation of file link/thumbnail */}
-                        <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="block w-full text-center text-sm text-blue-600 underline bg-white border border-zinc-200 py-6 rounded-md hover:bg-zinc-50 transition-colors">
-                          Lihat Dokumen
-                        </a>
+                        <ViewDocumentButton fileUrl={doc.fileUrl} />
                         <VerifyDocumentButton documentId={doc.id} currentStatus={doc.verifiedAt ? 'verified' : null} />
                       </div>
                     ) : (

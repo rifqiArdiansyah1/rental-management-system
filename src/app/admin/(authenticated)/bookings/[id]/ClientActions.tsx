@@ -2,7 +2,39 @@
 
 import { useState, useTransition } from 'react'
 import { verifyDocument, assignDriver, cancelBooking } from '@/actions/admin'
-import { CheckCircle2, XCircle, UserCheck, XOctagon } from 'lucide-react'
+import { generateSignedDocumentUrl } from '@/actions/document'
+import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink } from 'lucide-react'
+
+export function ViewDocumentButton({ fileUrl }: { fileUrl: string }) {
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  const handleView = () => {
+    startTransition(async () => {
+      setError(null)
+      const res = await generateSignedDocumentUrl(fileUrl)
+      if (res.error) {
+        setError(res.error)
+      } else if (res.url) {
+        window.open(res.url, '_blank')
+      }
+    })
+  }
+
+  return (
+    <div className="w-full">
+      <button
+        onClick={handleView}
+        disabled={isPending}
+        className="flex w-full items-center justify-center gap-2 text-sm text-blue-600 bg-white border border-zinc-200 py-6 rounded-md hover:bg-zinc-50 transition-colors disabled:opacity-50"
+      >
+        <ExternalLink className="w-4 h-4" />
+        {isPending ? 'Membuka...' : 'Lihat Dokumen'}
+      </button>
+      {error && <p className="text-xs text-red-600 mt-2 text-center">{error}</p>}
+    </div>
+  )
+}
 
 export function VerifyDocumentButton({ documentId, currentStatus }: { documentId: string, currentStatus?: 'verified' | null }) {
   const [isPending, startTransition] = useTransition()
