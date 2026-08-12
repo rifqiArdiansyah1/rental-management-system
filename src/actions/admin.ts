@@ -193,3 +193,148 @@ export async function endRental(bookingId: string) {
     return { error: error.message || 'Terjadi kesalahan sistem.' }
   }
 }
+
+
+import { sendDocumentStatusEmail } from '@/utils/email'
+
+export async function verifyDocument(documentId: string, status: 'verified' | 'rejected', reason?: string) {
+  try {
+    const adminUser = await requireAdminSession()
+    
+    // Find the document and its customer
+    const document = await prisma.document.findUnique({
+      where: { id: documentId },
+      include: { customer: true }
+    })
+    
+    if (!document) return { error: 'Dokumen tidak ditemukan.' }
+    
+    const customerId = document.customerId
+    if (!customerId || !document.customer) return { error: 'Dokumen tidak terkait dengan pelanggan manapun.' }
+    
+    // Check branch scope: Admin needs to have at least one booking with this customer in their branch
+    if (adminUser.branchId) {
+      const relatedBooking = await prisma.booking.findFirst({
+        where: { customerId: customerId, pickupBranchId: adminUser.branchId }
+      })
+      if (!relatedBooking) {
+        return { error: 'Anda tidak memiliki wewenang memverifikasi pelanggan ini karena tidak ada transaksi terkait cabang Anda.' }
+      }
+    }
+    
+    await prisma.$transaction(async (tx) => {
+      if (status === 'verified') {
+        await tx.document.update({
+          where: { id: documentId },
+          data: { verifiedAt: new Date() }
+        })
+      } else {
+        await tx.document.update({
+          where: { id: documentId },
+          data: { verifiedAt: null }
+        })
+      }
+      
+      const allCustomerDocs = await tx.document.findMany({
+        where: { customerId }
+      })
+      
+      const hasVerifiedKTP = allCustomerDocs.some(d => d.type.toLowerCase() === 'ktp' && d.verifiedAt !== null)
+      const hasVerifiedSIM = allCustomerDocs.some(d => d.type.toLowerCase() === 'sim' && d.verifiedAt !== null)
+      
+      if (hasVerifiedKTP && hasVerifiedSIM) {
+        await tx.customer.update({
+          where: { id: customerId },
+          data: { verificationStatus: 'verified' }
+        })
+      } else {
+        await tx.customer.update({
+          where: { id: customerId },
+          data: { verificationStatus: status === 'rejected' ? 'rejected' : 'pending' }
+        })
+      }
+    })
+    
+    try {
+      await sendDocumentStatusEmail({
+        toEmail: document.customer.email,
+        customerName: document.customer.name,
+        status: status,
+        reason: reason
+      })
+    } catch (e) {
+      console.error('Failed to send document status email:', e)
+    }
+    
+    revalidatePath('/admin/bookings')
+    // We will revalidate specific booking ID path in client by calling useRouter().refresh() or we can revalidate all bookings detail
+    
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message || 'Terjadi kesalahan sistem saat memverifikasi dokumen.' }
+  }
+}
+
+export async function assignDriver(bookingId: string, driverId: string) {
+  try {
+    const adminUser = await requireAdminSession()
+    const branchScope = adminUser.branchId ? { pickupBranchId: adminUser.branchId } : {}
+    
+    const booking = await prisma.booking.findFirst({
+      where: { id: bookingId, ...branchScope }
+    })
+    
+    if (!booking) return { error: 'Pesanan tidak ditemukan atau Anda tidak memiliki akses.' }
+    
+    if (booking.rentalType !== 'with_driver') return { error: 'Pesanan ini tidak memerlukan sopir.' }
+    if (booking.status === 'ongoing' || booking.status === 'completed') {
+      return { error: 'Tidak dapat menugaskan sopir pada pesanan yang sudah berjalan/selesai.' }
+    }
+    
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        driverId: driverId,
+        driverAssignmentStatus: 'assigned'
+      }
+    })
+    
+    revalidatePath('/admin/bookings')
+    
+    return { success: true }
+  } catch (error: any) {
+    if (error.code === 'P2010' || (error.message && (error.message.includes('23P01') || error.message.includes('booking_driver_no_overlap')))) {
+      return { error: 'Sopir ini sudah ditugaskan di jadwal yang beririsan.' }
+    }
+    return { error: error.message || 'Terjadi kesalahan saat menugaskan sopir.' }
+  }
+}
+
+export async function cancelBooking(bookingId: string) {
+  try {
+    const adminUser = await requireAdminSession()
+    const branchScope = adminUser.branchId ? { pickupBranchId: adminUser.branchId } : {}
+    
+    const booking = await prisma.booking.findFirst({
+      where: { id: bookingId, ...branchScope }
+    })
+    
+    if (!booking) return { error: 'Pesanan tidak ditemukan atau Anda tidak memiliki akses.' }
+    
+    if (booking.status === 'ongoing' || booking.status === 'completed' || booking.status === 'cancelled') {
+      return { error: 'Hanya pesanan yang belum berjalan yang dapat dibatalkan.' }
+    }
+    
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: 'cancelled' }
+    })
+    
+    revalidatePath('/admin/bookings')
+    
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message || 'Terjadi kesalahan saat membatalkan pesanan.' }
+  }
+}
+

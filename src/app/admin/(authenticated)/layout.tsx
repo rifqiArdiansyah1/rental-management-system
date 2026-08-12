@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, CalendarRange, Car, LogOut } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Car, LogOut, Users } from 'lucide-react'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -44,6 +44,10 @@ export default async function AdminLayout({
           <Link href="/admin/vehicles" className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-zinc-800 transition-colors">
             <Car className="w-5 h-5 text-zinc-400" />
             <span className="font-medium">Status Armada</span>
+          </Link>
+          <Link href="/admin/drivers" className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-zinc-800 transition-colors">
+            <Users className="w-5 h-5 text-zinc-400" />
+            <span className="font-medium">Manajemen Sopir</span>
           </Link>
         </nav>
 

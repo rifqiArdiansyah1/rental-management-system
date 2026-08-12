@@ -1,5 +1,6 @@
 import { requireAdminSession } from '@/actions/admin'
 import { prisma } from '@/utils/prisma'
+import Link from 'next/link'
 import { StartRentalButton, EndRentalButton } from './BookingActions'
 
 export default async function AdminBookingsPage() {
@@ -83,15 +84,15 @@ export default async function AdminBookingsPage() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 flex justify-end">
+                  <td className="px-6 py-4 flex flex-col items-end gap-2">
+                    <Link href={`/admin/bookings/${booking.id}`} className="text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 px-3 py-1.5 rounded border border-blue-200 w-full text-center">
+                      Detail / Verifikasi
+                    </Link>
                     {booking.status === 'confirmed' && (
                       <StartRentalButton bookingId={booking.id} />
                     )}
                     {booking.status === 'ongoing' && (
                       <EndRentalButton bookingId={booking.id} />
-                    )}
-                    {booking.status !== 'confirmed' && booking.status !== 'ongoing' && (
-                      <span className="text-xs text-zinc-400 italic">Tidak ada aksi</span>
                     )}
                   </td>
                 </tr>
