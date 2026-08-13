@@ -17,10 +17,48 @@ export default async function AdminVehiclesPage() {
   })
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <h1 className="text-3xl font-bold text-zinc-900 mb-6">Ketersediaan Armada</h1>
       
-      <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
+      {/* Mobile Card Layout (< lg) */}
+      <div className="lg:hidden flex flex-col gap-4">
+        {vehicles.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-8 text-center text-zinc-500">
+            Belum ada armada terdaftar.
+          </div>
+        ) : vehicles.map((vehicle) => (
+          <div key={vehicle.id} className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-zinc-100 flex justify-between items-center">
+              <div className="font-bold text-zinc-900 uppercase text-lg">{vehicle.plateNumber}</div>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                ${vehicle.status === 'available' ? 'bg-emerald-100 text-emerald-800' : ''}
+                ${vehicle.status === 'rented' ? 'bg-blue-100 text-blue-800' : ''}
+                ${vehicle.status === 'maintenance' ? 'bg-amber-100 text-amber-800' : ''}
+                ${vehicle.status === 'moved' ? 'bg-zinc-100 text-zinc-800' : ''}
+              `}>
+                {vehicle.status.toUpperCase()}
+              </span>
+            </div>
+            
+            <div className="p-4 grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-xs text-zinc-500 block mb-1">Kategori Kendaraan</span>
+                <div className="font-medium text-zinc-900">{vehicle.category.name}</div>
+                <div className="text-xs text-zinc-500 mt-1">
+                  {vehicle.category.capacity} Kursi • {vehicle.category.transmission}
+                </div>
+              </div>
+              <div>
+                <span className="text-xs text-zinc-500 block mb-1">Lokasi Cabang</span>
+                <div className="font-medium text-zinc-900">{vehicle.branch.name}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Table Layout (>= lg) */}
+      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-zinc-600">
             <thead className="bg-zinc-50 text-zinc-900 font-medium border-b border-zinc-200">

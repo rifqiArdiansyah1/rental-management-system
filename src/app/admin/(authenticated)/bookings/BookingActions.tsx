@@ -21,11 +21,11 @@ export function StartRentalButton({ bookingId }: { bookingId: string }) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col lg:items-end w-full lg:w-auto gap-1">
       <button 
         onClick={handleStart} 
         disabled={isPending}
-        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50"
+        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 min-h-[44px] w-full lg:w-auto rounded-md text-sm font-medium transition-colors disabled:opacity-50"
       >
         <Play className="w-4 h-4" />
         {isPending ? 'Memproses...' : 'Mulai Sewa'}
@@ -52,11 +52,11 @@ export function EndRentalButton({ bookingId }: { bookingId: string }) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col lg:items-end w-full lg:w-auto gap-1">
       <button 
         onClick={handleEnd} 
         disabled={isPending}
-        className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50"
+        className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-900 text-white px-4 min-h-[44px] w-full lg:w-auto rounded-md text-sm font-medium transition-colors disabled:opacity-50"
       >
         <Square className="w-4 h-4" />
         {isPending ? 'Memproses...' : 'Selesai Sewa'}
