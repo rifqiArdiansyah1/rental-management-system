@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build')
 const EMAIL_FROM = process.env.EMAIL_FROM || 'onboarding@resend.dev'
 
 interface BookingConfirmedData {
