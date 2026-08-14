@@ -40,7 +40,8 @@ export async function uploadIdentityDocument(formData: FormData) {
   const fileName = `${Date.now()}_${type}.${fileExt}`
   const filePath = `${user.id}/${fileName}`
 
-  const { error: uploadError } = await supabase.storage
+  const adminClient = createAdminClient()
+  const { error: uploadError } = await adminClient.storage
     .from('documents')
     .upload(filePath, file, {
       upsert: false

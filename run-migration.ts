@@ -1,6 +1,9 @@
 import { Pool } from 'pg';
 import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+
+if (!process.env.DIRECT_URL) {
+  dotenv.config({ path: '.env.local' });
+}
 
 async function main() {
   const pool = new Pool({ connectionString: process.env.DIRECT_URL }); // use DIRECT_URL for migrations

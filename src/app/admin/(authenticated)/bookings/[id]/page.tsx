@@ -5,14 +5,15 @@ import Link from 'next/link'
 import { ChevronLeft, FileCheck2, AlertCircle, FileText, CheckCircle2 } from 'lucide-react'
 import { VerifyDocumentButton, AssignDriverForm, CancelBookingButton, ViewDocumentButton } from './ClientActions'
 
-export default async function BookingDetailPage({ params }: { params: { id: string } }) {
+export default async function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const adminUser = await requireAdminSession()
+  const resolvedParams = await params
   
   const branchScope = adminUser.branchId ? { pickupBranchId: adminUser.branchId } : {}
   
   const booking = await prisma.booking.findFirst({
     where: {
-      id: params.id,
+      id: resolvedParams.id,
       ...branchScope
     },
     include: {

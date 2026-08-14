@@ -26,6 +26,6 @@ export async function adminLogin(formData: FormData) {
     redirect('/admin/login?message=Akses ditolak. Bukan akun staf atau admin.')
   }
 
-  revalidatePath('/admin', 'layout')
-  redirect('/admin')
+  revalidatePath('/admin/dashboard', 'layout')
+  redirect('/admin/dashboard')
 }

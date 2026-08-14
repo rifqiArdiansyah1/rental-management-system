@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:e2e": "node run-e2e.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "resend": "^6.19.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.20.3",
