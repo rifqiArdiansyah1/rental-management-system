@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getStaffScope } from '@/lib/auth/scope'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'application/pdf']
@@ -106,24 +107,48 @@ export async function generateSignedDocumentUrl(fileUrl: string) {
   }
 
   // Validasi Otorisasi: Apakah user ini pemilik file, atau seorang admin?
-  // 1. Ambil data dari prisma
-  const customerDoc = await prisma.document.findFirst({
-    where: { fileUrl, customerId: user.id }
+  // 1. Ambil data dokumen dari prisma
+  const targetDocument = await prisma.document.findFirst({
+    where: { fileUrl }
   })
+
+  if (!targetDocument) {
+    return { error: 'Dokumen tidak ditemukan' }
+  }
+
+  if (!targetDocument.customerId) {
+    return { error: 'Dokumen tidak memiliki relasi pelanggan' }
+  }
 
   let isAuthorized = false
 
-  if (customerDoc) {
+  if (targetDocument.customerId === user.id) {
     // User adalah pemilik file
     isAuthorized = true
   } else {
-    // Cek apakah user adalah admin
-    const adminUser = await prisma.user.findUnique({
-      where: { id: user.id }
-    })
-    
-    if (adminUser && ['staff_cabang', 'admin_cabang', 'admin_pusat'].includes(adminUser.role)) {
-      isAuthorized = true
+    // Cek apakah user adalah admin dan periksa scope-nya
+    try {
+      const scope = await getStaffScope()
+      
+      if (scope.scope === 'all') {
+        isAuthorized = true
+      } else {
+        // Staff/Admin cabang: cek apakah ada pesanan aktif dari customer ini di cabangnya
+        const activeBooking = await prisma.booking.findFirst({
+          where: { 
+            customerId: targetDocument.customerId, 
+            pickupBranchId: scope.branchId,
+            status: { in: ['pending_payment', 'confirmed', 'ongoing'] }
+          }
+        })
+        
+        if (activeBooking) {
+          isAuthorized = true
+        }
+      }
+    } catch (err: any) {
+      // Jika getStaffScope melempar error (misal branchId kosong), anggap tidak berwenang
+      isAuthorized = false
     }
   }
 

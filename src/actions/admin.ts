@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import { revalidatePath } from 'next/cache'
+import { getStaffScope, assertInScope } from '@/lib/auth/scope'
 
 // Valid roles
 const VALID_ROLES = ['staff_cabang', 'admin_cabang', 'admin_pusat']
@@ -38,22 +39,22 @@ export async function requireAdminSession() {
 
 export async function startRental(bookingId: string) {
   try {
-    const adminUser = await requireAdminSession()
-    
-    // Scoping query: Admin Pusat bisa akses semua, Staf/Admin Cabang hanya cabangnya
-    const branchScope = adminUser.branchId ? { pickupBranchId: adminUser.branchId } : {}
+    const scope = await getStaffScope()
 
     // 1. Dapatkan informasi Booking beserta Customer-nya
-    const booking = await prisma.booking.findFirst({
-      where: {
-        id: bookingId,
-        ...branchScope
-      },
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
       include: { customer: true }
     })
 
     if (!booking) {
-      return { error: 'Pesanan tidak ditemukan atau Anda tidak memiliki akses ke cabang ini.' }
+      return { error: 'Pesanan tidak ditemukan.' }
+    }
+
+    try {
+      assertInScope([booking.pickupBranchId], scope)
+    } catch (err: any) {
+      return { error: err.message }
     }
 
     if (booking.status !== 'confirmed') {
@@ -119,29 +120,21 @@ export async function startRental(bookingId: string) {
 
 export async function endRental(bookingId: string) {
   try {
-    const adminUser = await requireAdminSession()
-    
-    // Scoping query: Admin Pusat bisa akses semua, Staf/Admin Cabang hanya cabangnya
-    // Saat Selesai Sewa, kita biasanya mengembalikan mobil ke `returnBranchId`.
-    // Kita filter agar staf cabang pengembalian (atau pengambilan) yang berhak klik "Selesai".
-    // Disini kita batasi staf cabang pickup atau return.
-    const branchScope = adminUser.branchId ? {
-      OR: [
-        { pickupBranchId: adminUser.branchId },
-        { returnBranchId: adminUser.branchId }
-      ]
-    } : {}
+    const scope = await getStaffScope()
 
     // 1. Dapatkan informasi Booking
-    const booking = await prisma.booking.findFirst({
-      where: {
-        id: bookingId,
-        ...branchScope
-      }
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId }
     })
 
     if (!booking) {
-      return { error: 'Pesanan tidak ditemukan atau Anda tidak memiliki akses ke pesanan ini.' }
+      return { error: 'Pesanan tidak ditemukan.' }
+    }
+
+    try {
+      assertInScope([booking.pickupBranchId, booking.returnBranchId], scope)
+    } catch (err: any) {
+      return { error: err.message }
     }
 
     if (booking.status !== 'ongoing') {
@@ -199,7 +192,7 @@ import { sendDocumentStatusEmail } from '@/utils/email'
 
 export async function verifyDocument(documentId: string, status: 'verified' | 'rejected', reason?: string) {
   try {
-    const adminUser = await requireAdminSession()
+    const scope = await getStaffScope()
     
     // Find the document and its customer
     const document = await prisma.document.findUnique({
@@ -212,13 +205,17 @@ export async function verifyDocument(documentId: string, status: 'verified' | 'r
     const customerId = document.customerId
     if (!customerId || !document.customer) return { error: 'Dokumen tidak terkait dengan pelanggan manapun.' }
     
-    // Check branch scope: Admin needs to have at least one booking with this customer in their branch
-    if (adminUser.branchId) {
-      const relatedBooking = await prisma.booking.findFirst({
-        where: { customerId: customerId, pickupBranchId: adminUser.branchId }
+    // Check branch scope: Admin needs to have at least one ACTIVE booking with this customer in their branch
+    if (scope.scope === 'branch') {
+      const activeBooking = await prisma.booking.findFirst({
+        where: { 
+          customerId: customerId, 
+          pickupBranchId: scope.branchId,
+          status: { in: ['pending_payment', 'confirmed', 'ongoing'] }
+        }
       })
-      if (!relatedBooking) {
-        return { error: 'Anda tidak memiliki wewenang memverifikasi pelanggan ini karena tidak ada transaksi terkait cabang Anda.' }
+      if (!activeBooking) {
+        return { error: 'Akses ditolak: Anda hanya dapat memverifikasi pelanggan yang sedang memiliki pesanan aktif di cabang Anda.' }
       }
     }
     
@@ -277,14 +274,29 @@ export async function verifyDocument(documentId: string, status: 'verified' | 'r
 
 export async function assignDriver(bookingId: string, driverId: string) {
   try {
-    const adminUser = await requireAdminSession()
-    const branchScope = adminUser.branchId ? { pickupBranchId: adminUser.branchId } : {}
+    const scope = await getStaffScope()
     
-    const booking = await prisma.booking.findFirst({
-      where: { id: bookingId, ...branchScope }
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId }
     })
     
-    if (!booking) return { error: 'Pesanan tidak ditemukan atau Anda tidak memiliki akses.' }
+    if (!booking) return { error: 'Pesanan tidak ditemukan.' }
+
+    try {
+      assertInScope([booking.pickupBranchId], scope)
+    } catch (err: any) {
+      return { error: err.message }
+    }
+
+    // SERVER-SIDE CROSS-BRANCH VALIDATION: Ensure driver belongs to the same branch as the booking
+    const driver = await prisma.driver.findUnique({
+      where: { id: driverId }
+    })
+
+    if (!driver) return { error: 'Sopir tidak ditemukan.' }
+    if (driver.branchId !== booking.pickupBranchId) {
+      return { error: 'Akses ditolak: Sopir tidak berada di cabang yang sama dengan lokasi pengambilan pesanan.' }
+    }
     
     if (booking.rentalType !== 'with_driver') return { error: 'Pesanan ini tidak memerlukan sopir.' }
     if (booking.status === 'ongoing' || booking.status === 'completed') {
@@ -312,14 +324,19 @@ export async function assignDriver(bookingId: string, driverId: string) {
 
 export async function cancelBooking(bookingId: string) {
   try {
-    const adminUser = await requireAdminSession()
-    const branchScope = adminUser.branchId ? { pickupBranchId: adminUser.branchId } : {}
+    const scope = await getStaffScope()
     
-    const booking = await prisma.booking.findFirst({
-      where: { id: bookingId, ...branchScope }
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId }
     })
     
-    if (!booking) return { error: 'Pesanan tidak ditemukan atau Anda tidak memiliki akses.' }
+    if (!booking) return { error: 'Pesanan tidak ditemukan.' }
+
+    try {
+      assertInScope([booking.pickupBranchId], scope)
+    } catch (err: any) {
+      return { error: err.message }
+    }
     
     if (booking.status === 'ongoing' || booking.status === 'completed' || booking.status === 'cancelled') {
       return { error: 'Hanya pesanan yang belum berjalan yang dapat dibatalkan.' }

@@ -1,11 +1,11 @@
-import { requireAdminSession } from '@/actions/admin'
 import { prisma } from '@/utils/prisma'
+import { getStaffScope, buildScopeWhere } from '@/lib/auth/scope'
 import { Car, CalendarCheck, CalendarClock } from 'lucide-react'
 
 export default async function AdminDashboardPage() {
-  const user = await requireAdminSession()
-  const branchScope = user.branchId ? { branchId: user.branchId } : {}
-  const pickupBranchScope = user.branchId ? { pickupBranchId: user.branchId } : {}
+  const scope = await getStaffScope()
+  const branchScope = buildScopeWhere(scope, 'branchId')
+  const pickupBranchScope = buildScopeWhere(scope, 'pickupBranchId')
 
   // 1. Total Kendaraan
   const totalVehicles = await prisma.vehicle.count({
@@ -32,11 +32,38 @@ export default async function AdminDashboardPage() {
     }
   })
 
+  let branchBreakdowns: any[] = []
+  if (scope.scope === 'all') {
+    // Breakdown for admin_pusat
+    const branches = await prisma.branch.findMany()
+    const vehiclesByBranch = await prisma.vehicle.groupBy({
+      by: ['branchId'],
+      _count: { id: true }
+    })
+    const activeBookingsByBranch = await prisma.booking.groupBy({
+      by: ['pickupBranchId'],
+      where: { status: { in: ['confirmed', 'ongoing'] } },
+      _count: { id: true }
+    })
+    const pendingBookingsByBranch = await prisma.booking.groupBy({
+      by: ['pickupBranchId'],
+      where: { status: 'pending_payment' },
+      _count: { id: true }
+    })
+
+    branchBreakdowns = branches.map(branch => ({
+      name: branch.name,
+      vehicles: vehiclesByBranch.find(v => v.branchId === branch.id)?._count.id || 0,
+      activeBookings: activeBookingsByBranch.find(b => b.pickupBranchId === branch.id)?._count.id || 0,
+      pendingBookings: pendingBookingsByBranch.find(b => b.pickupBranchId === branch.id)?._count.id || 0,
+    }))
+  }
+
   return (
     <div className="p-8">
       <h1 className="text-3xl font-bold text-zinc-900 mb-2">Dashboard</h1>
       <p className="text-zinc-500 mb-8">
-        {user.branchId 
+        {scope.scope === 'branch' 
           ? `Menampilkan statistik untuk cabang Anda.` 
           : `Menampilkan statistik keseluruhan semua cabang.`}
       </p>
@@ -88,6 +115,44 @@ export default async function AdminDashboardPage() {
         </div>
 
       </div>
+
+      {scope.scope === 'all' && (
+        <div className="mt-8 bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
+          <div className="p-6 border-b border-zinc-200 bg-zinc-50">
+            <h3 className="text-lg font-bold text-zinc-900">Rincian Per Cabang</h3>
+            <p className="text-sm text-zinc-500">Rekapitulasi beban kerja dan utilisasi di setiap cabang operasional.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-zinc-600">
+              <thead className="bg-zinc-50 text-zinc-900 font-medium border-b border-zinc-200">
+                <tr>
+                  <th className="px-6 py-4">Cabang</th>
+                  <th className="px-6 py-4">Total Armada</th>
+                  <th className="px-6 py-4">Pesanan Aktif</th>
+                  <th className="px-6 py-4">Menunggu Pembayaran</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200">
+                {branchBreakdowns.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-zinc-500">
+                      Belum ada data cabang.
+                    </td>
+                  </tr>
+                ) : branchBreakdowns.map((branch, idx) => (
+                  <tr key={idx} className="hover:bg-zinc-50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-zinc-900">{branch.name}</td>
+                    <td className="px-6 py-4">{branch.vehicles} unit</td>
+                    <td className="px-6 py-4">{branch.activeBookings} pesanan</td>
+                    <td className="px-6 py-4">{branch.pendingBookings} pesanan</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

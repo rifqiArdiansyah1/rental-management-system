@@ -1,11 +1,11 @@
-import { requireAdminSession } from '@/actions/admin'
 import { prisma } from '@/utils/prisma'
+import { getStaffScope, buildScopeWhere } from '@/lib/auth/scope'
 import { UserCircle2 } from 'lucide-react'
 
 export default async function AdminDriversPage() {
-  const user = await requireAdminSession()
+  const scope = await getStaffScope()
   
-  const branchScope = user.branchId ? { branchId: user.branchId } : {}
+  const branchScope = buildScopeWhere(scope, 'branchId')
 
   const drivers = await prisma.driver.findMany({
     where: branchScope,

@@ -1,11 +1,11 @@
-import { requireAdminSession } from '@/actions/admin'
 import { prisma } from '@/utils/prisma'
+import { getStaffScope, buildScopeWhere } from '@/lib/auth/scope'
 
 export default async function AdminVehiclesPage() {
-  const user = await requireAdminSession()
+  const scope = await getStaffScope()
   
   // Scope vehicles to the user's branch if they are not admin_pusat
-  const branchScope = user.branchId ? { branchId: user.branchId } : {}
+  const branchScope = buildScopeWhere(scope, 'branchId')
 
   const vehicles = await prisma.vehicle.findMany({
     where: branchScope,

@@ -2,12 +2,13 @@ import { requireAdminSession } from '@/actions/admin'
 import { prisma } from '@/utils/prisma'
 import Link from 'next/link'
 import { StartRentalButton, EndRentalButton } from './BookingActions'
+import { getStaffScope, buildScopeWhere } from '@/lib/auth/scope'
 
 export default async function AdminBookingsPage() {
-  const user = await requireAdminSession()
+  const scope = await getStaffScope()
   
   // Scope bookings to the user's branch (pickupBranch) if they are not admin_pusat
-  const branchScope = user.branchId ? { pickupBranchId: user.branchId } : {}
+  const branchScope = buildScopeWhere(scope, 'pickupBranchId')
 
   const bookings = await prisma.booking.findMany({
     where: {
