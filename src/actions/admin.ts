@@ -322,8 +322,19 @@ export async function assignDriver(bookingId: string, driverId: string) {
   }
 }
 
-export async function cancelBooking(bookingId: string) {
+export async function adminCancelBooking(bookingId: string, reason: string, rejectCustomerDoc: boolean = false, sendEmail: boolean = true) {
   try {
+    const adminUser = await requireAdminSession()
+    
+    // RBAC: Only admin_cabang or admin_pusat can manually cancel
+    if (adminUser.role === 'staff_cabang') {
+      return { error: 'Akses ditolak: Hanya Admin Cabang atau Admin Pusat yang berwenang membatalkan pesanan.' }
+    }
+
+    if (!reason || reason.trim().length === 0) {
+      return { error: 'Alasan pembatalan wajib diisi.' }
+    }
+
     const scope = await getStaffScope()
     
     const booking = await prisma.booking.findUnique({
@@ -338,20 +349,84 @@ export async function cancelBooking(bookingId: string) {
       return { error: err.message }
     }
     
-    if (booking.status === 'ongoing' || booking.status === 'completed' || booking.status === 'cancelled') {
-      return { error: 'Hanya pesanan yang belum berjalan yang dapat dibatalkan.' }
+    // Gunakan updateMany untuk menjamin atomisitas dan mencegah race condition
+    const updateResult = await prisma.booking.updateMany({
+      where: { 
+        id: bookingId,
+        status: { in: ['pending_payment', 'confirmed'] }
+      },
+      data: { 
+        status: 'cancelled',
+        cancellationNote: reason.trim(),
+        cancelledBy: adminUser.id
+      }
+    })
+
+    if (updateResult.count === 0) {
+      return { error: 'Pembatalan gagal: Pesanan sedang berjalan, sudah selesai, sudah dibatalkan, atau Anda tidak memiliki akses.' }
+    }
+
+    // Optional: Reject customer verification
+    if (rejectCustomerDoc && booking.customerId) {
+      await prisma.customer.update({
+        where: { id: booking.customerId },
+        data: { verificationStatus: 'rejected' }
+      })
     }
     
-    await prisma.booking.update({
-      where: { id: bookingId },
-      data: { status: 'cancelled' }
-    })
+    // Optional: Send email
+    if (sendEmail) {
+      // Di sini idealnya memanggil servis email, misalnya sendDocumentStatusEmail
+      // Untuk MVP kita abaikan implementasi aktual pengiriman email, cukup beri penanda
+      console.log(`[Email Mock] Sending cancellation email to customer ${booking.customerId} for booking ${bookingId}`)
+    }
     
     revalidatePath('/admin/bookings')
+    revalidatePath(`/admin/bookings/${bookingId}`)
     
     return { success: true }
   } catch (error: any) {
     return { error: error.message || 'Terjadi kesalahan saat membatalkan pesanan.' }
+  }
+}
+
+export async function markPaymentRefunded(paymentId: string) {
+  try {
+    const adminUser = await requireAdminSession()
+    if (adminUser.role === 'staff_cabang') {
+      return { error: 'Akses ditolak: Hanya Admin Cabang atau Admin Pusat yang berwenang menandai refund.' }
+    }
+
+    const scope = await getStaffScope()
+
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { booking: true }
+    })
+
+    if (!payment) return { error: 'Pembayaran tidak ditemukan.' }
+
+    try {
+      assertInScope([payment.booking.pickupBranchId], scope)
+    } catch (err: any) {
+      return { error: err.message }
+    }
+
+    if (payment.status !== 'success') {
+      return { error: 'Hanya pembayaran yang berhasil (success) yang dapat di-refund.' }
+    }
+
+    await prisma.payment.update({
+      where: { id: paymentId },
+      data: { status: 'refunded' }
+    })
+
+    revalidatePath('/admin/bookings')
+    revalidatePath(`/admin/bookings/${payment.bookingId}`)
+
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message || 'Terjadi kesalahan saat memproses refund.' }
   }
 }
 

@@ -3,7 +3,7 @@ import { prisma } from '@/utils/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, FileCheck2, AlertCircle, FileText, CheckCircle2 } from 'lucide-react'
-import { VerifyDocumentButton, AssignDriverForm, CancelBookingButton, ViewDocumentButton } from './ClientActions'
+import { VerifyDocumentButton, AssignDriverForm, CancelBookingButton, ViewDocumentButton, MarkRefundedButton } from './ClientActions'
 
 export default async function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const adminUser = await requireAdminSession()
@@ -23,7 +23,12 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
       vehicle: { include: { category: true } },
       driver: true,
       pickupBranch: true,
-      returnBranch: true
+      returnBranch: true,
+      payments: {
+        orderBy: { createdAt: 'desc' },
+        take: 1
+      },
+      adminCanceler: true
     }
   })
 
@@ -54,7 +59,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
         
-        {['pending_payment', 'confirmed'].includes(booking.status) && (
+        {['pending_payment', 'confirmed'].includes(booking.status) && adminUser.role !== 'staff_cabang' && (
           <CancelBookingButton bookingId={booking.id} />
         )}
       </div>
@@ -158,6 +163,31 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                 `}>
                   {booking.status.replace('_', ' ').toUpperCase()}
                 </span>
+                
+                {booking.status === 'cancelled' && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-md">
+                    <p className="text-xs text-red-700 font-bold mb-1">Dibatalkan Oleh:</p>
+                    <p className="text-sm text-red-900 mb-3">{booking.adminCanceler?.name || 'Sistem / Tidak diketahui'}</p>
+                    
+                    <p className="text-xs text-red-700 font-bold mb-1">Alasan Pembatalan:</p>
+                    <p className="text-sm text-red-900">{booking.cancellationNote || '-'}</p>
+
+                    {(() => { console.log('DEBUG: Payment:', booking.payments[0]?.status, 'Role:', adminUser?.role); return null; })()}
+                    {booking.payments[0]?.status === 'success' && adminUser.role !== 'staff_cabang' && (
+                      <div className="mt-4 pt-3 border-t border-red-200">
+                        <p className="text-xs text-red-700 font-bold mb-1">Status Pembayaran: Berhasil</p>
+                        <p className="text-xs text-red-600 mb-2">Dana pelanggan masih tertahan. Silakan lakukan proses pengembalian dana manual via dasbor Midtrans.</p>
+                        <MarkRefundedButton paymentId={booking.payments[0].id} />
+                      </div>
+                    )}
+                    {booking.payments[0]?.status === 'refunded' && (
+                      <div className="mt-4 pt-3 border-t border-red-200">
+                        <p className="text-xs text-emerald-700 font-bold mb-1">Status Pembayaran: Refunded</p>
+                        <p className="text-xs text-emerald-600">Pengembalian dana telah ditandai selesai.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               
               {booking.rentalType === 'with_driver' && (

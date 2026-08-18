@@ -3,9 +3,11 @@ import { prisma } from '@/utils/prisma'
 import Link from 'next/link'
 import { StartRentalButton, EndRentalButton } from './BookingActions'
 import { getStaffScope, buildScopeWhere } from '@/lib/auth/scope'
+import { AlertCircle } from 'lucide-react'
 
 export default async function AdminBookingsPage() {
   const scope = await getStaffScope()
+  const adminUser = await requireAdminSession()
   
   // Scope bookings to the user's branch (pickupBranch) if they are not admin_pusat
   const branchScope = buildScopeWhere(scope, 'pickupBranchId')
@@ -19,14 +21,66 @@ export default async function AdminBookingsPage() {
       customer: true,
       vehicle: { include: { category: true } },
       driver: true,
-      pickupBranch: true
+      pickupBranch: true,
+      payments: {
+        orderBy: { createdAt: 'desc' },
+        take: 1
+      }
     },
     orderBy: { createdAt: 'desc' }
   })
 
+  // Khusus admin_cabang/pusat: Cari booking yang butuh manual refund
+  let refundPendingBookings: any[] = []
+  if (scope.scope === 'all' || (adminUser && adminUser.role !== 'staff_cabang')) {
+    refundPendingBookings = await prisma.booking.findMany({
+      where: {
+        ...branchScope,
+        status: 'cancelled',
+        payments: {
+          some: { status: 'success' }
+        }
+      },
+      include: {
+        customer: true,
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    })
+  }
+
   return (
     <div className="p-4 md:p-8">
       <h1 className="text-3xl font-bold text-zinc-900 mb-6">Manajemen Pesanan</h1>
+
+      {refundPendingBookings.length > 0 && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-bold text-red-800">Perlu Tindak Lanjut Refund ({refundPendingBookings.length} Pesanan)</h3>
+              <p className="text-sm text-red-700 mt-1 mb-3">
+                Terdapat pesanan yang dibatalkan sepihak namun pembayaran pelanggannya telah masuk. Lakukan pengembalian dana manual via dasbor Midtrans.
+              </p>
+              <div className="flex flex-col gap-2">
+                {refundPendingBookings.map((b) => (
+                  <div key={b.id} className="bg-white px-3 py-2 rounded-md border border-red-100 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-sm text-zinc-900">{b.id.substring(0, 8)}</span>
+                      <span className="text-xs text-zinc-500 ml-2">{b.customer.name}</span>
+                    </div>
+                    <Link href={`/admin/bookings/${b.id}`} className="text-xs font-medium text-blue-600 hover:underline">
+                      Tindak Lanjut &rarr;
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Card Layout (< lg) */}
       <div className="lg:hidden flex flex-col gap-4">
