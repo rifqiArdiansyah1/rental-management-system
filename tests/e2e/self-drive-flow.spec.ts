@@ -27,9 +27,9 @@ test.describe('Self-Drive Booking Flow & Webhook Security', () => {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + 2);
     
-    const dateInputs = await page.locator('input[type="date"]').all();
-    await dateInputs[0].fill(startDate.toISOString().split('T')[0]);
-    await dateInputs[1].fill(endDate.toISOString().split('T')[0]);
+    const dateInputs = await page.locator('input[type="datetime-local"]').all();
+    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T00:00');
+    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T00:00');
 
     // Ensure Self-Drive is selected (default)
     await page.getByRole('button', { name: 'Self-Drive' }).click();

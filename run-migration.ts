@@ -20,7 +20,7 @@ async function main() {
       ADD CONSTRAINT booking_vehicle_no_overlap
       EXCLUDE USING gist (
         "vehicleId" WITH =,
-        daterange("startDate"::date, "endDate"::date, '[)') WITH &&
+        tsrange("startDate", "endDate" + interval '3 hours', '[)') WITH &&
       )
       WHERE (status IN ('pending_payment', 'confirmed', 'ongoing'));
     `);
@@ -31,7 +31,7 @@ async function main() {
       ADD CONSTRAINT booking_driver_no_overlap
       EXCLUDE USING gist (
         "driverId" WITH =,
-        daterange("startDate"::date, "endDate"::date, '[)') WITH &&
+        tsrange("startDate", "endDate" + interval '3 hours', '[)') WITH &&
       )
       WHERE ("driverId" IS NOT NULL AND status IN ('pending_payment', 'confirmed', 'ongoing'));
     `);

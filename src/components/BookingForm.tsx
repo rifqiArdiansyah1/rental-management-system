@@ -67,6 +67,12 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
   }
 
+  const getLocalMinDateTime = () => {
+    const d = new Date()
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+    return d.toISOString().slice(0, 16)
+  }
+
   return (
     <div className="flex flex-col gap-6 w-full h-full">
       <h2 className="font-headline-md text-on-surface mb-2">Booking Details</h2>
@@ -82,22 +88,22 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
         {/* Date Inputs */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex flex-col gap-2">
-            <label className="font-label-caps text-on-surface-variant uppercase">Pick-up Date</label>
+            <label className="font-label-caps text-on-surface-variant uppercase">Pick-up Time</label>
             <input 
-              type="date" 
+              type="datetime-local" 
               required
-              min={new Date().toISOString().split('T')[0]}
+              min={getLocalMinDateTime()}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               className="bg-surface-container border border-outline-variant rounded p-3 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-colors"
             />
           </div>
           <div className="flex flex-col gap-2">
-            <label className="font-label-caps text-on-surface-variant uppercase">Return Date</label>
+            <label className="font-label-caps text-on-surface-variant uppercase">Return Time</label>
             <input 
-              type="date" 
+              type="datetime-local" 
               required
-              min={startDate || new Date().toISOString().split('T')[0]}
+              min={startDate || getLocalMinDateTime()}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               className="bg-surface-container border border-outline-variant rounded p-3 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-colors"

@@ -19,9 +19,9 @@ test.describe('With Driver Booking Flow & Admin Scoping', () => {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + 11);
     
-    const dateInputs = await page.locator('input[type="date"]').all();
-    await dateInputs[0].fill(startDate.toISOString().split('T')[0]);
-    await dateInputs[1].fill(endDate.toISOString().split('T')[0]);
+    const dateInputs = await page.locator('input[type="datetime-local"]').all();
+    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T00:00');
+    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T00:00');
 
     // Select With Driver
     await page.getByRole('button', { name: 'With Driver' }).click();
@@ -63,9 +63,13 @@ test.describe('With Driver Booking Flow & Admin Scoping', () => {
     const driverSelect = adminPage.locator('select').first(); // Assuming the driver assignment is a select
     if (await driverSelect.isVisible()) {
       await driverSelect.selectOption({ label: 'Sopir Test' });
-      await adminPage.getByRole('button', { name: 'Assign' }).click();
-      
-      await expect(adminPage.locator('text=Sopir Test').first()).toBeVisible();
+        await Promise.all([
+            adminPage.waitForResponse(resp => resp.request().method() === 'POST' && resp.status() === 200),
+            adminPage.getByRole('button', { name: 'Assign' }).click()
+        ]);
+        
+        await adminPage.reload();
+        await expect(adminPage.locator('p:has-text("Sopir Test")').first()).toBeVisible({ timeout: 15000 });
     }
 
     await adminContext.close();

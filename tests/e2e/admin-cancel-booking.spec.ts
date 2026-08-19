@@ -166,10 +166,13 @@ test.describe('Admin Cancel Booking', () => {
     // Submit
     await page.getByRole('button', { name: /Batalkan Sekarang/i }).click()
     
-    // Verify UI reflects cancellation
-    // Verify UI reflects cancellation
-    await expect(page.getByText('DIBATALKAN')).toBeVisible()
-    await expect(page.getByRole('button', { name: /Tandai Refund Selesai/i })).toBeVisible()
+    // Wait for the modal to close, meaning the action finished successfully
+    await expect(page.locator('text=Batalkan Pesanan Secara Sepihak')).not.toBeVisible({ timeout: 15000 })
+    
+    // Now it is safe to reload the page to get the freshest data if router.refresh() is flaky
+    await page.reload()
+    await expect(page.getByText('CANCELLED')).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole('button', { name: /Tandai Refund Selesai/i })).toBeVisible({ timeout: 15000 })
 
     // Verify Customer KYC is rejected
     const cust = await prisma.customer.findUnique({ where: { id: customerId } })
@@ -187,7 +190,11 @@ test.describe('Admin Cancel Booking', () => {
     page.once('dialog', dialog => dialog.accept())
     await page.getByRole('button', { name: /Tandai Refund Selesai/i }).click()
     
+    // Wait for the button to disappear (action finished)
+    await expect(page.getByRole('button', { name: /Tandai Refund Selesai/i })).not.toBeVisible({ timeout: 15000 })
+    
     // Wait for the UI to update to Refunded (indicates action finished)
+    await page.reload()
     await expect(page.getByText('Status Pembayaran: Refunded')).toBeVisible({ timeout: 15000 })
 
     // Verify it disappears from "Perlu Refund"

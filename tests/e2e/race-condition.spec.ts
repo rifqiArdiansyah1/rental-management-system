@@ -39,15 +39,15 @@ test.describe('Race Condition & Double Submit Protection', () => {
     const endStr = endDate.toISOString().split('T')[0];
 
     // Customer 1
-    await page1.fill('input[type="date"]', startStr); // Note: Assuming the first date input is Pick-up Date
-    const dateInputs1 = await page1.locator('input[type="date"]').all();
-    await dateInputs1[0].fill(startStr);
-    await dateInputs1[1].fill(endStr);
+    await page1.fill('input[type="datetime-local"]', startStr + 'T00:00'); // Note: Assuming the first date input is Pick-up Date
+    const dateInputs1 = await page1.locator('input[type="datetime-local"]').all();
+    await dateInputs1[0].fill(startStr + 'T00:00');
+    await dateInputs1[1].fill(endStr + 'T00:00');
     
     // Customer 2
-    const dateInputs2 = await page2.locator('input[type="date"]').all();
-    await dateInputs2[0].fill(startStr);
-    await dateInputs2[1].fill(endStr);
+    const dateInputs2 = await page2.locator('input[type="datetime-local"]').all();
+    await dateInputs2[0].fill(startStr + 'T00:00');
+    await dateInputs2[1].fill(endStr + 'T00:00');
 
     // Wait for pricing to appear (which enables the button)
     await page1.waitForSelector('text=Price Breakdown');
@@ -108,9 +108,9 @@ test.describe('Race Condition & Double Submit Protection', () => {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + 6);
     
-    const dateInputs = await page.locator('input[type="date"]').all();
-    await dateInputs[0].fill(startDate.toISOString().split('T')[0]);
-    await dateInputs[1].fill(endDate.toISOString().split('T')[0]);
+    const dateInputs = await page.locator('input[type="datetime-local"]').all();
+    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T00:00');
+    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T00:00');
 
     await page.waitForSelector('text=Price Breakdown');
 

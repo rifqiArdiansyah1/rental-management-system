@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { verifyDocument, assignDriver, adminCancelBooking, markPaymentRefunded } from '@/actions/admin'
+import { useRouter } from 'next/navigation'
 import { generateSignedDocumentUrl } from '@/actions/document'
 import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw } from 'lucide-react'
 
@@ -92,6 +93,7 @@ export function AssignDriverForm({ bookingId, availableDrivers, currentDriverId 
   const [isPending, startTransition] = useTransition()
   const [selectedDriver, setSelectedDriver] = useState(currentDriverId || '')
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   const handleAssign = () => {
     if (!selectedDriver) return
@@ -99,6 +101,7 @@ export function AssignDriverForm({ bookingId, availableDrivers, currentDriverId 
       setError(null)
       const res = await assignDriver(bookingId, selectedDriver)
       if (res.error) setError(res.error)
+      else router.refresh()
     })
   }
 
@@ -137,6 +140,7 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
   const [reason, setReason] = useState('')
   const [rejectDoc, setRejectDoc] = useState(false)
   const [sendEmail, setSendEmail] = useState(true)
+  const router = useRouter()
 
   const handleCancel = () => {
     if (!reason || reason.trim().length === 0) {
@@ -151,6 +155,7 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
         setError(res.error)
       } else {
         setIsOpen(false)
+        router.refresh()
       }
     })
   }
@@ -243,14 +248,16 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
 export function MarkRefundedButton({ paymentId }: { paymentId: string }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   const handleRefunded = () => {
-    if (!confirm('Apakah pengembalian dana manual ke pelanggan sudah berhasil dilakukan?')) return
-
+    if (!confirm('Apakah Anda yakin telah mengembalikan dana ke pelanggan secara manual? Tindakan ini akan menandai refund selesai dan tidak bisa dibatalkan.')) return
+    
     startTransition(async () => {
       setError(null)
       const res = await markPaymentRefunded(paymentId)
       if (res.error) setError(res.error)
+      else router.refresh()
     })
   }
 

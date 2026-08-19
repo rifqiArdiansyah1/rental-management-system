@@ -27,9 +27,9 @@ test.describe('Payment Cancellation & Vehicle Lock Release', () => {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + 21);
     
-    const dateInputs = await page.locator('input[type="date"]').all();
-    await dateInputs[0].fill(startDate.toISOString().split('T')[0]);
-    await dateInputs[1].fill(endDate.toISOString().split('T')[0]);
+    const dateInputs = await page.locator('input[type="datetime-local"]').all();
+    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T00:00');
+    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T00:00');
 
     await page.waitForSelector('text=Price Breakdown');
     await page.getByRole('button', { name: 'Confirm Booking' }).click();
@@ -85,8 +85,8 @@ test.describe('Payment Cancellation & Vehicle Lock Release', () => {
 
     // 4. Verify vehicle is available again for the same dates by attempting to book it again
     await page.goto(`/vehicles/${vehicleId}/book`);
-    await dateInputs[0].fill(startDate.toISOString().split('T')[0]);
-    await dateInputs[1].fill(endDate.toISOString().split('T')[0]);
+    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T00:00');
+    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T00:00');
     await page.waitForSelector('text=Price Breakdown');
     
     // Attempt booking again
