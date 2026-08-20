@@ -56,6 +56,11 @@ export async function createDraftBookingAction(payload: BookingFormPayload) {
     rentalType: payload.rentalType,
   }
 
+  const minStartDate = new Date(Date.now() + 3 * 60 * 60 * 1000)
+  if (corePayload.startDate < minStartDate) {
+    return { success: false, error: 'Waktu pengambilan minimal 3 jam dari waktu pemesanan saat ini.' }
+  }
+
   try {
     const booking = await createDraftBookingCore(corePayload)
     // In next phase, redirect to payment. For now, returning booking ID is enough to redirect on client.

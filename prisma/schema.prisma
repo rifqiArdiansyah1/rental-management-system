@@ -161,8 +161,8 @@ model Booking {
   pickupBranchId String
   returnBranchId String
 
-  startDate DateTime
-  endDate   DateTime
+  startDate DateTime @db.Timestamptz(6)
+  endDate   DateTime @db.Timestamptz(6)
 
   rentalType             RentalType
   driverId               String?

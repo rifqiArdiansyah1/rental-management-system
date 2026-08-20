@@ -14,13 +14,17 @@ async function main() {
     await pool.query(`ALTER TABLE "Booking" DROP CONSTRAINT IF EXISTS booking_vehicle_no_overlap;`);
     await pool.query(`ALTER TABLE "Booking" DROP CONSTRAINT IF EXISTS booking_driver_no_overlap;`);
     
+    console.log('Altering column types to timestamptz...');
+    await pool.query(`ALTER TABLE "Booking" ALTER COLUMN "startDate" TYPE timestamptz USING "startDate" AT TIME ZONE 'UTC';`);
+    await pool.query(`ALTER TABLE "Booking" ALTER COLUMN "endDate" TYPE timestamptz USING "endDate" AT TIME ZONE 'UTC';`);
+    
     console.log('Adding new vehicle constraint...');
     await pool.query(`
       ALTER TABLE "Booking"
       ADD CONSTRAINT booking_vehicle_no_overlap
       EXCLUDE USING gist (
         "vehicleId" WITH =,
-        tsrange("startDate", "endDate" + interval '3 hours', '[)') WITH &&
+        tstzrange("startDate", ("endDate" AT TIME ZONE 'UTC' + interval '3 hours') AT TIME ZONE 'UTC', '[)') WITH &&
       )
       WHERE (status IN ('pending_payment', 'confirmed', 'ongoing'));
     `);
@@ -31,7 +35,7 @@ async function main() {
       ADD CONSTRAINT booking_driver_no_overlap
       EXCLUDE USING gist (
         "driverId" WITH =,
-        tsrange("startDate", "endDate" + interval '3 hours', '[)') WITH &&
+        tstzrange("startDate", ("endDate" AT TIME ZONE 'UTC' + interval '3 hours') AT TIME ZONE 'UTC', '[)') WITH &&
       )
       WHERE ("driverId" IS NOT NULL AND status IN ('pending_payment', 'confirmed', 'ongoing'));
     `);

@@ -32,8 +32,11 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
   const isFormValid = startDate && endDate && new Date(startDate) <= new Date(endDate) && branchId
   
   let pricing = null
-  if (isFormValid) {
-    pricing = calculateEstimatedPrice(dailyRate, startDate, endDate, rentalType)
+  if (startDate && endDate) {
+    // Explicitly parse string as WIB (+07:00) to avoid environment timezone bugs
+    const parsedStartDate = new Date(`${startDate}+07:00`)
+    const parsedEndDate = new Date(`${endDate}+07:00`)
+    pricing = calculateEstimatedPrice(dailyRate, parsedStartDate, parsedEndDate, rentalType)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,11 +46,15 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
     setErrorMsg(null)
     
     startTransition(async () => {
+      // Explicitly parse string as WIB (+07:00) to avoid environment timezone bugs
+      const parsedStartDate = new Date(`${startDate}+07:00`)
+      const parsedEndDate = new Date(`${endDate}+07:00`)
+
       const payload: BookingFormPayload = {
         vehicleId,
         branchId,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
         rentalType,
       }
 
@@ -68,9 +75,11 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
   }
 
   const getLocalMinDateTime = () => {
-    const d = new Date()
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
-    return d.toISOString().slice(0, 16)
+    // Minimum time is 3 hours from now
+    const d = new Date(Date.now() + 3 * 60 * 60 * 1000)
+    // Convert to WIB string (+7 hours) for datetime-local naive format
+    const wibDate = new Date(d.getTime() + 7 * 60 * 60 * 1000)
+    return wibDate.toISOString().slice(0, 16)
   }
 
   return (

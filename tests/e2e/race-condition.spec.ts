@@ -81,12 +81,12 @@ test.describe('Race Condition & Double Submit Protection', () => {
 
     if (!success1) {
       const errorMsg = await page1.locator('.bg-error-container\\/20').textContent();
-      expect(errorMsg).toContain('tidak tersedia');
+      expect(errorMsg).toContain('sudah dipesan');
     }
 
     if (!success2) {
       const errorMsg = await page2.locator('.bg-error-container\\/20').textContent();
-      expect(errorMsg).toContain('Mobil sudah dipesan');
+      expect(errorMsg).toContain('sudah dipesan');
     }
 
     await context1.close();

@@ -14,9 +14,13 @@ export async function checkVehicleAvailability(vehicleId: string, startDate: Dat
     return false
   }
 
-  // 2. Overlap Check: Half-open range [startDate, endDate)
-  // Two intervals [A, B) and [X, Y) overlap if: A < Y AND B > X
-  // i.e., newStartDate < existingEndDate AND newEndDate > existingStartDate
+  // 2. Overlap Check: Half-open range [startDate, endDate + 3 hours)
+  // Interval overlap condition for [A, B+3) and [X, Y+3): A < Y+3 AND B+3 > X
+  // Which translates to: existingStartDate < newEndDate + 3h AND existingEndDate > newStartDate - 3h
+  const BUFFER_MS = 3 * 60 * 60 * 1000;
+  const newEndWithBuffer = new Date(endDate.getTime() + BUFFER_MS);
+  const newStartWithBuffer = new Date(startDate.getTime() - BUFFER_MS);
+
   const overlappingBookings = await prisma.booking.count({
     where: {
       vehicleId,
@@ -24,10 +28,10 @@ export async function checkVehicleAvailability(vehicleId: string, startDate: Dat
         in: ['pending_payment', 'confirmed', 'ongoing']
       },
       startDate: {
-        lt: endDate
+        lt: newEndWithBuffer
       },
       endDate: {
-        gt: startDate
+        gt: newStartWithBuffer
       }
     }
   })
