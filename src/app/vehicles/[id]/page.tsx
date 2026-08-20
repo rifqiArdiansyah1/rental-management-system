@@ -189,7 +189,7 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                   </span>
                 </div>
                 
-                <Link href={`/booking?vehicleId=${vehicle.id}`} className="block w-full text-center bg-secondary text-on-secondary font-button text-button py-4 rounded hover:bg-secondary-fixed transition-all duration-300 transform hover:-translate-y-1 shadow-[0_10px_20px_-10px_rgba(233,193,118,0.3)]">
+                <Link href={`/vehicles/${vehicle.id}/book`} className="block w-full text-center bg-secondary text-on-secondary font-button text-button py-4 rounded hover:bg-secondary-fixed transition-all duration-300 transform hover:-translate-y-1 shadow-[0_10px_20px_-10px_rgba(233,193,118,0.3)]">
                   Rent This Car
                 </Link>
                 <p className="font-label-caps text-label-caps text-on-surface-variant text-center lowercase tracking-normal">Requires security deposit and insurance verification.</p>

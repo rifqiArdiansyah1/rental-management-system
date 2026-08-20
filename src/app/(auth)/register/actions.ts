@@ -36,8 +36,13 @@ export async function signup(formData: FormData) {
     // Tapi untuk keperluan Customer, jika app_metadata.role tidak ada, kita bisa anggap sebagai customer default
     
     try {
-      await prisma.customer.create({
-        data: {
+      await prisma.customer.upsert({
+        where: { id: authData.user.id },
+        update: {
+          name: data.name,
+          phone: data.phone,
+        },
+        create: {
           id: authData.user.id,
           email: data.email,
           name: data.name,
