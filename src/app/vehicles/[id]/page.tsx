@@ -1,11 +1,17 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getVehicleById } from '@/actions/vehicle'
+import { createClient } from '@/utils/supabase/server'
+import { LogoutButton } from '@/components/LogoutButton'
 
 export const dynamic = 'force-dynamic'
 
 export default async function VehicleDetail({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
+  
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   const vehicle = await getVehicleById(resolvedParams.id)
 
   if (!vehicle) {
@@ -63,7 +69,18 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
             <li><span className="text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer active:scale-95">About</span></li>
           </ul>
           <div className="flex items-center gap-base">
-            <Link href="/login" className="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors">Login</Link>
+            <div className="hidden md:flex items-center gap-4">
+              {user ? (
+                <>
+                  <Link href="/dashboard" className="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors">
+                    Dashboard
+                  </Link>
+                  <LogoutButton />
+                </>
+              ) : (
+                <Link href="/login" className="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors">Login</Link>
+              )}
+            </div>
             <button className="md:hidden text-on-surface-variant">
               <span className="material-symbols-outlined">menu</span>
             </button>
