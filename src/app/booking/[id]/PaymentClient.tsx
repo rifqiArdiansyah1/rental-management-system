@@ -40,8 +40,12 @@ export default function PaymentClient({ bookingId, createdAtMs, clientKey }: Pro
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
+  const [isSnapOpen, setIsSnapOpen] = useState<boolean>(false)
+
   const handlePay = () => {
+    if (isSnapOpen) return;
     setErrorMsg(null)
+    setIsSnapOpen(true)
     startTransition(async () => {
       try {
         const { token } = await getSnapToken(bookingId)
@@ -52,22 +56,28 @@ export default function PaymentClient({ bookingId, createdAtMs, clientKey }: Pro
           // @ts-ignore
           window.snap.pay(token, {
             onSuccess: function() {
+              setIsSnapOpen(false)
               router.refresh()
             },
             onPending: function() {
               // Still pending, just close or notify
+              setIsSnapOpen(false)
             },
             onError: function() {
+              setIsSnapOpen(false)
               setErrorMsg('Pembayaran gagal atau dibatalkan.')
             },
             onClose: function() {
+              setIsSnapOpen(false)
               // Customer closed the popup without finishing
             }
           })
         } else {
+          setIsSnapOpen(false)
           setErrorMsg('Midtrans Snap tidak tersedia. Coba refresh halaman.')
         }
       } catch (err: any) {
+        setIsSnapOpen(false)
         setErrorMsg(err.message || 'Gagal membuat token pembayaran.')
       }
     })
@@ -100,7 +110,7 @@ export default function PaymentClient({ bookingId, createdAtMs, clientKey }: Pro
         
         <button
           onClick={handlePay}
-          disabled={isPending || timeLeft === 0}
+          disabled={isPending || isSnapOpen || timeLeft === 0}
           className="w-full mt-4 bg-secondary text-on-secondary font-button py-4 rounded-lg hover:bg-secondary-fixed transition-all shadow-[0_10px_20px_-10px_rgba(233,193,118,0.3)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex justify-center items-center gap-2"
         >
           {isPending ? (
