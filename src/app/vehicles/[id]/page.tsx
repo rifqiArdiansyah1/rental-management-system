@@ -1,17 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getVehicleById } from '@/actions/vehicle'
-import { createClient } from '@/utils/supabase/server'
-import { LogoutButton } from '@/components/LogoutButton'
+import Navbar from '@/components/Navbar'
 
 export const dynamic = 'force-dynamic'
 
 export default async function VehicleDetail({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
   const vehicle = await getVehicleById(resolvedParams.id)
 
   if (!vehicle) {
@@ -56,37 +52,7 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
   return (
     <div className="flex-grow flex flex-col">
       {/* Top Navigation */}
-      <header className="w-full top-0 sticky z-50 bg-background/80 backdrop-blur-md">
-        <nav className="flex justify-between items-center h-20 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
-          <div className="flex items-center gap-gutter">
-            <Link href="/" className="font-display-lg text-headline-md tracking-tighter text-secondary dark:text-secondary-fixed">
-              Prestige Motion
-            </Link>
-          </div>
-          <ul className="hidden md:flex gap-gutter font-label-caps text-label-caps">
-            <li><Link href="/" className="text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer active:scale-95">Home</Link></li>
-            <li><span className="text-secondary border-b-2 border-secondary pb-1 cursor-pointer active:scale-95">Vehicles</span></li>
-            <li><span className="text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer active:scale-95">About</span></li>
-          </ul>
-          <div className="flex items-center gap-base">
-            <div className="hidden md:flex items-center gap-4">
-              {user ? (
-                <>
-                  <Link href="/dashboard" className="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors">
-                    Dashboard
-                  </Link>
-                  <LogoutButton />
-                </>
-              ) : (
-                <Link href="/login" className="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors">Login</Link>
-              )}
-            </div>
-            <button className="md:hidden text-on-surface-variant">
-              <span className="material-symbols-outlined">menu</span>
-            </button>
-          </div>
-        </nav>
-      </header>
+      <Navbar />
 
       {/* Main Content Canvas */}
       <main className="flex-grow flex flex-col">
