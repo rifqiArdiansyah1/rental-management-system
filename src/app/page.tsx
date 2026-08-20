@@ -2,6 +2,7 @@ import Link from 'next/link'
 import FilterBar from '@/components/ui/FilterBar'
 import VehicleCard from '@/components/ui/VehicleCard'
 import { getVehicles, getBranches, getCategories } from '@/actions/vehicle'
+import { LogoutButton } from '@/components/LogoutButton'
 
 import { createClient } from '@/utils/supabase/server'
 
@@ -55,11 +56,14 @@ export default async function Home({
           </ul>
           
           {/* Trailing Action */}
-          <div className="hidden md:block">
+          <div className="hidden md:flex items-center gap-4">
             {user ? (
-              <Link href="/dashboard" className="font-button text-button text-background bg-secondary px-6 py-2 rounded-DEFAULT hover:bg-secondary-fixed transition-colors cursor-pointer active:scale-95 inline-block">
-                Dashboard
-              </Link>
+              <>
+                <Link href="/dashboard" className="font-button text-button text-background bg-secondary px-6 py-2 rounded-DEFAULT hover:bg-secondary-fixed transition-colors cursor-pointer active:scale-95 inline-block">
+                  Dashboard
+                </Link>
+                <LogoutButton />
+              </>
             ) : (
               <Link href="/login" className="font-button text-button text-secondary border border-secondary px-6 py-2 rounded-DEFAULT hover:bg-secondary hover:text-background transition-colors cursor-pointer active:scale-95 inline-block">
                 Login
