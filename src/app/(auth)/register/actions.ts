@@ -15,6 +15,19 @@ export async function signup(formData: FormData) {
     phone: formData.get('phone') as string,
   }
 
+  const existingName = await prisma.customer.findFirst({
+    where: { 
+      name: { 
+        equals: data.name,
+        mode: 'insensitive' 
+      } 
+    }
+  })
+
+  if (existingName) {
+    redirect('/register?message=Nama tersebut sudah digunakan. Agar tidak tertukar, mohon tambahkan nama belakang atau variasi lain pada nama Anda.')
+  }
+
   const existingCustomer = await prisma.customer.findUnique({
     where: { email: data.email }
   })
