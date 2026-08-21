@@ -109,7 +109,7 @@ export function AssignDriverForm({ bookingId, availableDrivers, currentDriverId 
     <div className="flex flex-col gap-2 mt-2">
       <div className="flex items-center gap-2">
         <select 
-          className="border border-zinc-300 rounded-md px-3 py-1.5 text-sm flex-1 disabled:opacity-50"
+          className="border border-zinc-300 rounded-md px-3 py-1.5 text-sm flex-1 disabled:opacity-50 text-zinc-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           value={selectedDriver}
           onChange={(e) => setSelectedDriver(e.target.value)}
           disabled={isPending}
@@ -184,7 +184,7 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
               <div>
                 <label className="block text-sm font-medium text-zinc-700 mb-1">Alasan Pembatalan *</label>
                 <textarea
-                  className="w-full border border-zinc-300 rounded-md p-2 text-sm"
+                  className="w-full border border-zinc-300 rounded-md p-2 text-sm text-zinc-900 bg-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   rows={3}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
