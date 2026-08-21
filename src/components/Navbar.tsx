@@ -22,7 +22,7 @@ export default async function Navbar() {
             </Link>
           </li>
           <li>
-            <Link href="/#vehicles" className="text-on-surface-variant hover:text-white transition-colors cursor-pointer active:scale-95 hover:text-secondary duration-300">
+            <Link href="#vehicles" className="text-on-surface-variant hover:text-white transition-colors cursor-pointer active:scale-95 hover:text-secondary duration-300">
               Vehicles
             </Link>
           </li>

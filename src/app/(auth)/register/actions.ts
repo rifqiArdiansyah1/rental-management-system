@@ -15,6 +15,14 @@ export async function signup(formData: FormData) {
     phone: formData.get('phone') as string,
   }
 
+  const existingCustomer = await prisma.customer.findUnique({
+    where: { email: data.email }
+  })
+
+  if (existingCustomer) {
+    redirect('/register?message=Email sudah terdaftar. Silakan gunakan email lain atau masuk.')
+  }
+
   const { data: authData, error } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,
@@ -26,7 +34,7 @@ export async function signup(formData: FormData) {
   })
 
   if (error) {
-    redirect('/register?message=Could not create user')
+    redirect(`/register?message=${encodeURIComponent(error.message)}`)
   }
 
   // Create row in Prisma Customer table
@@ -53,6 +61,10 @@ export async function signup(formData: FormData) {
       console.error(e)
       // gracefully ignore unique constraint errors if double click
     }
+  }
+
+  if (!authData.session) {
+    redirect('/login?message=Pendaftaran berhasil! Silakan periksa email Anda untuk verifikasi.')
   }
 
   revalidatePath('/', 'layout')

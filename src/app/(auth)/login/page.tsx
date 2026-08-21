@@ -1,6 +1,11 @@
 import { login } from './actions'
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ message?: string }>
+}) {
+  const resolvedSearchParams = await searchParams;
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
       <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-[#121212] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800">
@@ -12,6 +17,13 @@ export default function LoginPage() {
             Penyewaan mobil mudah dan cepat
           </p>
         </div>
+        {resolvedSearchParams.message && (
+          <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md">
+            <p className="text-sm text-blue-600 dark:text-blue-400 text-center">
+              {resolvedSearchParams.message}
+            </p>
+          </div>
+        )}
         <form className="mt-8 space-y-6" action={login}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>

@@ -1,6 +1,11 @@
 import { signup } from './actions'
 
-export default function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ message?: string }>
+}) {
+  const resolvedSearchParams = await searchParams;
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
       <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-[#121212] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800">
@@ -12,6 +17,13 @@ export default function RegisterPage() {
             Mulai perjalanan Anda bersama kami
           </p>
         </div>
+        {resolvedSearchParams.message && (
+          <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-md">
+            <p className="text-sm text-red-600 dark:text-red-400 text-center">
+              {resolvedSearchParams.message}
+            </p>
+          </div>
+        )}
         <form className="mt-8 space-y-6" action={signup}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>
