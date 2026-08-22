@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle } from '@/actions/adminVehicle'
 import { VehicleStatus } from '@prisma/client'
 
@@ -12,6 +12,7 @@ export function VehicleFilterBar({ branches, categories, userRole }: {
   userRole: string 
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   
   const [q, setQ] = useState(searchParams.get('q') || '')
@@ -30,13 +31,14 @@ export function VehicleFilterBar({ branches, categories, userRole }: {
 
   const applyFilters = (searchQ: string, cat: string, br: string, inactive: boolean) => {
     const params = new URLSearchParams()
-    if (searchQ) params.set('q', searchQ)
+    if (searchQ.trim()) params.set('q', searchQ.trim())
     if (cat !== 'all') params.set('category', cat)
     if (br !== 'all') params.set('branch', br)
     if (inactive) params.set('showInactive', 'true')
     
+    const query = params.toString() ? `?${params.toString()}` : ''
     startTransition(() => {
-      router.push(`?${params.toString()}`)
+      router.push(`${pathname}${query}`)
     })
   }
 

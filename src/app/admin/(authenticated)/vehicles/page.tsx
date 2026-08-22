@@ -7,8 +7,9 @@ import { Prisma } from '@prisma/client'
 export default async function AdminVehiclesPage({
   searchParams
 }: {
-  searchParams: { q?: string; category?: string; branch?: string; showInactive?: string }
+  searchParams: Promise<{ q?: string; category?: string; branch?: string; showInactive?: string }>
 }) {
+  const resolvedSearchParams = await searchParams
   const adminUser = await requireAdminSession()
   const scope = await getStaffScope()
   
@@ -21,25 +22,25 @@ export default async function AdminVehiclesPage({
   }
 
   // Filter: Search Query (plateNumber)
-  if (searchParams.q) {
-    where.plateNumber = { contains: searchParams.q.replace(/\s+/g, ''), mode: 'insensitive' }
+  if (resolvedSearchParams.q) {
+    where.plateNumber = { contains: resolvedSearchParams.q.replace(/\s+/g, ''), mode: 'insensitive' }
   }
 
   // Filter: Category
-  if (searchParams.category && searchParams.category !== 'all') {
-    where.categoryId = searchParams.category
+  if (resolvedSearchParams.category && resolvedSearchParams.category !== 'all') {
+    where.categoryId = resolvedSearchParams.category
   }
 
   // Filter: Branch
-  if (searchParams.branch && searchParams.branch !== 'all') {
+  if (resolvedSearchParams.branch && resolvedSearchParams.branch !== 'all') {
     // Only allow overriding branchId if user is admin_pusat (scope === 'all')
     if (scope.scope === 'all') {
-      where.branchId = searchParams.branch
+      where.branchId = resolvedSearchParams.branch
     }
   }
 
   // Filter: isActive (default to true, unless showInactive is 'true')
-  if (searchParams.showInactive !== 'true') {
+  if (resolvedSearchParams.showInactive !== 'true') {
     where.isActive = true
   }
 
