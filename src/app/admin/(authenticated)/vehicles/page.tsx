@@ -43,7 +43,7 @@ export default async function AdminVehiclesPage({
     where.isActive = true
   }
 
-  const vehicles = await prisma.vehicle.findMany({
+  const rawVehicles = await prisma.vehicle.findMany({
     where,
     include: {
       category: true,
@@ -51,10 +51,15 @@ export default async function AdminVehiclesPage({
     },
     orderBy: { createdAt: 'desc' }
   })
+  
+  const vehicles = JSON.parse(JSON.stringify(rawVehicles)) as typeof rawVehicles
 
   // Get options for filters and forms
-  const categories = await prisma.vehicleCategory.findMany({ orderBy: { name: 'asc' } })
-  const branches = await prisma.branch.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } })
+  const rawCategories = await prisma.vehicleCategory.findMany({ orderBy: { name: 'asc' } })
+  const rawBranches = await prisma.branch.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } })
+
+  const categories = JSON.parse(JSON.stringify(rawCategories)) as typeof rawCategories
+  const branches = JSON.parse(JSON.stringify(rawBranches)) as typeof rawBranches
 
   return (
     <div className="p-4 md:p-8">
