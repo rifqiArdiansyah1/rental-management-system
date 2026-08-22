@@ -33,7 +33,7 @@ export async function createVehicle(data: {
       }
     })
 
-    return { success: true, vehicle }
+    return { success: true, vehicle: JSON.parse(JSON.stringify(vehicle)) }
   } catch (error: any) {
     if (error.code === 'P2002') {
       return { error: 'Plat nomor sudah terdaftar' }
