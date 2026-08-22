@@ -107,6 +107,7 @@ model Vehicle {
   // Decimal, bukan Float — hindari rounding error pada nilai uang
   dailyRate   Decimal       @db.Decimal(12, 2)
   status      VehicleStatus @default(available)
+  isActive    Boolean       @default(true)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

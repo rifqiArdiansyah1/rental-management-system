@@ -7,6 +7,7 @@ export async function getVehicles(filters?: { branchId?: string; categoryId?: st
   try {
     const where: Prisma.VehicleWhereInput = {
       status: 'available',
+      isActive: true,
     }
 
     if (filters?.branchId && filters.branchId !== 'all') {
@@ -38,8 +39,11 @@ export async function getVehicles(filters?: { branchId?: string; categoryId?: st
 
 export async function getVehicleById(id: string) {
   try {
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id },
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { 
+        id,
+        isActive: true 
+      },
       include: {
         category: true,
         branch: true,

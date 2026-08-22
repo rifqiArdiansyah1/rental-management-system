@@ -7,10 +7,10 @@ export async function checkVehicleAvailability(vehicleId: string, startDate: Dat
   // 1. Precondition: Vehicle must be available
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { status: true }
+    select: { status: true, isActive: true }
   })
 
-  if (!vehicle || vehicle.status !== 'available') {
+  if (!vehicle || vehicle.status !== 'available' || !vehicle.isActive) {
     return false
   }
 
@@ -53,11 +53,11 @@ export type CreateDraftBookingPayload = {
 export async function createDraftBookingCore(payload: CreateDraftBookingPayload) {
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: payload.vehicleId },
-    select: { dailyRate: true }
+    select: { dailyRate: true, isActive: true }
   })
 
-  if (!vehicle) {
-    throw new Error('Vehicle not found')
+  if (!vehicle || !vehicle.isActive) {
+    throw new Error('Vehicle not found or inactive')
   }
 
   // Calculate price purely on the server
