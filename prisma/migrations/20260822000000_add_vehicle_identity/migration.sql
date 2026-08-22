@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Vehicle" ADD COLUMN "name" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "photos" TEXT[] DEFAULT ARRAY[]::TEXT[];

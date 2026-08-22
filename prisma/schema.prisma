@@ -101,6 +101,8 @@ model VehicleCategory {
 
 model Vehicle {
   id          String        @id @default(uuid())
+  name        String        @default("")
+  photos      String[]      @default([])
   branchId    String
   categoryId  String
   plateNumber String        @unique

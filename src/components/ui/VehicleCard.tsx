@@ -12,7 +12,10 @@ interface VehicleCardProps {
 
 export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardProps) {
   const { category } = vehicle
-  const imageUrl = category.imageUrl || 'https://via.placeholder.com/600x400?text=Vehicle'
+  const vehicleName = vehicle.name || `${category.name} (${vehicle.plateNumber})`
+  const imageUrl = (vehicle.photos && vehicle.photos.length > 0) 
+    ? vehicle.photos[0] 
+    : (category.imageUrl || 'https://via.placeholder.com/600x400?text=Vehicle')
   
   // Parse features safely
   let features: string[] = []
@@ -45,7 +48,7 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
           <img 
             className={`w-full h-full object-cover card-image transition-all duration-500 ${!isPopular ? 'mix-blend-luminosity group-hover:mix-blend-normal' : ''}`} 
             src={imageUrl} 
-            alt={category.name}
+            alt={vehicleName}
           />
           <div className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm border border-outline-variant/50 px-3 py-1 rounded font-label-caps text-label-caps text-on-surface uppercase tracking-wider">
             {category.name}
@@ -53,7 +56,7 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
         </div>
         
         <div className={`p-6 flex flex-col flex-grow ${isPopular ? 'bg-gradient-to-b from-surface-container-high to-surface-container' : ''}`}>
-          <h3 className="font-headline-md text-headline-md text-on-surface mb-2">{vehicle.plateNumber} - {category.name}</h3>
+          <h3 className="font-headline-md text-headline-md text-on-surface mb-2">{vehicleName}</h3>
           <p className="font-body-md text-body-md text-on-surface-variant mb-6 flex-grow">
             {category.capacity} Seats • {category.transmission} {features.length > 0 ? `• ${features.join(', ')}` : ''}
           </p>

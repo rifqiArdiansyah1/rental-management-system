@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle } from '@/actions/adminVehicle'
+import { uploadVehiclePhoto } from '@/actions/vehiclePhoto'
 import { VehicleStatus } from '@prisma/client'
 
 // -- Filter Bar --
@@ -45,17 +46,17 @@ export function VehicleFilterBar({ branches, categories, userRole }: {
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-zinc-200 mb-6 flex flex-col md:flex-row gap-4 items-end">
       <div className="flex-1 w-full">
-        <label className="block text-xs font-medium text-zinc-500 mb-1">Cari Plat Nomor</label>
+        <label className="block text-xs font-medium text-zinc-500 mb-1">Cari Nama Mobil atau Plat Nomor</label>
         <input 
           type="text" 
           value={q}
           onChange={e => setQ(e.target.value)}
-          placeholder="Misal: B 1234 ABC"
+          placeholder="Misal: Porsche / B 1234 ABC"
           className="w-full text-zinc-900 border border-zinc-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
         />
       </div>
       <div className="flex-1 w-full">
-        <label className="block text-xs font-medium text-zinc-500 mb-1">Kategori</label>
+        <label className="block text-xs font-medium text-zinc-500 mb-1">Kategori Kelas</label>
         <select 
           value={category}
           onChange={e => setCategory(e.target.value)}
@@ -86,7 +87,7 @@ export function VehicleFilterBar({ branches, categories, userRole }: {
           onChange={e => setShowInactive(e.target.checked)}
           className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
         />
-        <label htmlFor="showInactive" className="text-sm text-zinc-700 cursor-pointer">
+        <label htmlFor="showInactive" className="text-sm text-zinc-700 cursor-pointer whitespace-nowrap">
           Tampilkan Nonaktif
         </label>
       </div>
@@ -94,6 +95,134 @@ export function VehicleFilterBar({ branches, categories, userRole }: {
   )
 }
 
+// -- Photo Uploader Component --
+function PhotoManager({ photos, onChange, maxPhotos = 6 }: {
+  photos: string[]
+  onChange: (photos: string[]) => void
+  maxPhotos?: number
+}) {
+  const [isUploading, setIsUploading] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (photos.length >= maxPhotos) {
+      setUploadError(`Maksimal ${maxPhotos} foto per armada`)
+      return
+    }
+
+    setIsUploading(true)
+    setUploadError(null)
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await uploadVehiclePhoto(formData)
+    setIsUploading(false)
+
+    if (res.error) {
+      setUploadError(res.error)
+    } else if (res.publicUrl) {
+      onChange([...photos, res.publicUrl])
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleAddUrl = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!urlInput.trim()) return
+    if (photos.length >= maxPhotos) {
+      setUploadError(`Maksimal ${maxPhotos} foto per armada`)
+      return
+    }
+    onChange([...photos, urlInput.trim()])
+    setUrlInput('')
+  }
+
+  const handleRemovePhoto = (index: number) => {
+    const newPhotos = photos.filter((_, i) => i !== index)
+    onChange(newPhotos)
+  }
+
+  return (
+    <div className="space-y-3">
+      <label className="block text-sm font-medium text-zinc-700">
+        Galeri Foto Kendaraan ({photos.length}/{maxPhotos})
+      </label>
+
+      {/* Thumbnails Grid */}
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {photos.map((url, idx) => (
+            <div key={idx} className="relative group rounded-lg overflow-hidden border border-zinc-200 aspect-video bg-zinc-100">
+              <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+              {idx === 0 && (
+                <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                  COVER
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => handleRemovePhoto(idx)}
+                className="absolute top-1 right-1 bg-red-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs opacity-90 hover:opacity-100 transition-opacity shadow"
+                title="Hapus foto"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upload & URL Input Controls */}
+      {photos.length < maxPhotos && (
+        <div className="space-y-2">
+          <div className="flex gap-2 items-center">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/jpeg,image/png,image/webp,image/jpg"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="vehicle-photo-upload"
+            />
+            <label
+              htmlFor="vehicle-photo-upload"
+              className={`flex-1 flex items-center justify-center gap-2 border border-dashed border-zinc-300 rounded-md py-2 px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50 cursor-pointer transition-colors ${
+                isUploading ? 'opacity-50 pointer-events-none' : ''
+              }`}
+            >
+              <span>📷 {isUploading ? 'Mengunggah...' : 'Upload Gambar (Maks 5MB)'}</span>
+            </label>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="Atau tempel URL gambar..."
+              value={urlInput}
+              onChange={e => setUrlInput(e.target.value)}
+              className="flex-1 text-xs border border-zinc-300 rounded-md px-2.5 py-1.5 text-zinc-900 outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              onClick={handleAddUrl}
+              className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-medium rounded-md transition-colors"
+            >
+              Tambah
+            </button>
+          </div>
+        </div>
+      )}
+
+      {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
+    </div>
+  )
+}
 
 // -- Create Vehicle Modal --
 export function CreateVehicleButton({ branches, categories, userRole }: {
@@ -107,10 +236,12 @@ export function CreateVehicleButton({ branches, categories, userRole }: {
   const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
+    name: '',
     plateNumber: '',
     categoryId: '',
     branchId: '',
-    dailyRate: ''
+    dailyRate: '',
+    photos: [] as string[]
   })
 
   // Disable completely for staff
@@ -121,14 +252,24 @@ export function CreateVehicleButton({ branches, categories, userRole }: {
     startTransition(async () => {
       setError(null)
       const res = await createVehicle({
+        name: form.name,
         plateNumber: form.plateNumber,
         categoryId: form.categoryId,
         branchId: form.branchId,
-        dailyRate: Number(form.dailyRate)
+        dailyRate: Number(form.dailyRate),
+        photos: form.photos
       })
       if (res.error) setError(res.error)
       else {
         setIsOpen(false)
+        setForm({
+          name: '',
+          plateNumber: '',
+          categoryId: '',
+          branchId: '',
+          dailyRate: '',
+          photos: []
+        })
         router.refresh()
       }
     })
@@ -144,59 +285,84 @@ export function CreateVehicleButton({ branches, categories, userRole }: {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl max-w-md w-full shadow-lg">
-            <h3 className="text-lg font-bold text-zinc-900 mb-4">Tambah Kendaraan</h3>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl max-w-lg w-full shadow-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-zinc-900 mb-4">Tambah Kendaraan Baru</h3>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Plat Nomor *</label>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Nama Mobil / Model *</label>
                 <input 
                   required
                   type="text"
-                  placeholder="B 1234 ABC"
-                  value={form.plateNumber}
-                  onChange={e => setForm({...form, plateNumber: e.target.value})}
+                  placeholder="Misal: BMW 730Li M Sport / Toyota Alphard"
+                  value={form.name}
+                  onChange={e => setForm({...form, name: e.target.value})}
                   className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Plat Nomor *</label>
+                  <input 
+                    required
+                    type="text"
+                    placeholder="B 1234 ABC"
+                    value={form.plateNumber}
+                    onChange={e => setForm({...form, plateNumber: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Tarif Harian (Rp) *</label>
+                  <input 
+                    required
+                    type="number"
+                    min="0"
+                    step="1000"
+                    placeholder="500000"
+                    value={form.dailyRate}
+                    onChange={e => setForm({...form, dailyRate: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
               
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Kategori *</label>
-                <select 
-                  required
-                  value={form.categoryId}
-                  onChange={e => setForm({...form, categoryId: e.target.value})}
-                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Pilih Kategori --</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Kategori Kelas *</label>
+                  <select 
+                    required
+                    value={form.categoryId}
+                    onChange={e => setForm({...form, categoryId: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Pilih Kategori --</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Cabang *</label>
+                  <select 
+                    required
+                    value={form.branchId}
+                    onChange={e => setForm({...form, branchId: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Pilih Cabang --</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Cabang *</label>
-                <select 
-                  required
-                  value={form.branchId}
-                  onChange={e => setForm({...form, branchId: e.target.value})}
-                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Pilih Cabang --</option>
-                  {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Tarif Harian (Rp) *</label>
-                <input 
-                  required
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={form.dailyRate}
-                  onChange={e => setForm({...form, dailyRate: e.target.value})}
-                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              {/* Photo Manager */}
+              <div className="pt-2 border-t border-zinc-100">
+                <PhotoManager 
+                  photos={form.photos} 
+                  onChange={newPhotos => setForm({...form, photos: newPhotos})} 
                 />
               </div>
             </div>
@@ -217,7 +383,7 @@ export function CreateVehicleButton({ branches, categories, userRole }: {
                 disabled={isPending}
                 className="px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-md disabled:opacity-50"
               >
-                {isPending ? 'Menyimpan...' : 'Simpan'}
+                {isPending ? 'Menyimpan...' : 'Simpan Kendaraan'}
               </button>
             </div>
           </form>
@@ -244,16 +410,14 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
   const [status, setStatus] = useState<VehicleStatus>(vehicle.status)
   
   const [form, setForm] = useState({
+    name: vehicle.name || '',
     plateNumber: vehicle.plateNumber,
     categoryId: vehicle.categoryId,
     branchId: vehicle.branchId,
-    dailyRate: vehicle.dailyRate.toString()
+    dailyRate: vehicle.dailyRate.toString(),
+    photos: (vehicle.photos || []) as string[]
   })
 
-  // Staff Cabang cannot edit or delete vehicles, but can they update status? 
-  // Wait, updating status to maintenance usually staff can do? 
-  // The plan didn't explicitly forbid updateVehicleStatus for staff_cabang, just create and softDelete. 
-  // Let's assume staff can change status but not edit/delete.
   const canEditOrDelete = userRole !== 'staff_cabang'
 
   const handleUpdateStatus = () => {
@@ -272,10 +436,12 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
     startTransition(async () => {
       setError(null)
       const res = await updateVehicle(vehicle.id, {
+        name: form.name,
         plateNumber: form.plateNumber,
         categoryId: form.categoryId,
         branchId: form.branchId,
-        dailyRate: Number(form.dailyRate)
+        dailyRate: Number(form.dailyRate),
+        photos: form.photos
       })
       if (res.error) setError(res.error)
       else {
@@ -322,7 +488,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
                   onClick={() => { setMenuOpen(false); setModalType('edit') }}
                   className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
                 >
-                  Edit Detail
+                  Edit Detail & Foto
                 </button>
                 <button 
                   onClick={() => { setMenuOpen(false); setModalType('delete') }}
@@ -373,50 +539,75 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
       )}
 
       {modalType === 'edit' && canEditOrDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-xl max-w-md w-full shadow-lg">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white p-6 rounded-xl max-w-lg w-full shadow-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-zinc-900 mb-4">Edit Kendaraan</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Plat Nomor *</label>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Nama Mobil / Model *</label>
                 <input 
                   type="text"
-                  value={form.plateNumber}
-                  onChange={e => setForm({...form, plateNumber: e.target.value})}
+                  value={form.name}
+                  onChange={e => setForm({...form, name: e.target.value})}
                   className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Kategori *</label>
-                <select 
-                  value={form.categoryId}
-                  onChange={e => setForm({...form, categoryId: e.target.value})}
-                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Plat Nomor *</label>
+                  <input 
+                    type="text"
+                    value={form.plateNumber}
+                    onChange={e => setForm({...form, plateNumber: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Tarif Harian (Rp) *</label>
+                  <input 
+                    type="number"
+                    value={form.dailyRate}
+                    onChange={e => setForm({...form, dailyRate: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Cabang *</label>
-                <select 
-                  value={form.branchId}
-                  onChange={e => setForm({...form, branchId: e.target.value})}
-                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Kategori *</label>
+                  <select 
+                    value={form.categoryId}
+                    onChange={e => setForm({...form, categoryId: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Cabang *</label>
+                  <select 
+                    value={form.branchId}
+                    onChange={e => setForm({...form, branchId: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Tarif Harian (Rp) *</label>
-                <input 
-                  type="number"
-                  value={form.dailyRate}
-                  onChange={e => setForm({...form, dailyRate: e.target.value})}
-                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+              {/* Photo Manager */}
+              <div className="pt-2 border-t border-zinc-100">
+                <PhotoManager 
+                  photos={form.photos} 
+                  onChange={newPhotos => setForm({...form, photos: newPhotos})} 
                 />
               </div>
             </div>
+
             {error && <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded-md">{error}</div>}
+
             <div className="mt-6 flex justify-end gap-2">
               <button 
                 onClick={() => setModalType(null)}
@@ -430,7 +621,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
                 disabled={isPending}
                 className="px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-md disabled:opacity-50"
               >
-                {isPending ? 'Menyimpan...' : 'Simpan'}
+                {isPending ? 'Menyimpan...' : 'Simpan Perubahan'}
               </button>
             </div>
           </div>

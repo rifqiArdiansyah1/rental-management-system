@@ -6,15 +6,21 @@ import { getStaffScope, assertInScope } from '@/lib/auth/scope'
 import { VehicleStatus, Prisma } from '@prisma/client'
 
 export async function createVehicle(data: {
+  name: string
   plateNumber: string
   categoryId: string
   branchId: string
   dailyRate: number
+  photos?: string[]
 }) {
   try {
     const adminUser = await requireAdminSession()
     if (adminUser.role === 'staff_cabang') {
       return { error: 'Akses ditolak: Hanya Admin Pusat atau Admin Cabang yang berwenang menambah kendaraan.' }
+    }
+
+    if (!data.name || data.name.trim() === '') {
+      return { error: 'Nama kendaraan wajib diisi' }
     }
 
     const scope = await getStaffScope()
@@ -24,10 +30,12 @@ export async function createVehicle(data: {
 
     const vehicle = await prisma.vehicle.create({
       data: {
+        name: data.name.trim(),
         plateNumber: normalizedPlate,
         categoryId: data.categoryId,
         branchId: data.branchId,
         dailyRate: new Prisma.Decimal(data.dailyRate),
+        photos: data.photos || [],
         status: 'available',
         isActive: true,
       }
@@ -44,15 +52,21 @@ export async function createVehicle(data: {
 }
 
 export async function updateVehicle(id: string, data: {
+  name: string
   plateNumber: string
   categoryId: string
   branchId: string
   dailyRate: number
+  photos?: string[]
 }) {
   try {
     const adminUser = await requireAdminSession()
     if (adminUser.role === 'staff_cabang') {
       return { error: 'Akses ditolak.' }
+    }
+
+    if (!data.name || data.name.trim() === '') {
+      return { error: 'Nama kendaraan wajib diisi' }
     }
 
     const existingVehicle = await prisma.vehicle.findUnique({
@@ -78,10 +92,12 @@ export async function updateVehicle(id: string, data: {
     await prisma.vehicle.update({
       where: { id },
       data: {
+        name: data.name.trim(),
         plateNumber: normalizedPlate,
         categoryId: data.categoryId,
         branchId: data.branchId,
         dailyRate: new Prisma.Decimal(data.dailyRate),
+        photos: data.photos || [],
       }
     })
 

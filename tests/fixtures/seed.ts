@@ -60,6 +60,8 @@ async function seed() {
   await prisma.vehicle.create({
     data: {
       id: 'vehicle-race-condition',
+      name: 'Toyota Fortuner Test',
+      photos: ['https://example.com/suv.png'],
       branchId: branch.id,
       categoryId: category.id,
       plateNumber: `RACE-${Date.now()}`,
@@ -71,6 +73,8 @@ async function seed() {
   await prisma.vehicle.create({
     data: {
       id: 'vehicle-self-drive',
+      name: 'Honda CR-V Test',
+      photos: ['https://example.com/suv.png'],
       branchId: branch.id,
       categoryId: category.id,
       plateNumber: `SELF-${Date.now()}`,
@@ -82,6 +86,8 @@ async function seed() {
   await prisma.vehicle.create({
     data: {
       id: 'vehicle-with-driver',
+      name: 'Toyota Alphard Test',
+      photos: ['https://example.com/suv.png'],
       branchId: branch.id,
       categoryId: category.id,
       plateNumber: `DRIV-${Date.now()}`,
@@ -93,6 +99,8 @@ async function seed() {
   await prisma.vehicle.create({
     data: {
       id: 'vehicle-payment-cancel',
+      name: 'Mitsubishi Pajero Test',
+      photos: ['https://example.com/suv.png'],
       branchId: branch.id,
       categoryId: category.id,
       plateNumber: `CANC-${Date.now()}`,

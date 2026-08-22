@@ -28,7 +28,10 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   }
 
   const { category } = vehicle
-  const imageUrl = category.imageUrl || 'https://via.placeholder.com/1200x800?text=Vehicle'
+  const vehicleName = vehicle.name || `${category.name} (${vehicle.plateNumber})`
+  const imageUrl = (vehicle.photos && vehicle.photos.length > 0) 
+    ? vehicle.photos[0] 
+    : (category.imageUrl || 'https://via.placeholder.com/1200x800?text=Vehicle')
 
   return (
     <div className="flex-grow flex flex-col bg-background">
@@ -59,16 +62,16 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           <div className="rounded-xl overflow-hidden relative border border-outline-variant shadow-lg ambient-glow">
             <img 
               src={imageUrl} 
-              alt={category.name} 
+              alt={vehicleName} 
               className="w-full h-64 md:h-80 object-cover object-center"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
             <div className="absolute bottom-0 left-0 p-6">
               <span className="font-label-caps text-secondary tracking-widest uppercase mb-1 block">
-                {category.name}
+                {category.name} • {vehicle.plateNumber}
               </span>
               <h2 className="font-headline-lg text-white">
-                {vehicle.plateNumber}
+                {vehicleName}
               </h2>
             </div>
           </div>

@@ -73,34 +73,49 @@ async function main() {
   // 3. Mobil (Vehicle)
   await prisma.vehicle.upsert({
     where: { plateNumber: 'B 1 BMW' },
-    update: {},
+    update: {
+      name: 'BMW 730Li M Sport',
+      photos: [catSedan.imageUrl || ''],
+    },
     create: {
+      name: 'BMW 730Li M Sport',
       plateNumber: 'B 1 BMW',
       branchId: branchPusat.id,
       categoryId: catSedan.id,
       dailyRate: 4500000,
+      photos: [catSedan.imageUrl || ''],
     },
   })
 
   await prisma.vehicle.upsert({
     where: { plateNumber: 'B 2 RR' },
-    update: {},
+    update: {
+      name: 'Range Rover Autobiography',
+      photos: [catSuv.imageUrl || ''],
+    },
     create: {
+      name: 'Range Rover Autobiography',
       plateNumber: 'B 2 RR',
       branchId: branchPusat.id,
       categoryId: catSuv.id,
       dailyRate: 6000000,
+      photos: [catSuv.imageUrl || ''],
     },
   })
 
   await prisma.vehicle.upsert({
     where: { plateNumber: 'B 911 PC' },
-    update: {},
+    update: {
+      name: 'Porsche 911 Carrera S',
+      photos: [catSports.imageUrl || ''],
+    },
     create: {
+      name: 'Porsche 911 Carrera S',
       plateNumber: 'B 911 PC',
       branchId: branchPusat.id,
       categoryId: catSports.id,
       dailyRate: 8500000,
+      photos: [catSports.imageUrl || ''],
     },
   })
   console.log(`✅ Vehicles ensured`)
