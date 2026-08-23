@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, FileCheck2, AlertCircle, FileText, CheckCircle2 } from 'lucide-react'
 import { VerifyDocumentButton, AssignDriverForm, CancelBookingButton, ViewDocumentButton, MarkRefundedButton } from './ClientActions'
+import { getEligibleDrivers } from '@/lib/driverEligibility'
 
 export default async function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const adminUser = await requireAdminSession()
@@ -39,11 +40,8 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
   // Find available drivers for assignment if needed
   let availableDrivers: Array<{id: string, name: string}> = []
   if (booking.rentalType === 'with_driver' && ['pending_payment', 'confirmed'].includes(booking.status)) {
-    // Basic pre-check: drivers in the same branch that are active
-    availableDrivers = await prisma.driver.findMany({
-      where: { branchId: booking.pickupBranchId, status: { not: 'off_duty' } },
-      select: { id: true, name: true }
-    })
+    const eligible = await getEligibleDrivers(booking.pickupBranchId, booking.startDate, booking.endDate, booking.id)
+    availableDrivers = eligible.map(d => ({ id: d.id, name: `${d.name} (${d.licenseNumber})` }))
   }
 
   return (

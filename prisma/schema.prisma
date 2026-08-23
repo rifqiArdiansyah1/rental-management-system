@@ -140,21 +140,37 @@ model Customer {
 }
 
 model Driver {
-  id            String       @id @default(uuid())
+  id            String        @id @default(uuid())
   branchId      String
   name          String
   phone         String
-  licenseNumber String       @unique
-  status        DriverStatus @default(available)
-  dailyFee      Decimal      @db.Decimal(12, 2)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  licenseNumber String        @unique
+  status        DriverStatus  @default(available)
+  dailyFee      Decimal       @db.Decimal(12, 2)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  branch   Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch   Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
   bookings Booking[]
+  leaves   DriverLeave[]
 
   // Query paling sering: "sopir tersedia di cabang X" -> filter branchId + status
   @@index([branchId, status])
+  @@index([branchId, isActive])
+}
+
+model DriverLeave {
+  id        String   @id @default(uuid())
+  driverId  String
+  startDate DateTime @db.Timestamptz(6)
+  endDate   DateTime @db.Timestamptz(6)
+  reason    String?
+  createdAt DateTime @default(now())
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId, startDate, endDate])
 }
 
 model Booking {

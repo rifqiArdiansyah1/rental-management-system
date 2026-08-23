@@ -34,7 +34,7 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
   const navLinks = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/admin/bookings', icon: CalendarRange, label: 'Manajemen Pesanan' },
-    { href: '/admin/vehicles', icon: Car, label: 'Status Armada' },
+    { href: '/admin/vehicles', icon: Car, label: 'Manajemen Armada' },
     { href: '/admin/drivers', icon: Users, label: 'Manajemen Sopir' },
   ]
 
@@ -43,7 +43,7 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
       {/* Mobile Header & Hamburger Toggle */}
       <div className="lg:hidden flex items-center justify-between bg-zinc-900 text-zinc-100 p-4 shrink-0">
         <h2 className="text-xl font-bold tracking-tight">Prestige Admin</h2>
-        <button 
+        <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 -mr-2 text-zinc-400 hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
           aria-label="Toggle Menu"
@@ -54,14 +54,14 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
 
       {/* Backdrop for mobile */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar Container */}
-      <aside 
+      <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50 w-64 bg-zinc-900 text-zinc-100 flex flex-col
           transform transition-transform duration-300 ease-in-out
@@ -72,7 +72,7 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
           <h2 className="text-2xl font-bold tracking-tight">Prestige Admin</h2>
           <p className="text-sm text-zinc-400 mt-1 capitalize">{userRole}</p>
         </div>
-        
+
         {/* Mobile only role display */}
         <div className="p-6 lg:hidden border-b border-zinc-800">
           <p className="text-sm text-zinc-400 capitalize">Login sebagai: <strong className="text-zinc-200">{userRole}</strong></p>
@@ -82,12 +82,11 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
           {navLinks.map((link) => {
             const isActive = pathname.startsWith(link.href)
             return (
-              <Link 
+              <Link
                 key={link.href}
-                href={link.href} 
-                className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors min-h-[44px] ${
-                  isActive ? 'bg-zinc-800 text-white font-semibold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white font-medium'
-                }`}
+                href={link.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors min-h-[44px] ${isActive ? 'bg-zinc-800 text-white font-semibold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white font-medium'
+                  }`}
               >
                 <link.icon className={`w-5 h-5 ${isActive ? 'text-zinc-200' : 'text-zinc-400'}`} />
                 <span>{link.label}</span>
@@ -98,8 +97,8 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
 
         <div className="p-4 mt-auto border-t border-zinc-800 shrink-0">
           <form action={handleLogout}>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="flex items-center gap-3 px-4 py-3 w-full rounded-md text-red-400 hover:bg-red-500/10 transition-colors text-left min-h-[44px]"
             >
               <LogOut className="w-5 h-5" />

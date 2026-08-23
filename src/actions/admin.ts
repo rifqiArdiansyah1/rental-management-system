@@ -288,27 +288,60 @@ export async function assignDriver(bookingId: string, driverId: string) {
       return { error: err.message }
     }
 
-    // SERVER-SIDE CROSS-BRANCH VALIDATION: Ensure driver belongs to the same branch as the booking
-    const driver = await prisma.driver.findUnique({
-      where: { id: driverId }
-    })
-
-    if (!driver) return { error: 'Sopir tidak ditemukan.' }
-    if (driver.branchId !== booking.pickupBranchId) {
-      return { error: 'Akses ditolak: Sopir tidak berada di cabang yang sama dengan lokasi pengambilan pesanan.' }
-    }
-    
     if (booking.rentalType !== 'with_driver') return { error: 'Pesanan ini tidak memerlukan sopir.' }
     if (booking.status === 'ongoing' || booking.status === 'completed') {
       return { error: 'Tidak dapat menugaskan sopir pada pesanan yang sudah berjalan/selesai.' }
     }
-    
-    await prisma.booking.update({
-      where: { id: bookingId },
-      data: {
-        driverId: driverId,
-        driverAssignmentStatus: 'assigned'
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Lock driver row to prevent concurrent assignment / leave creation
+      await tx.$queryRaw`SELECT id FROM "Driver" WHERE id = ${driverId} FOR UPDATE`
+
+      const driver = await tx.driver.findUnique({
+        where: { id: driverId }
+      })
+
+      if (!driver) throw new Error('Sopir tidak ditemukan.')
+      if (!driver.isActive) throw new Error('Sopir berstatus nonaktif dan tidak dapat ditugaskan.')
+      if (driver.branchId !== booking.pickupBranchId) {
+        throw new Error('Akses ditolak: Sopir tidak berada di cabang yang sama dengan lokasi pengambilan pesanan.')
       }
+
+      // 2. Check for overlapping DriverLeave
+      const conflictingLeave = await tx.driverLeave.findFirst({
+        where: {
+          driverId: driverId,
+          startDate: { lt: booking.endDate },
+          endDate: { gt: booking.startDate }
+        }
+      })
+
+      if (conflictingLeave) {
+        throw new Error('Sopir sedang dalam jadwal cuti/libur pada tanggal pesanan ini.')
+      }
+
+      // 3. Check for overlapping active bookings assigned to this driver
+      const conflictingBooking = await tx.booking.findFirst({
+        where: {
+          id: { not: bookingId },
+          driverId: driverId,
+          status: { in: ['pending_payment', 'confirmed', 'ongoing'] },
+          startDate: { lt: booking.endDate },
+          endDate: { gt: booking.startDate }
+        }
+      })
+
+      if (conflictingBooking) {
+        throw new Error('Sopir ini sudah ditugaskan pada pesanan lain di jadwal yang beririsan.')
+      }
+
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          driverId: driverId,
+          driverAssignmentStatus: 'assigned'
+        }
+      })
     })
     
     revalidatePath('/admin/bookings')
