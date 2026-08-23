@@ -33,7 +33,13 @@ export async function createDriver(data: {
     const scope = await getStaffScope()
     assertInScope([data.branchId], scope)
 
-    const normalizedLicense = data.licenseNumber.trim().toUpperCase()
+    let normalizedLicense = data.licenseNumber.trim().toUpperCase().replace(/\s+/g, '-')
+    if (!normalizedLicense.startsWith('SIM-')) {
+      normalizedLicense = `SIM-A-${normalizedLicense}`
+    }
+    if (/^SIM-[AB0-9]+-?$/.test(normalizedLicense) || normalizedLicense.endsWith('-')) {
+      return { error: 'Nomor atau indeks SIM wajib diisi lengkap (misal: SIM-A-001)' }
+    }
 
     const driver = await prisma.driver.create({
       data: {
@@ -96,7 +102,13 @@ export async function updateDriver(id: string, data: {
       return { error: 'Tidak dapat memindah cabang sopir yang memiliki pesanan aktif' }
     }
 
-    const normalizedLicense = data.licenseNumber.trim().toUpperCase()
+    let normalizedLicense = data.licenseNumber.trim().toUpperCase().replace(/\s+/g, '-')
+    if (!normalizedLicense.startsWith('SIM-')) {
+      normalizedLicense = `SIM-A-${normalizedLicense}`
+    }
+    if (/^SIM-[AB0-9]+-?$/.test(normalizedLicense) || normalizedLicense.endsWith('-')) {
+      return { error: 'Nomor atau indeks SIM wajib diisi lengkap (misal: SIM-A-001)' }
+    }
 
     await prisma.driver.update({
       where: { id },

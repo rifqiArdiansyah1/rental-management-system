@@ -13,6 +13,107 @@ import {
 } from '@/actions/adminDriver'
 import { DriverStatus } from '@prisma/client'
 
+// -- License Number Formatted Input Component --
+export function LicenseNumberInput({
+  value,
+  onChange,
+  required = true
+}: {
+  value: string
+  onChange: (val: string) => void
+  required?: boolean
+}) {
+  const parseValue = (raw: string) => {
+    const trimmed = (raw || '').trim().toUpperCase()
+    const match = trimmed.match(/^(SIM-[AB0-9]+)-(.*)$/)
+    if (match) {
+      return { prefix: match[1], code: match[2] }
+    }
+    if (trimmed.startsWith('SIM-B1')) return { prefix: 'SIM-B1', code: trimmed.replace(/^SIM-B1-?/, '') }
+    if (trimmed.startsWith('SIM-B2')) return { prefix: 'SIM-B2', code: trimmed.replace(/^SIM-B2-?/, '') }
+    if (trimmed.startsWith('SIM-B')) return { prefix: 'SIM-B', code: trimmed.replace(/^SIM-B-?/, '') }
+    if (trimmed.startsWith('SIM-A')) return { prefix: 'SIM-A', code: trimmed.replace(/^SIM-A-?/, '') }
+    return { prefix: 'SIM-A', code: trimmed.replace(/^SIM-?/, '') }
+  }
+
+  const initial = parseValue(value)
+  const [prefix, setPrefix] = useState(initial.prefix)
+  const [code, setCode] = useState(initial.code)
+
+  useEffect(() => {
+    const parsed = parseValue(value)
+    setPrefix(parsed.prefix)
+    setCode(parsed.code)
+  }, [value])
+
+  const handlePrefixChange = (newPrefix: string) => {
+    setPrefix(newPrefix)
+    const cleanCode = code.trim().toUpperCase()
+    onChange(cleanCode ? `${newPrefix}-${cleanCode}` : `${newPrefix}-`)
+  }
+
+  const handleCodeChange = (newCode: string) => {
+    let cleaned = newCode.trim().toUpperCase()
+    let currentPrefix = prefix
+
+    if (cleaned.startsWith('SIM-A-')) {
+      currentPrefix = 'SIM-A'
+      setPrefix('SIM-A')
+      cleaned = cleaned.replace(/^SIM-A-/, '')
+    } else if (cleaned.startsWith('SIM-B1-')) {
+      currentPrefix = 'SIM-B1'
+      setPrefix('SIM-B1')
+      cleaned = cleaned.replace(/^SIM-B1-/, '')
+    } else if (cleaned.startsWith('SIM-B2-')) {
+      currentPrefix = 'SIM-B2'
+      setPrefix('SIM-B2')
+      cleaned = cleaned.replace(/^SIM-B2-/, '')
+    } else if (cleaned.startsWith('SIM-B-')) {
+      currentPrefix = 'SIM-B'
+      setPrefix('SIM-B')
+      cleaned = cleaned.replace(/^SIM-B-/, '')
+    }
+
+    setCode(cleaned)
+    onChange(cleaned ? `${currentPrefix}-${cleaned}` : `${currentPrefix}-`)
+  }
+
+  const formattedResult = code.trim() ? `${prefix}-${code.trim().toUpperCase()}` : `${prefix}-...`
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-2">
+        <select
+          value={prefix}
+          onChange={e => handlePrefixChange(e.target.value)}
+          className="bg-zinc-100 border border-zinc-300 rounded-md px-2.5 py-2 text-xs font-bold text-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none w-28 flex-shrink-0"
+        >
+          <option value="SIM-A">SIM A</option>
+          <option value="SIM-B">SIM B</option>
+          <option value="SIM-B1">SIM B1</option>
+          <option value="SIM-B2">SIM B2</option>
+        </select>
+        <div className="relative flex-1">
+          <input
+            required={required}
+            type="text"
+            placeholder="Misal: 001 / ID-01"
+            value={code}
+            onChange={e => handleCodeChange(e.target.value)}
+            className="w-full text-zinc-900 font-mono uppercase border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-[11px] text-zinc-500">
+        <span>Format Tersimpan:</span>
+        <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+          {formattedResult}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // -- Filter Bar --
 export function DriverFilterBar({ branches, userRole }: {
   branches: Array<{ id: string; name: string }>
@@ -52,12 +153,12 @@ export function DriverFilterBar({ branches, userRole }: {
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-zinc-200 mb-6 flex flex-col md:flex-row gap-4 items-end">
       <div className="flex-1 w-full">
-        <label className="block text-xs font-medium text-zinc-500 mb-1">Cari Nama Sopir / Nomor SIM</label>
+        <label className="block text-xs font-medium text-zinc-500 mb-1">Cari Nama Sopir / Format SIM (SIM-A-...)</label>
         <input
           type="text"
           value={q}
           onChange={e => setQ(e.target.value)}
-          placeholder="Misal: Budi / SIM-A-001"
+          placeholder="Misal: Budi / SIM-A-001 / SIM-B"
           className="w-full text-zinc-900 border border-zinc-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
         />
       </div>
@@ -123,12 +224,11 @@ export function CreateDriverButton({ branches, userRole }: {
   const [form, setForm] = useState({
     name: '',
     phone: '',
-    licenseNumber: '',
+    licenseNumber: 'SIM-A-',
     branchId: '',
     dailyFee: '150000'
   })
 
-  // Disable completely for staff_cabang
   if (userRole === 'staff_cabang') return null
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -148,7 +248,7 @@ export function CreateDriverButton({ branches, userRole }: {
         setForm({
           name: '',
           phone: '',
-          licenseNumber: '',
+          licenseNumber: 'SIM-A-',
           branchId: '',
           dailyFee: '150000'
         })
@@ -184,30 +284,24 @@ export function CreateDriverButton({ branches, userRole }: {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Nomor Telepon / WA *</label>
-                  <input
-                    required
-                    type="text"
-                    placeholder="081234567890"
-                    value={form.phone}
-                    onChange={e => setForm({ ...form, phone: e.target.value })}
-                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Nomor Telepon / WA *</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="081234567890"
+                  value={form.phone}
+                  onChange={e => setForm({ ...form, phone: e.target.value })}
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Nomor SIM (SIM A/B) *</label>
-                  <input
-                    required
-                    type="text"
-                    placeholder="SIM-A-001"
-                    value={form.licenseNumber}
-                    onChange={e => setForm({ ...form, licenseNumber: e.target.value })}
-                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Nomor SIM Terformat *</label>
+                <LicenseNumberInput
+                  value={form.licenseNumber}
+                  onChange={val => setForm({ ...form, licenseNumber: val })}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -503,25 +597,22 @@ export function DriverRowActions({ driver, branches, userRole }: {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Nomor Telepon *</label>
-                  <input
-                    type="text"
-                    value={editForm.phone}
-                    onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Nomor SIM *</label>
-                  <input
-                    type="text"
-                    value={editForm.licenseNumber}
-                    onChange={e => setEditForm({ ...editForm, licenseNumber: e.target.value })}
-                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Nomor Telepon *</label>
+                <input
+                  type="text"
+                  value={editForm.phone}
+                  onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Nomor SIM Terformat *</label>
+                <LicenseNumberInput
+                  value={editForm.licenseNumber}
+                  onChange={val => setEditForm({ ...editForm, licenseNumber: val })}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
