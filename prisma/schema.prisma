@@ -258,21 +258,25 @@ model Document {
 }
 
 model User {
-  id   String @id @default(uuid())
+  id        String    @id @default(uuid())
   // NB: sama seperti Customer — id ini dipetakan ke Supabase Auth User ID,
   // pass secara eksplisit saat create(), default di atas cuma fallback.
-  name String
-  email String   @unique
-  role  UserRole @default(staff_cabang)
+  name      String
+  email     String    @unique
+  role      UserRole  @default(staff_cabang)
 
   // null = admin_pusat (akses semua cabang), terisi = staff/admin 1 cabang
-  branchId String?
+  branchId  String?
+  isActive  Boolean   @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   // SetNull: kalau cabang dihapus, staff tidak ikut terhapus — cukup jadi unassigned
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branch    Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   cancelledBookings Booking[]
+
+  @@index([branchId, role])
+  @@index([branchId, isActive])
 }

@@ -34,6 +34,10 @@ export async function requireAdminSession() {
     throw new Error('User record not found')
   }
 
+  if (!user.isActive) {
+    throw new Error('Akun Anda dinonaktifkan. Hubungi Admin Pusat untuk informasi lebih lanjut.')
+  }
+
   return user
 }
 
