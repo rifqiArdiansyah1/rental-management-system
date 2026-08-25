@@ -69,10 +69,12 @@ enum UserRole {
 
 model Branch {
   id        String   @id @default(uuid())
-  name      String
+  name      String   @unique
   city      String
   address   String
   phone     String
+  openTime  String   @default("08:00")
+  closeTime String   @default("21:00")
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -84,6 +86,7 @@ model Branch {
   returns  Booking[] @relation("ReturnBranch")
 
   @@index([city])
+  @@index([isActive])
 }
 
 model VehicleCategory {

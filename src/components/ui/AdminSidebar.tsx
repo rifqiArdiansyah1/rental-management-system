@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, CalendarRange, Car, LogOut, Users, Menu, X } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Car, LogOut, Users, Building2, Menu, X } from 'lucide-react'
 
 type AdminSidebarProps = {
   userRole: string;
@@ -36,6 +36,7 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
     { href: '/admin/bookings', icon: CalendarRange, label: 'Manajemen Pesanan' },
     { href: '/admin/vehicles', icon: Car, label: 'Manajemen Armada' },
     { href: '/admin/drivers', icon: Users, label: 'Manajemen Sopir' },
+    ...(userRole === 'admin_pusat' ? [{ href: '/admin/branches', icon: Building2, label: 'Manajemen Cabang' }] : []),
   ]
 
   return (
