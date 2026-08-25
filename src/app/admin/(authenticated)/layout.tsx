@@ -25,7 +25,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-zinc-100 overflow-hidden">
-      <AdminSidebar userRole={user.app_metadata.role.replace('_', ' ')} handleLogout={handleLogout} />
+      <AdminSidebar userRole={user.app_metadata?.role || ''} handleLogout={handleLogout} />
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">

@@ -31,13 +31,18 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
     setIsOpen(false)
   }, [pathname])
 
+  const normalizedRole = (userRole || '').toLowerCase().replace(/\s+/g, '_')
+  const isAdminPusat = normalizedRole === 'admin_pusat'
+
   const navLinks = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/admin/bookings', icon: CalendarRange, label: 'Manajemen Pesanan' },
     { href: '/admin/vehicles', icon: Car, label: 'Manajemen Armada' },
     { href: '/admin/drivers', icon: Users, label: 'Manajemen Sopir' },
-    ...(userRole === 'admin_pusat' ? [{ href: '/admin/branches', icon: Building2, label: 'Manajemen Cabang' }] : []),
+    ...(isAdminPusat ? [{ href: '/admin/branches', icon: Building2, label: 'Manajemen Cabang' }] : []),
   ]
+
+  const displayRole = userRole ? userRole.replace(/_/g, ' ') : ''
 
   return (
     <>
@@ -71,12 +76,12 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
       >
         <div className="p-6 hidden lg:block">
           <h2 className="text-2xl font-bold tracking-tight">Prestige Admin</h2>
-          <p className="text-sm text-zinc-400 mt-1 capitalize">{userRole}</p>
+          <p className="text-sm text-zinc-400 mt-1 capitalize">{displayRole}</p>
         </div>
 
         {/* Mobile only role display */}
         <div className="p-6 lg:hidden border-b border-zinc-800">
-          <p className="text-sm text-zinc-400 capitalize">Login sebagai: <strong className="text-zinc-200">{userRole}</strong></p>
+          <p className="text-sm text-zinc-400 capitalize">Login sebagai: <strong className="text-zinc-200">{displayRole}</strong></p>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
