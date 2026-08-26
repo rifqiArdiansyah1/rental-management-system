@@ -126,8 +126,8 @@ export default async function AdminBranchesPage({
       </div>
 
       {/* Desktop Table Layout (>= lg) */}
-      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-zinc-200">
+        <div className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-left text-sm text-zinc-600">
             <thead className="bg-zinc-50 text-zinc-900 font-medium border-b border-zinc-200">
               <tr>

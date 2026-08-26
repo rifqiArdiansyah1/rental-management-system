@@ -3,6 +3,7 @@ import { getStaffScope, buildScopeWhere } from '@/lib/auth/scope'
 import { requireAdminSession } from '@/actions/admin'
 import { VehicleFilterBar, CreateVehicleButton, VehicleRowActions } from './ClientActions'
 import { Prisma } from '@prisma/client'
+import { Car } from 'lucide-react'
 
 export default async function AdminVehiclesPage({
   searchParams
@@ -88,14 +89,18 @@ export default async function AdminVehiclesPage({
         ) : vehicles.map((vehicle) => {
           const coverImage = (vehicle.photos && vehicle.photos.length > 0) 
             ? vehicle.photos[0] 
-            : (vehicle.category.imageUrl || 'https://via.placeholder.com/300x200?text=Mobil')
+            : vehicle.category.imageUrl
 
           return (
             <div key={vehicle.id} className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col">
               <div className="p-4 border-b border-zinc-100 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-zinc-100 overflow-hidden flex-shrink-0 border border-zinc-200">
-                    <img src={coverImage} alt={vehicle.name || vehicle.plateNumber} className="w-full h-full object-cover" />
+                  <div className="w-12 h-12 rounded-lg bg-zinc-100 overflow-hidden flex-shrink-0 border border-zinc-200 flex items-center justify-center">
+                    {coverImage ? (
+                      <img src={coverImage} alt={vehicle.name || vehicle.plateNumber} className="w-full h-full object-cover" />
+                    ) : (
+                      <Car className="w-6 h-6 text-zinc-400" />
+                    )}
                   </div>
                   <div>
                     <div className="font-bold text-zinc-900 text-base">{vehicle.name || vehicle.plateNumber}</div>
@@ -137,8 +142,8 @@ export default async function AdminVehiclesPage({
       </div>
 
       {/* Desktop Table Layout (>= lg) */}
-      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-zinc-200">
+        <div className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-left text-sm text-zinc-600">
             <thead className="bg-zinc-50 text-zinc-900 font-medium border-b border-zinc-200">
               <tr>
@@ -160,14 +165,18 @@ export default async function AdminVehiclesPage({
               ) : vehicles.map((vehicle) => {
                 const coverImage = (vehicle.photos && vehicle.photos.length > 0) 
                   ? vehicle.photos[0] 
-                  : (vehicle.category.imageUrl || 'https://via.placeholder.com/300x200?text=Mobil')
+                  : vehicle.category.imageUrl
 
                 return (
                   <tr key={vehicle.id} className="hover:bg-zinc-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-14 h-10 rounded-md bg-zinc-100 overflow-hidden flex-shrink-0 border border-zinc-200 shadow-sm">
-                          <img src={coverImage} alt={vehicle.name || vehicle.plateNumber} className="w-full h-full object-cover" />
+                        <div className="w-14 h-10 rounded-md bg-zinc-100 overflow-hidden flex-shrink-0 border border-zinc-200 shadow-sm flex items-center justify-center">
+                          {coverImage ? (
+                            <img src={coverImage} alt={vehicle.name || vehicle.plateNumber} className="w-full h-full object-cover" />
+                          ) : (
+                            <Car className="w-5 h-5 text-zinc-400" />
+                          )}
                         </div>
                         <div>
                           <div className="font-bold text-zinc-900">{vehicle.name || vehicle.plateNumber}</div>

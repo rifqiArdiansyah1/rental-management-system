@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createStaff, updateStaff, softDeleteStaff } from '@/actions/adminStaff'
 import { UserRole } from '@prisma/client'
@@ -305,6 +305,8 @@ export function StaffRowActions({
   currentUserId: string
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [openUpward, setOpenUpward] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const [modalType, setModalType] = useState<'edit' | 'delete' | null>(null)
 
   const [isPending, startTransition] = useTransition()
@@ -324,6 +326,15 @@ export function StaffRowActions({
 
   if (!canEditOrDelete) {
     return <span className="text-zinc-300 text-xs">—</span>
+  }
+
+  const handleToggleMenu = () => {
+    if (!menuOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      setOpenUpward(spaceBelow < 220)
+    }
+    setMenuOpen(!menuOpen)
   }
 
   const handleEdit = () => {
@@ -366,7 +377,8 @@ export function StaffRowActions({
   return (
     <div className="relative">
       <button
-        onClick={() => setMenuOpen(!menuOpen)}
+        ref={buttonRef}
+        onClick={handleToggleMenu}
         className="p-1 hover:bg-zinc-200 rounded-md text-zinc-500 transition-colors"
       >
         •••
@@ -375,7 +387,9 @@ export function StaffRowActions({
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)}></div>
-          <div className="absolute right-0 mt-1 w-48 bg-white border border-zinc-200 rounded-md shadow-lg z-20 py-1">
+          <div className={`absolute right-0 w-48 bg-white border border-zinc-200 rounded-md shadow-lg z-30 py-1 ${
+            openUpward ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}>
             <button
               onClick={() => {
                 setMenuOpen(false)

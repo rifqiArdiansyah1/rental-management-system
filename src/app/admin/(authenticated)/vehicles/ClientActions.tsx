@@ -401,6 +401,8 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
   userRole: string
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [openUpward, setOpenUpward] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const [modalType, setModalType] = useState<'edit' | 'status' | 'delete' | null>(null)
   
   const [isPending, startTransition] = useTransition()
@@ -419,6 +421,15 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
   })
 
   const canEditOrDelete = userRole !== 'staff_cabang'
+
+  const handleToggleMenu = () => {
+    if (!menuOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      setOpenUpward(spaceBelow < 200)
+    }
+    setMenuOpen(!menuOpen)
+  }
 
   const handleUpdateStatus = () => {
     startTransition(async () => {
@@ -466,7 +477,8 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
   return (
     <div className="relative">
       <button 
-        onClick={() => setMenuOpen(!menuOpen)}
+        ref={buttonRef}
+        onClick={handleToggleMenu}
         className="p-1 hover:bg-zinc-200 rounded-md text-zinc-500 transition-colors"
       >
         •••
@@ -475,7 +487,9 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)}></div>
-          <div className="absolute right-0 mt-1 w-48 bg-white border border-zinc-200 rounded-md shadow-lg z-20 py-1">
+          <div className={`absolute right-0 w-48 bg-white border border-zinc-200 rounded-md shadow-lg z-30 py-1 ${
+            openUpward ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}>
             <button 
               onClick={() => { setMenuOpen(false); setModalType('status') }}
               className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
