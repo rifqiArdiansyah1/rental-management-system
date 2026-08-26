@@ -21,16 +21,16 @@ export function StartRentalButton({ bookingId }: { bookingId: string }) {
   }
 
   return (
-    <div className="flex flex-col lg:items-end w-full lg:w-auto gap-1">
+    <div className="flex flex-col items-end w-full gap-1">
       <button 
         onClick={handleStart} 
         disabled={isPending}
-        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 min-h-[44px] w-full lg:w-auto rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50 whitespace-nowrap"
       >
-        <Play className="w-4 h-4" />
-        {isPending ? 'Memproses...' : 'Mulai Sewa'}
+        <Play className="w-3.5 h-3.5 fill-current" />
+        <span>{isPending ? 'Memproses...' : 'Mulai Sewa'}</span>
       </button>
-      {error && <span className="text-xs text-red-600 max-w-[200px] text-right">{error}</span>}
+      {error && <span className="text-[11px] text-red-600 max-w-[160px] text-right">{error}</span>}
     </div>
   )
 }
@@ -52,16 +52,16 @@ export function EndRentalButton({ bookingId }: { bookingId: string }) {
   }
 
   return (
-    <div className="flex flex-col lg:items-end w-full lg:w-auto gap-1">
+    <div className="flex flex-col items-end w-full gap-1">
       <button 
         onClick={handleEnd} 
         disabled={isPending}
-        className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-900 text-white px-4 min-h-[44px] w-full lg:w-auto rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-1.5 bg-zinc-900 hover:bg-black text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50 whitespace-nowrap"
       >
-        <Square className="w-4 h-4" />
-        {isPending ? 'Memproses...' : 'Selesai Sewa'}
+        <Square className="w-3.5 h-3.5 fill-current" />
+        <span>{isPending ? 'Memproses...' : 'Selesai Sewa'}</span>
       </button>
-      {error && <span className="text-xs text-red-600 max-w-[200px] text-right">{error}</span>}
+      {error && <span className="text-[11px] text-red-600 max-w-[160px] text-right">{error}</span>}
     </div>
   )
 }

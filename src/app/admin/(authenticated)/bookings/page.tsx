@@ -26,7 +26,8 @@ import {
   Calendar,
   CheckCircle2,
   XCircle,
-  RotateCcw
+  RotateCcw,
+  ChevronRight
 } from 'lucide-react'
 
 export default async function AdminBookingsPage({
@@ -247,9 +248,10 @@ export default async function AdminBookingsPage({
                 <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex flex-col gap-2">
                   <Link
                     href={`/admin/bookings/${booking.id}`}
-                    className="flex items-center justify-center text-sm text-blue-600 hover:text-blue-800 font-medium bg-blue-50/50 px-4 py-2.5 rounded-md border border-blue-200 transition-colors text-center"
+                    className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-4 py-2.5 rounded-lg transition-colors text-center shadow-2xs whitespace-nowrap"
                   >
-                    Detail / Tindak Lanjut &rarr;
+                    <span>Detail Pesanan</span>
+                    <ChevronRight className="w-4 h-4 text-blue-500" />
                   </Link>
                   {booking.status === 'confirmed' && <StartRentalButton bookingId={booking.id} />}
                   {booking.status === 'ongoing' && <EndRentalButton bookingId={booking.id} />}
@@ -271,7 +273,7 @@ export default async function AdminBookingsPage({
                 <th className="px-6 py-4">Armada & Layanan</th>
                 <th className="px-6 py-4">Periode Sewa (WIB)</th>
                 <th className="px-6 py-4">Status & Indikator</th>
-                <th className="px-6 py-4 text-right">Aksi</th>
+                <th className="px-6 py-4 text-right w-44">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200">
@@ -406,13 +408,14 @@ export default async function AdminBookingsPage({
                       </td>
 
                       {/* Actions */}
-                      <td className="px-6 py-4 align-top text-right">
-                        <div className="flex flex-col items-end gap-2">
+                      <td className="px-6 py-4 align-top text-right w-44">
+                        <div className="flex flex-col items-end gap-2 w-36 ml-auto">
                           <Link
                             href={`/admin/bookings/${booking.id}`}
-                            className="inline-flex items-center justify-center text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 px-3 py-1.5 min-h-[36px] min-w-[130px] rounded border border-blue-200 transition-colors"
+                            className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-50/80 hover:bg-blue-100 border border-blue-200 px-3 py-2 rounded-lg transition-colors shadow-2xs whitespace-nowrap"
                           >
-                            Detail / Tindak Lanjut &rarr;
+                            <span>Detail Pesanan</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-blue-500" />
                           </Link>
                           {booking.status === 'confirmed' && <StartRentalButton bookingId={booking.id} />}
                           {booking.status === 'ongoing' && <EndRentalButton bookingId={booking.id} />}

@@ -298,20 +298,20 @@ export function BookingFilterBar({
       )}
 
       {/* Filter Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2 border-t border-zinc-100 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-3 border-t border-zinc-100 text-xs">
         {/* Status Filter */}
-        <div>
-          <label className="text-zinc-500 font-medium block mb-1">Status Pesanan</label>
+        <div className="lg:col-span-1">
+          <label className="text-zinc-600 font-semibold block mb-1">Status Pesanan</label>
           <select
             value={status}
             onChange={(e) => {
               setStatus(e.target.value)
               applyFilters({ status: e.target.value })
             }}
-            className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+            className="w-full text-zinc-900 border border-zinc-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           >
             <option value="all">Semua Status</option>
-            <option value="active">Semua Aktif (Pending, Confirmed, Ongoing)</option>
+            <option value="active">Semua Aktif</option>
             <option value="confirmed">Confirmed</option>
             <option value="ongoing">Ongoing</option>
             <option value="completed">Completed</option>
@@ -321,35 +321,35 @@ export function BookingFilterBar({
         </div>
 
         {/* Rental Type Filter */}
-        <div>
-          <label className="text-zinc-500 font-medium block mb-1">Tipe Rental</label>
+        <div className="lg:col-span-1">
+          <label className="text-zinc-600 font-semibold block mb-1">Tipe Rental</label>
           <select
             value={rentalType}
             onChange={(e) => {
               setRentalType(e.target.value)
               applyFilters({ rentalType: e.target.value })
             }}
-            className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+            className="w-full text-zinc-900 border border-zinc-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           >
             <option value="all">Semua Tipe</option>
-            <option value="self_drive">Lepas Kunci (Self Drive)</option>
+            <option value="self_drive">Lepas Kunci</option>
             <option value="with_driver">Dengan Sopir</option>
           </select>
         </div>
 
         {/* Driver Filter */}
-        <div>
-          <label className="text-zinc-500 font-medium block mb-1">Penugasan Sopir</label>
+        <div className="lg:col-span-1">
+          <label className="text-zinc-600 font-semibold block mb-1">Penugasan Sopir</label>
           <select
             value={driverId}
             onChange={(e) => {
               setDriverId(e.target.value)
               applyFilters({ driverId: e.target.value })
             }}
-            className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+            className="w-full text-zinc-900 border border-zinc-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           >
             <option value="all">Semua Sopir</option>
-            <option value="unassigned">⚠️ Belum Ditugaskan (Unassigned)</option>
+            <option value="unassigned">⚠️ Belum Ditugaskan</option>
             {drivers.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
@@ -360,15 +360,15 @@ export function BookingFilterBar({
 
         {/* Branch Filter (Only for admin_pusat) */}
         {userRole === 'admin_pusat' && (
-          <div>
-            <label className="text-zinc-500 font-medium block mb-1">Cabang Pickup</label>
+          <div className="lg:col-span-1">
+            <label className="text-zinc-600 font-semibold block mb-1">Cabang Pickup</label>
             <select
               value={branchId}
               onChange={(e) => {
                 setBranchId(e.target.value)
                 applyFilters({ branchId: e.target.value })
               }}
-              className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              className="w-full text-zinc-900 border border-zinc-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value="all">Semua Cabang</option>
               {branches.map((b) => (
@@ -380,19 +380,26 @@ export function BookingFilterBar({
           </div>
         )}
 
-        {/* Date Filter Selection */}
-        <div className={userRole === 'admin_pusat' ? 'sm:col-span-2 lg:col-span-1' : 'sm:col-span-2 lg:col-span-2'}>
+        {/* Date Filter Selection with Segmented Control Toggle */}
+        <div className={userRole === 'admin_pusat' ? 'sm:col-span-2 md:col-span-2 lg:col-span-2' : 'sm:col-span-2 md:col-span-3 lg:col-span-3'}>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-zinc-500 font-medium">Rentang Tanggal</label>
-            <div className="flex items-center gap-2">
+            <label className="text-zinc-600 font-semibold flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+              Rentang Tanggal
+            </label>
+
+            {/* Segmented Control Button Group */}
+            <div className="inline-flex p-0.5 bg-zinc-100 rounded-md border border-zinc-200 shadow-2xs">
               <button
                 type="button"
                 onClick={() => {
                   setDateType('pickup')
                   applyFilters({ dateType: 'pickup' })
                 }}
-                className={`text-[10px] px-1.5 py-0.5 rounded ${
-                  dateType === 'pickup' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-800'
+                className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all ${
+                  dateType === 'pickup'
+                    ? 'bg-white text-zinc-900 shadow-xs font-bold'
+                    : 'text-zinc-500 hover:text-zinc-800'
                 }`}
               >
                 Sewa
@@ -403,34 +410,55 @@ export function BookingFilterBar({
                   setDateType('created')
                   applyFilters({ dateType: 'created' })
                 }}
-                className={`text-[10px] px-1.5 py-0.5 rounded ${
-                  dateType === 'created' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-800'
+                className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all ${
+                  dateType === 'created'
+                    ? 'bg-white text-zinc-900 shadow-xs font-bold'
+                    : 'text-zinc-500 hover:text-zinc-800'
                 }`}
               >
                 Transaksi
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => {
-                setDateFrom(e.target.value)
-                applyFilters({ dateFrom: e.target.value })
-              }}
-              className="w-full text-zinc-900 border border-zinc-300 rounded-md p-1.5 text-xs bg-white"
-            />
-            <span className="text-zinc-400">-</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => {
-                setDateTo(e.target.value)
-                applyFilters({ dateTo: e.target.value })
-              }}
-              className="w-full text-zinc-900 border border-zinc-300 rounded-md p-1.5 text-xs bg-white"
-            />
+
+          <div className="flex items-center gap-1.5">
+            <div className="relative flex-1 min-w-[120px]">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value)
+                  applyFilters({ dateFrom: e.target.value })
+                }}
+                className="w-full text-zinc-900 border border-zinc-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <span className="text-zinc-400 text-xs font-medium px-0.5">s/d</span>
+            <div className="relative flex-1 min-w-[120px]">
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value)
+                  applyFilters({ dateTo: e.target.value })
+                }}
+                className="w-full text-zinc-900 border border-zinc-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                  applyFilters({ dateFrom: '', dateTo: '' })
+                }}
+                className="p-1 text-zinc-400 hover:text-red-500 rounded hover:bg-zinc-100 transition-colors"
+                title="Hapus filter tanggal"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
       </div>
