@@ -215,6 +215,10 @@ model Booking {
   @@index([vehicleId, startDate, endDate])
   // Dipakai untuk cek jadwal sopir per rentang tanggal
   @@index([driverId, startDate, endDate])
+  // Indeks komposit performa query antrian operasional & filter cabang
+  @@index([pickupBranchId, status])
+  @@index([status, startDate])
+  @@index([createdAt])
 }
 
 model Payment {
