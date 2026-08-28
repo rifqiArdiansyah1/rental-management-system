@@ -4,6 +4,7 @@ import { prisma } from '@/utils/prisma'
 import { requireAdminSession } from '@/actions/admin'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
 import { VehicleStatus, Prisma } from '@prisma/client'
+import { revalidatePath } from 'next/cache'
 
 export async function createVehicle(data: {
   name: string
@@ -40,6 +41,10 @@ export async function createVehicle(data: {
         isActive: true,
       }
     })
+
+    revalidatePath('/admin/vehicles')
+    revalidatePath('/admin/dashboard')
+    revalidatePath('/')
 
     return { success: true, vehicle: JSON.parse(JSON.stringify(vehicle)) }
   } catch (error: any) {
@@ -89,6 +94,7 @@ export async function updateVehicle(id: string, data: {
 
     const normalizedPlate = data.plateNumber.replace(/\s+/g, '').toUpperCase()
 
+    // Note: status is strictly omitted from data update to prevent status bypass
     await prisma.vehicle.update({
       where: { id },
       data: {
@@ -101,6 +107,12 @@ export async function updateVehicle(id: string, data: {
       }
     })
 
+    revalidatePath('/admin/vehicles')
+    revalidatePath('/admin/dashboard')
+    revalidatePath('/')
+    revalidatePath(`/vehicles/${id}`)
+    revalidatePath(`/vehicles/${id}/book`)
+
     return { success: true }
   } catch (error: any) {
     if (error.code === 'P2002') return { error: 'Plat nomor sudah terdaftar' }
@@ -112,34 +124,79 @@ export async function updateVehicleStatus(id: string, newStatus: VehicleStatus) 
   try {
     const adminUser = await requireAdminSession()
     
-    // Check scope first
+    // 1. Larangan mutlak transisi manual ke status 'rented'
+    if (newStatus === 'rented') {
+      return { error: 'Status "Disewa (Rented)" dikelola otomatis oleh sistem saat Mulai Sewa di Manajemen Pesanan.' }
+    }
+
+    // 2. Check scope first
     const vehicle = await prisma.vehicle.findUnique({ where: { id } })
     if (!vehicle) return { error: 'Kendaraan tidak ditemukan' }
     
     const scope = await getStaffScope()
     assertInScope([vehicle.branchId], scope)
 
-    // Transaction to ensure atomicity
-    const result = await prisma.$transaction(async (tx) => {
-      // Find if there are active bookings
-      const activeBookings = await tx.booking.count({
+    // 3. Eksekusi atomik anti-TOCTOU dengan validasi ketat
+    await prisma.$transaction(async (tx) => {
+      const currentVehicle = await tx.vehicle.findUnique({ where: { id } })
+      if (!currentVehicle) {
+        throw new Error('Kendaraan tidak ditemukan.')
+      }
+
+      // Guard mobil nonaktif
+      if (!currentVehicle.isActive) {
+        throw new Error('Kendaraan nonaktif tidak dapat diubah status operasionalnya. Aktifkan kendaraan terlebih dahulu.')
+      }
+
+      // Guard mobil sedang disewa (ongoing booking OR status DB saat ini rented)
+      const activeOngoing = await tx.booking.count({
         where: {
           vehicleId: id,
           status: 'ongoing'
         }
       })
 
-      if (activeBookings > 0 && newStatus !== 'rented') {
-        throw new Error('Kendaraan sedang disewa (ongoing). Tidak dapat diubah statusnya.')
+      if (activeOngoing > 0 || currentVehicle.status === 'rented') {
+        throw new Error('Kendaraan sedang dalam masa sewa aktif (ongoing). Status tidak dapat diubah secara manual.')
       }
 
-      const updated = await tx.vehicle.update({
-        where: { id },
+      // Guard jendela bergulir 24 jam untuk status maintenance atau moved
+      if (newStatus === 'maintenance' || newStatus === 'moved') {
+        const now = new Date()
+        const rolling24h = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+        const conflictingBookings = await tx.booking.count({
+          where: {
+            vehicleId: id,
+            status: { in: ['confirmed', 'pending_payment'] },
+            startDate: { lte: rolling24h },
+            endDate: { gte: now }
+          }
+        })
+
+        if (conflictingBookings > 0) {
+          throw new Error('Kendaraan memiliki jadwal sewa (confirmed/pending) dalam 24 jam ke depan. Selesaikan atau alihkan pesanan terlebih dahulu.')
+        }
+      }
+
+      // Update bersyarat atomik (mencegah TOCTOU race condition)
+      const updateResult = await tx.vehicle.updateMany({
+        where: { id, status: currentVehicle.status },
         data: { status: newStatus }
       })
 
-      return updated
+      if (updateResult.count === 0) {
+        throw new Error('Status kendaraan telah berubah oleh proses lain. Silakan muat ulang halaman.')
+      }
     })
+
+    // 4. Revalidasi cache mendalam
+    revalidatePath('/admin/vehicles')
+    revalidatePath('/admin/dashboard')
+    revalidatePath('/admin/bookings')
+    revalidatePath('/')
+    revalidatePath(`/vehicles/${id}`)
+    revalidatePath(`/vehicles/${id}/book`)
 
     return { success: true }
   } catch (error: any) {
@@ -181,6 +238,13 @@ export async function softDeleteVehicle(id: string, isActive: boolean) {
 
       return updated
     })
+
+    revalidatePath('/admin/vehicles')
+    revalidatePath('/admin/dashboard')
+    revalidatePath('/admin/bookings')
+    revalidatePath('/')
+    revalidatePath(`/vehicles/${id}`)
+    revalidatePath(`/vehicles/${id}/book`)
 
     return { success: true }
   } catch (error: any) {

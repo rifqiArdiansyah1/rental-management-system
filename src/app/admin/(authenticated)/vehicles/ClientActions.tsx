@@ -490,12 +490,28 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
           <div className={`absolute right-0 w-48 bg-white border border-zinc-200 rounded-md shadow-lg z-30 py-1 ${
             openUpward ? 'bottom-full mb-1' : 'top-full mt-1'
           }`}>
-            <button 
-              onClick={() => { setMenuOpen(false); setModalType('status') }}
-              className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
-            >
-              Ubah Status
-            </button>
+            {vehicle.status === 'rented' ? (
+              <div className="w-full text-left px-4 py-2 text-xs text-zinc-400 cursor-not-allowed bg-zinc-50 flex items-center justify-between">
+                <span>Ubah Status</span>
+                <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                  Disewa (Otomatis)
+                </span>
+              </div>
+            ) : !vehicle.isActive ? (
+              <div className="w-full text-left px-4 py-2 text-xs text-zinc-400 cursor-not-allowed bg-zinc-50 flex items-center justify-between">
+                <span>Ubah Status</span>
+                <span className="text-[10px] font-semibold bg-red-100 text-red-800 px-1.5 py-0.5 rounded">
+                  Nonaktif
+                </span>
+              </div>
+            ) : (
+              <button 
+                onClick={() => { setMenuOpen(false); setModalType('status') }}
+                className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
+              >
+                Ubah Status
+              </button>
+            )}
             {canEditOrDelete && (
               <>
                 <button 
@@ -520,17 +536,20 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
       {modalType === 'status' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-xl max-w-sm w-full shadow-lg">
-            <h3 className="text-lg font-bold text-zinc-900 mb-4">Ubah Status</h3>
+            <h3 className="text-lg font-bold text-zinc-900 mb-1">Ubah Status</h3>
+            <p className="text-xs text-zinc-500 mb-4">Pilih status operasional kendaraan di cabang.</p>
             <select 
               value={status}
               onChange={e => setStatus(e.target.value as VehicleStatus)}
               className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="available">Tersedia (Available)</option>
-              <option value="rented">Disewa (Rented)</option>
               <option value="maintenance">Perbaikan (Maintenance)</option>
               <option value="moved">Dipindahkan (Moved)</option>
             </select>
+            <p className="text-[11px] text-zinc-400 mt-2">
+              Status &quot;Disewa&quot; dikelola otomatis oleh sistem saat Mulai Sewa di Manajemen Pesanan.
+            </p>
             {error && <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded-md">{error}</div>}
             <div className="mt-6 flex justify-end gap-2">
               <button 
