@@ -67,7 +67,7 @@ export async function sendBookingConfirmedEmail(data: BookingConfirmedData) {
             </p>
 
             <div style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="background-color: #1a1a1a; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; display: inline-block;">
+              <a href="${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard" style="background-color: #1a1a1a; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; display: inline-block;">
                 Ke Dasbor Saya
               </a>
             </div>
@@ -150,7 +150,7 @@ export async function sendDocumentStatusEmail(data: DocumentStatusData) {
             ` : ''}
 
             <div style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="background-color: #1a1a1a; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; display: inline-block;">
+              <a href="${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard" style="background-color: #1a1a1a; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; display: inline-block;">
                 Buka Dasbor
               </a>
             </div>

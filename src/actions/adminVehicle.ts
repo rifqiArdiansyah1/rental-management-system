@@ -188,6 +188,9 @@ export async function updateVehicleStatus(id: string, newStatus: VehicleStatus) 
       if (updateResult.count === 0) {
         throw new Error('Status kendaraan telah berubah oleh proses lain. Silakan muat ulang halaman.')
       }
+    }, {
+      maxWait: 10000,
+      timeout: 20000
     })
 
     // 4. Revalidasi cache mendalam

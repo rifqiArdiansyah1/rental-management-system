@@ -97,7 +97,8 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
           <PaymentClient 
             bookingId={booking.id} 
             createdAtMs={createdAt}
-            clientKey={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ''}
+            clientKey={process.env.MIDTRANS_CLIENT_KEY || process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ''}
+            isProduction={(process.env.MIDTRANS_IS_PRODUCTION || process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION) === 'true'}
           />
         ) : booking.status === 'pending_payment' ? (
           <div className="text-center p-4 bg-error-container/20 border border-error rounded-lg text-error">

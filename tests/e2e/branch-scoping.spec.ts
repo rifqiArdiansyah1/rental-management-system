@@ -46,7 +46,7 @@ test.describe('Branch Scoping & RBAC Granular', () => {
 
     // 4. Setup Staff Users via Supabase Admin
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );

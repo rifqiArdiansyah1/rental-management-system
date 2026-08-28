@@ -420,6 +420,18 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
     photos: (vehicle.photos || []) as string[]
   })
 
+  useEffect(() => {
+    setStatus(vehicle.status)
+    setForm({
+      name: vehicle.name || '',
+      plateNumber: vehicle.plateNumber,
+      categoryId: vehicle.categoryId,
+      branchId: vehicle.branchId,
+      dailyRate: vehicle.dailyRate.toString(),
+      photos: (vehicle.photos || []) as string[]
+    })
+  }, [vehicle.status, vehicle.name, vehicle.plateNumber, vehicle.categoryId, vehicle.branchId, vehicle.dailyRate, vehicle.photos])
+
   const canEditOrDelete = userRole !== 'staff_cabang'
 
   const handleToggleMenu = () => {
@@ -506,7 +518,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
               </div>
             ) : (
               <button 
-                onClick={() => { setMenuOpen(false); setModalType('status') }}
+                onClick={() => { setMenuOpen(false); setStatus(vehicle.status); setModalType('status') }}
                 className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
               >
                 Ubah Status

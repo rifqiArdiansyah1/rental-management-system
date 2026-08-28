@@ -54,18 +54,18 @@ export default defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+      SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
       DATABASE_URL: process.env.DATABASE_URL || '',
       DIRECT_URL: process.env.DIRECT_URL || '',
       MIDTRANS_SERVER_KEY: process.env.MIDTRANS_SERVER_KEY || '',
-      NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || '',
-      NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION: process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION || '',
+      MIDTRANS_CLIENT_KEY: process.env.MIDTRANS_CLIENT_KEY || process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || '',
+      MIDTRANS_IS_PRODUCTION: process.env.MIDTRANS_IS_PRODUCTION || process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION || '',
       CRON_MANUAL_SECRET: process.env.CRON_MANUAL_SECRET || '',
       RESEND_API_KEY: process.env.RESEND_API_KEY || 're_placeholder_key_here',
       EMAIL_FROM: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-      NEXT_PUBLIC_APP_URL: 'http://localhost:3001'
+      APP_URL: 'http://localhost:3001'
     }
   },
 });

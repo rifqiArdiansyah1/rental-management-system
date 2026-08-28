@@ -8,13 +8,13 @@ import { PaymentStatus, BookingStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 
 const serverKey = process.env.MIDTRANS_SERVER_KEY || ''
-const isProd = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true'
+const isProd = (process.env.MIDTRANS_IS_PRODUCTION || process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION) === 'true'
 
 // Initialize Snap client
 const snap = new midtransClient.Snap({
   isProduction: isProd,
   serverKey: serverKey,
-  clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ''
+  clientKey: process.env.MIDTRANS_CLIENT_KEY || process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ''
 })
 
 export async function getSnapToken(bookingId: string) {

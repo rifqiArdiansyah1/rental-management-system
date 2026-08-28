@@ -10,6 +10,16 @@ export default function AuthNotifier() {
   useEffect(() => {
     const supabase = createClient()
 
+    if (!supabase) {
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('verified') === 'true') {
+        setMessage('Akun berhasil diverifikasi!')
+        setShowToast(true)
+        setTimeout(() => setShowToast(false), 5000)
+      }
+      return
+    }
+
     // Listen to Supabase Auth state changes (e.g. when picking up a token from the URL after email confirmation)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // INITIAL_SESSION occurs on load. If there is a hash with type=signup or access_token, 

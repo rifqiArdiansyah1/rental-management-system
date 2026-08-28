@@ -9,7 +9,7 @@ const adapter = new PrismaPg(pool)
 const prisma = new PrismaClient({ adapter })
 
 const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
@@ -141,9 +141,10 @@ test.describe('Vehicle Status Consistency & Operational Lifecycle Audit (Issue #
     // 6. Change status to Maintenance
     await selectDropdown.selectOption('maintenance')
     await modal.getByRole('button', { name: 'Simpan' }).click()
+    await expect(modal).not.toBeVisible({ timeout: 15000 })
 
     // 7. Verify status updated to MAINTENANCE in UI and Database
-    await expect(vehicleRow.locator('span', { hasText: 'MAINTENANCE' })).toBeVisible()
+    await expect(vehicleRow.locator('span', { hasText: 'MAINTENANCE' })).toBeVisible({ timeout: 15000 })
 
     const dbVehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } })
     expect(dbVehicle?.status).toBe('maintenance')
@@ -153,7 +154,8 @@ test.describe('Vehicle Status Consistency & Operational Lifecycle Audit (Issue #
     await vehicleRow.getByRole('button', { name: 'Ubah Status' }).click()
     await modal.locator('select').selectOption('available')
     await modal.getByRole('button', { name: 'Simpan' }).click()
-    await expect(vehicleRow.locator('span', { hasText: 'AVAILABLE' })).toBeVisible()
+    await expect(modal).not.toBeVisible({ timeout: 15000 })
+    await expect(vehicleRow.locator('span', { hasText: 'AVAILABLE' })).toBeVisible({ timeout: 15000 })
 
     const dbVehicleAvailable = await prisma.vehicle.findUnique({ where: { id: vehicleId } })
     expect(dbVehicleAvailable?.status).toBe('available')

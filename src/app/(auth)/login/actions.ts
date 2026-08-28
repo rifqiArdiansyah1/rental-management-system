@@ -18,7 +18,7 @@ export async function login(formData: FormData) {
 
   if (error) {
     console.error('Login error:', error.message);
-    console.error('Using Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.error('Using Supabase URL:', process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
     redirect('/login?message=Could not authenticate user')
   }
 

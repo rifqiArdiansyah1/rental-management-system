@@ -9,9 +9,10 @@ type Props = {
   bookingId: string
   createdAtMs: number
   clientKey: string
+  isProduction?: boolean
 }
 
-export default function PaymentClient({ bookingId, createdAtMs, clientKey }: Props) {
+export default function PaymentClient({ bookingId, createdAtMs, clientKey, isProduction = false }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isSyncing, setIsSyncing] = useState(false)
@@ -116,8 +117,7 @@ export default function PaymentClient({ bookingId, createdAtMs, clientKey }: Pro
     }
   }
 
-  const isProd = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true'
-  const snapScriptUrl = isProd 
+  const snapScriptUrl = isProduction 
     ? "https://app.midtrans.com/snap/snap.js"
     : "https://app.sandbox.midtrans.com/snap/snap.js"
 
