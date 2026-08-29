@@ -200,13 +200,18 @@ model Booking {
   cancellationNote String?
   cancelledBy      String?
 
-  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  pickupBranch Branch   @relation("PickupBranch", fields: [pickupBranchId], references: [id], onDelete: Restrict)
-  returnBranch Branch   @relation("ReturnBranch", fields: [returnBranchId], references: [id], onDelete: Restrict)
+  reassignmentReason String?
+  reassignedBy      String?
+  reassignedAt      DateTime?
+
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  pickupBranch    Branch   @relation("PickupBranch", fields: [pickupBranchId], references: [id], onDelete: Restrict)
+  returnBranch    Branch   @relation("ReturnBranch", fields: [returnBranchId], references: [id], onDelete: Restrict)
   // SetNull: driver bisa "dilepas" dari booking tanpa menghapus booking-nya
-  driver       Driver?  @relation(fields: [driverId], references: [id], onDelete: SetNull)
-  adminCanceler User?   @relation(fields: [cancelledBy], references: [id], onDelete: SetNull)
+  driver          Driver?  @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  adminCanceler   User?    @relation("AdminCanceler", fields: [cancelledBy], references: [id], onDelete: SetNull)
+  adminReassigner User?    @relation("AdminReassigner", fields: [reassignedBy], references: [id], onDelete: SetNull)
 
   payments  Payment[]
   documents Document[]
@@ -279,7 +284,8 @@ model User {
   // SetNull: kalau cabang dihapus, staff tidak ikut terhapus — cukup jadi unassigned
   branch    Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
-  cancelledBookings Booking[]
+  cancelledBookings   Booking[] @relation("AdminCanceler")
+  reassignedBookings  Booking[] @relation("AdminReassigner")
 
   @@index([branchId, role])
   @@index([branchId, isActive])

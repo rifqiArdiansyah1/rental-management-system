@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { verifyDocument, assignDriver, adminCancelBooking, markPaymentRefunded } from '@/actions/admin'
 import { useRouter } from 'next/navigation'
 import { generateSignedDocumentUrl } from '@/actions/document'
@@ -92,16 +92,34 @@ export function AssignDriverForm({ bookingId, availableDrivers, currentDriverId 
 }) {
   const [isPending, startTransition] = useTransition()
   const [selectedDriver, setSelectedDriver] = useState(currentDriverId || '')
+  const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const prevDriverIdRef = useRef(currentDriverId)
+
+  // Hanya perbarui selectedDriver jika prop currentDriverId benar-benar berganti dari server,
+  // agar input yang sedang diketik staf tidak ter-reset oleh revalidasi halaman lain.
+  useEffect(() => {
+    if (prevDriverIdRef.current !== currentDriverId) {
+      prevDriverIdRef.current = currentDriverId
+      setSelectedDriver(currentDriverId || '')
+      setReason('')
+    }
+  }, [currentDriverId])
+
+  const isReassignment = !!currentDriverId
+  const isDriverChanged = selectedDriver && selectedDriver !== currentDriverId
 
   const handleAssign = () => {
-    if (!selectedDriver) return
+    if (!selectedDriver || selectedDriver === currentDriverId) return
     startTransition(async () => {
       setError(null)
-      const res = await assignDriver(bookingId, selectedDriver)
+      const res = await assignDriver(bookingId, selectedDriver, reason)
       if (res.error) setError(res.error)
-      else router.refresh()
+      else {
+        setReason('')
+        window.location.reload()
+      }
     })
   }
 
@@ -121,14 +139,28 @@ export function AssignDriverForm({ bookingId, availableDrivers, currentDriverId 
         </select>
         <button
           onClick={handleAssign}
-          disabled={isPending || !selectedDriver || selectedDriver === currentDriverId}
+          disabled={isPending || !isDriverChanged}
           className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50"
         >
           <UserCheck className="w-4 h-4" />
-          Assign
+          {isReassignment ? 'Ganti Sopir' : 'Tugaskan'}
         </button>
       </div>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+
+      {isReassignment && isDriverChanged && (
+        <div className="mt-1">
+          <input
+            type="text"
+            placeholder="Alasan pergantian sopir (opsional)"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            disabled={isPending}
+            className="w-full border border-zinc-300 rounded-md px-3 py-1.5 text-xs text-zinc-900 bg-zinc-50 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+          />
+        </div>
+      )}
+
+      {error && <span className="text-xs text-red-600 font-medium">{error}</span>}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import { revalidatePath } from 'next/cache'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
+import { sendDriverReassignedEmail } from '@/utils/email'
 
 // Valid roles
 const VALID_ROLES = ['staff_cabang', 'admin_cabang', 'admin_pusat']
@@ -276,12 +277,17 @@ export async function verifyDocument(documentId: string, status: 'verified' | 'r
   }
 }
 
-export async function assignDriver(bookingId: string, driverId: string) {
+export async function assignDriver(bookingId: string, driverId: string, reason?: string) {
   try {
+    const adminUser = await requireAdminSession()
     const scope = await getStaffScope()
     
     const booking = await prisma.booking.findUnique({
-      where: { id: bookingId }
+      where: { id: bookingId },
+      include: {
+        customer: true,
+        driver: true
+      }
     })
     
     if (!booking) return { error: 'Pesanan tidak ditemukan.' }
@@ -292,46 +298,93 @@ export async function assignDriver(bookingId: string, driverId: string) {
       return { error: err.message }
     }
 
-    if (booking.rentalType !== 'with_driver') return { error: 'Pesanan ini tidak memerlukan sopir.' }
-    if (booking.status === 'ongoing' || booking.status === 'completed') {
-      return { error: 'Tidak dapat menugaskan sopir pada pesanan yang sudah berjalan/selesai.' }
+    // 1. Guard tipe sewa
+    if (booking.rentalType !== 'with_driver') {
+      return { error: 'Pesanan ini bertipe Lepas Kunci (self-drive) dan tidak memerlukan sopir.' }
     }
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Lock driver row to prevent concurrent assignment / leave creation
-      await tx.$queryRaw`SELECT id FROM "Driver" WHERE id = ${driverId} FOR UPDATE`
+    // 2. Guard status pesanan
+    if (booking.status === 'pending_payment') {
+      return { error: 'Sopir hanya dapat ditugaskan setelah pembayaran pesanan terkonfirmasi (status confirmed).' }
+    }
 
-      const driver = await tx.driver.findUnique({
+    if (booking.status === 'completed' || booking.status === 'cancelled') {
+      return { error: 'Tidak dapat menugaskan atau mengganti sopir pada pesanan yang sudah selesai atau dibatalkan.' }
+    }
+
+    // 3. Guard identitas sopir yang sama
+    if (booking.driverId === driverId) {
+      return { error: 'Sopir ini sudah ditugaskan pada pesanan ini.' }
+    }
+
+    const isReassignment = !!booking.driverId
+    const oldDriverId = booking.driverId
+    const oldDriverName = booking.driver?.name
+    let newDriverInfo: { name: string; phone: string } | null = null
+
+    // 4. Eksekusi transaksi atomik anti-TOCTOU & deadlock-free
+    await prisma.$transaction(async (tx) => {
+      // a. Verifikasi status terkini dari Booking (optimistic concurrency guard)
+      const currentBooking = await tx.booking.findUnique({
+        where: { id: bookingId }
+      })
+      if (!currentBooking) throw new Error('Pesanan tidak ditemukan.')
+      if (!['confirmed', 'ongoing'].includes(currentBooking.status)) {
+        throw new Error('Status pesanan telah berubah oleh proses lain. Silakan muat ulang halaman.')
+      }
+
+      // b. Deadlock-free deterministic row locking
+      const idsToLock = [oldDriverId, driverId].filter(Boolean) as string[]
+      idsToLock.sort()
+      for (const id of idsToLock) {
+        await tx.$queryRaw`SELECT id FROM "Driver" WHERE id = ${id} FOR UPDATE`
+      }
+
+      // c. Ambil dan validasi sopir baru
+      const newDriver = await tx.driver.findUnique({
         where: { id: driverId }
       })
 
-      if (!driver) throw new Error('Sopir tidak ditemukan.')
-      if (!driver.isActive) throw new Error('Sopir berstatus nonaktif dan tidak dapat ditugaskan.')
-      if (driver.branchId !== booking.pickupBranchId) {
+      if (!newDriver) throw new Error('Sopir tidak ditemukan.')
+      if (!newDriver.isActive) throw new Error('Sopir berstatus nonaktif dan tidak dapat ditugaskan.')
+      if (newDriver.branchId !== currentBooking.pickupBranchId) {
         throw new Error('Akses ditolak: Sopir tidak berada di cabang yang sama dengan lokasi pengambilan pesanan.')
       }
 
-      // 2. Check for overlapping DriverLeave
+      // d. Jika booking ongoing, sopir baru WAJIB saat ini berstatus 'available'
+      if (currentBooking.status === 'ongoing' && newDriver.status !== 'available') {
+        throw new Error('Sopir baru tidak dalam status tersedia (available) untuk langsung melakukan perjalanan.')
+      }
+
+      newDriverInfo = { name: newDriver.name, phone: newDriver.phone }
+
+      // e. Hitung rentang waktu efektif
+      // Untuk booking ongoing, perjalanan sudah berjalan, evaluasi dari 'now' ke endDate
+      const effectiveStart = currentBooking.status === 'ongoing' ? new Date() : currentBooking.startDate
+      const bufferEnd = new Date(currentBooking.endDate.getTime() + 3 * 60 * 60 * 1000)
+      const bufferStart = new Date(effectiveStart.getTime() - 3 * 60 * 60 * 1000)
+
+      // f. Cek overlap DriverLeave menggunakan effectiveStart
       const conflictingLeave = await tx.driverLeave.findFirst({
         where: {
           driverId: driverId,
-          startDate: { lt: booking.endDate },
-          endDate: { gt: booking.startDate }
+          startDate: { lt: currentBooking.endDate },
+          endDate: { gt: effectiveStart }
         }
       })
 
       if (conflictingLeave) {
-        throw new Error('Sopir sedang dalam jadwal cuti/libur pada tanggal pesanan ini.')
+        throw new Error('Sopir sedang dalam jadwal cuti/libur pada rentang waktu pesanan ini.')
       }
 
-      // 3. Check for overlapping active bookings assigned to this driver
+      // g. Cek overlap booking aktif lain menggunakan buffer 3 jam
       const conflictingBooking = await tx.booking.findFirst({
         where: {
           id: { not: bookingId },
           driverId: driverId,
           status: { in: ['pending_payment', 'confirmed', 'ongoing'] },
-          startDate: { lt: booking.endDate },
-          endDate: { gt: booking.startDate }
+          startDate: { lt: bufferEnd },
+          endDate: { gt: bufferStart }
         }
       })
 
@@ -339,21 +392,84 @@ export async function assignDriver(bookingId: string, driverId: string) {
         throw new Error('Sopir ini sudah ditugaskan pada pesanan lain di jadwal yang beririsan.')
       }
 
-      await tx.booking.update({
-        where: { id: bookingId },
+      // h. Sinkronisasi status operasional Driver
+      if (currentBooking.status === 'ongoing') {
+        // Sopir lama dikembalikan ke 'available' jika tadinya 'on_trip'
+        if (oldDriverId) {
+          await tx.driver.updateMany({
+            where: { id: oldDriverId, status: 'on_trip' },
+            data: { status: 'available' }
+          })
+        }
+
+        // Sopir baru dialihkan menjadi 'on_trip'
+        const newDriverUpdate = await tx.driver.updateMany({
+          where: { id: driverId, status: 'available' },
+          data: { status: 'on_trip' }
+        })
+
+        if (newDriverUpdate.count === 0) {
+          throw new Error('Gagal memperbarui status sopir baru (sopir mungkin sudah tidak berstatus available).')
+        }
+      }
+      // Jika status confirmed: kedua sopir tetap berstatus 'available' (startRental nanti yang akan mengubah status ke on_trip)
+
+      // i. Update Booking row secara atomik dengan optimistic locking
+      const updateResult = await tx.booking.updateMany({
+        where: {
+          id: bookingId,
+          status: currentBooking.status,
+          driverId: currentBooking.driverId
+        },
         data: {
           driverId: driverId,
-          driverAssignmentStatus: 'assigned'
+          driverAssignmentStatus: 'assigned',
+          ...(isReassignment ? {
+            reassignedBy: adminUser.id,
+            reassignmentReason: reason?.trim() || null,
+            reassignedAt: new Date()
+          } : {})
         }
       })
+
+      if (updateResult.count === 0) {
+        throw new Error('Status pesanan atau sopir telah berubah oleh proses lain. Silakan muat ulang halaman.')
+      }
+    }, {
+      maxWait: 10000,
+      timeout: 20000
     })
-    
+
+    // 5. Notifikasi Email ke Pelanggan (khusus reassignment atau booking ongoing)
+    if (isReassignment && booking.customer && newDriverInfo) {
+      const driverData = newDriverInfo as { name: string; phone: string }
+      // Non-blocking fire-and-forget email so network latency doesn't stall the UI response
+      sendDriverReassignedEmail({
+        toEmail: booking.customer.email,
+        customerName: booking.customer.name,
+        bookingId: booking.id,
+        oldDriverName: oldDriverName,
+        newDriverName: driverData.name,
+        newDriverPhone: driverData.phone,
+        isOngoing: booking.status === 'ongoing',
+        reason: reason?.trim()
+      }).catch((err) => {
+        console.error('[Email Error] Failed to send driver reassigned email:', err)
+      })
+    }
+
+    // 6. Revalidasi Cache Mendalam (Admin dan Customer)
     revalidatePath('/admin/bookings')
-    
+    revalidatePath('/admin/bookings/[id]', 'page')
+    revalidatePath(`/admin/bookings/${bookingId}`)
+    revalidatePath('/admin/drivers')
+    revalidatePath(`/booking/${bookingId}`)
+    revalidatePath('/dashboard')
+
     return { success: true }
   } catch (error: any) {
-    if (error.code === 'P2010' || (error.message && (error.message.includes('23P01') || error.message.includes('booking_driver_no_overlap')))) {
-      return { error: 'Sopir ini sudah ditugaskan di jadwal yang beririsan.' }
+    if (error.message && error.message.includes('booking_driver_no_overlap')) {
+      return { error: 'Sopir ini sudah ditugaskan pada pesanan lain di jadwal yang beririsan.' }
     }
     return { error: error.message || 'Terjadi kesalahan saat menugaskan sopir.' }
   }

@@ -10,44 +10,58 @@ export interface EligibleDriver {
   branchId: string
 }
 
+export interface EligibleDriverOptions {
+  excludeBookingId?: string
+  effectiveStartDate?: Date
+  requireCurrentlyAvailable?: boolean
+}
+
 /**
  * Single source of truth for driver availability across a date range.
  * 
  * Rules:
  * 1. Driver must belong to the specified branchId.
  * 2. Driver must be active (isActive: true).
- * 3. Driver must NOT have overlapping active bookings (status: pending_payment, confirmed, ongoing).
- * 4. Driver must NOT have overlapping DriverLeave periods.
- * 
- * Note: Driver.status (e.g. off_duty) is an operational real-time indicator for "today",
- * so it is NOT used to exclude drivers from future bookings. DriverLeave is the single source of truth for dates.
+ * 3. Driver must NOT have overlapping active bookings (status: pending_payment, confirmed, ongoing) with 3h buffer.
+ * 4. Driver must NOT have overlapping DriverLeave periods relative to effectiveStartDate.
+ * 5. If requireCurrentlyAvailable is true, driver must have status 'available' right now.
  */
 export async function getEligibleDrivers(
   branchId: string,
   startDate: Date,
   endDate: Date,
-  excludeBookingId?: string
+  excludeBookingIdOrOptions?: string | EligibleDriverOptions,
+  extraOptions?: EligibleDriverOptions
 ): Promise<EligibleDriver[]> {
+  const options: EligibleDriverOptions = typeof excludeBookingIdOrOptions === 'string'
+    ? { excludeBookingId: excludeBookingIdOrOptions, ...extraOptions }
+    : (excludeBookingIdOrOptions || {})
+
+  const effectiveStart = options.effectiveStartDate || startDate
+  const bufferEnd = new Date(endDate.getTime() + 3 * 60 * 60 * 1000)
+  const bufferStart = new Date(effectiveStart.getTime() - 3 * 60 * 60 * 1000)
+
   // Query all active drivers in the branch with their active bookings and leaves
   const drivers = await prisma.driver.findMany({
     where: {
       branchId,
-      isActive: true
+      isActive: true,
+      ...(options.requireCurrentlyAvailable ? { status: 'available' } : {})
     },
     include: {
       bookings: {
         where: {
-          id: excludeBookingId ? { not: excludeBookingId } : undefined,
+          id: options.excludeBookingId ? { not: options.excludeBookingId } : undefined,
           status: { in: ['pending_payment', 'confirmed', 'ongoing'] },
-          startDate: { lt: endDate },
-          endDate: { gt: startDate }
+          startDate: { lt: bufferEnd },
+          endDate: { gt: bufferStart }
         },
         select: { id: true }
       },
       leaves: {
         where: {
           startDate: { lt: endDate },
-          endDate: { gt: startDate }
+          endDate: { gt: effectiveStart }
         },
         select: { id: true }
       }

@@ -29,7 +29,8 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
         orderBy: { createdAt: 'desc' },
         take: 1
       },
-      adminCanceler: true
+      adminCanceler: true,
+      adminReassigner: true
     }
   })
 
@@ -37,10 +38,20 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
     notFound()
   }
 
-  // Find available drivers for assignment if needed
+  // Find available drivers for assignment if needed (strictly confirmed and ongoing)
   let availableDrivers: Array<{id: string, name: string}> = []
-  if (booking.rentalType === 'with_driver' && ['pending_payment', 'confirmed'].includes(booking.status)) {
-    const eligible = await getEligibleDrivers(booking.pickupBranchId, booking.startDate, booking.endDate, booking.id)
+  if (booking.rentalType === 'with_driver' && ['confirmed', 'ongoing'].includes(booking.status)) {
+    const isOngoing = booking.status === 'ongoing'
+    const eligible = await getEligibleDrivers(
+      booking.pickupBranchId, 
+      booking.startDate, 
+      booking.endDate, 
+      {
+        excludeBookingId: booking.id,
+        effectiveStartDate: isOngoing ? new Date() : booking.startDate,
+        requireCurrentlyAvailable: isOngoing
+      }
+    )
     availableDrivers = eligible.map(d => ({ id: d.id, name: `${d.name} (${d.licenseNumber})` }))
   }
 
@@ -203,9 +214,26 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                     </div>
                   )}
 
-                  {['pending_payment', 'confirmed'].includes(booking.status) && (
+                  {booking.reassignedAt && (
+                    <div className="mt-3 p-3 bg-zinc-50 border border-zinc-200 rounded-md">
+                      <p className="text-xs text-zinc-500 font-medium mb-0.5">Riwayat Pergantian Sopir:</p>
+                      <p className="text-xs text-zinc-700">
+                        Diganti oleh <strong className="text-zinc-900">{booking.adminReassigner?.name || 'Admin'}</strong> pada{' '}
+                        {booking.reassignedAt.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+                      {booking.reassignmentReason && (
+                        <p className="text-xs text-zinc-600 mt-1 italic">
+                          "{booking.reassignmentReason}"
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {['confirmed', 'ongoing'].includes(booking.status) && (
                     <div className="mt-4">
-                      <p className="text-xs text-zinc-500 mb-2">Pilih / Ubah Sopir:</p>
+                      <p className="text-xs text-zinc-500 mb-2">
+                        {booking.driverId ? 'Ganti Sopir (Reassignment):' : 'Pilih Sopir:'}
+                      </p>
                       <AssignDriverForm 
                         bookingId={booking.id} 
                         availableDrivers={availableDrivers} 

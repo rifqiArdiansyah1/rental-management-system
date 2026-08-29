@@ -161,10 +161,116 @@ export async function sendDocumentStatusEmail(data: DocumentStatusData) {
     </html>
   `
 
-  return resend.emails.send({
-    from: `Prestige Motion <${EMAIL_FROM}>`,
-    to: data.toEmail,
-    subject: subject,
-    html: htmlContent
-  })
+  try {
+    return resend.emails.send({
+      from: `Prestige Motion <${EMAIL_FROM}>`,
+      to: data.toEmail,
+      subject: subject,
+      html: htmlContent
+    })
+  } catch (err) {
+    console.error('[Email Error] Failed to send document status email:', err)
+    return null
+  }
+}
+
+export interface DriverReassignedData {
+  toEmail: string
+  customerName: string
+  bookingId: string
+  oldDriverName?: string
+  newDriverName: string
+  newDriverPhone: string
+  isOngoing: boolean
+  reason?: string
+}
+
+export async function sendDriverReassignedEmail(data: DriverReassignedData) {
+  try {
+    if (process.env.NODE_ENV === 'test' || !process.env.RESEND_API_KEY) {
+      return { id: 'mock-test-email-id' }
+    }
+
+    const subject = data.isOngoing
+      ? `[PENTING] Pembaruan Sopir Perjalanan Anda - ${data.bookingId.substring(0, 8).toUpperCase()}`
+      : `Pembaruan Sopir Pesanan - ${data.bookingId.substring(0, 8).toUpperCase()}`
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${subject}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-w-xl mx-auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; margin: 0 auto; max-width: 600px;">
+          <tr>
+            <td style="background-color: #1a1a1a; padding: 30px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: normal; letter-spacing: 2px;">PRESTIGE MOTION</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <h2 style="color: #1a1a1a; font-size: 20px; margin-top: 0;">Halo, ${data.customerName}</h2>
+              <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 24px;">
+                ${data.isOngoing 
+                  ? 'Kami ingin menginformasikan bahwa terjadi <strong>pergantian sopir</strong> untuk perjalanan yang sedang berlangsung pada pesanan Anda.'
+                  : 'Terdapat pembaruan informasi penugasan sopir untuk pesanan rental Anda.'
+                }
+              </p>
+
+              <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                <p style="color: #1e40af; font-size: 13px; font-weight: bold; text-transform: uppercase; margin: 0 0 10px 0;">
+                  Informasi Sopir Baru
+                </p>
+                <p style="color: #1e3a8a; font-size: 18px; font-weight: bold; margin: 0 0 6px 0;">
+                  ${data.newDriverName}
+                </p>
+                <p style="color: #1e40af; font-size: 14px; margin: 0;">
+                  Nomor Kontak: <strong>${data.newDriverPhone}</strong>
+                </p>
+                ${data.oldDriverName ? `
+                  <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0; border-top: 1px dashed #bfdbfe; pt: 8px;">
+                    Menggantikan sopir sebelumnya: ${data.oldDriverName}
+                  </p>
+                ` : ''}
+              </div>
+
+              ${data.reason ? `
+                <div style="background-color: #f8f9fa; border-left: 4px solid #6b7280; padding: 12px 16px; margin-bottom: 24px;">
+                  <p style="color: #4b5563; font-size: 13px; margin: 0;">
+                    <strong>Alasan Pergantian:</strong> ${data.reason}
+                  </p>
+                </div>
+              ` : ''}
+
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/booking/${data.bookingId}" style="background-color: #1a1a1a; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; display: inline-block;">
+                  Lihat Status Pesanan
+                </a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 13px; margin: 0;">
+                © ${new Date().getFullYear()} Prestige Motion. Seluruh hak cipta dilindungi.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `
+
+    return await resend.emails.send({
+      from: `Prestige Motion <${EMAIL_FROM}>`,
+      to: data.toEmail,
+      subject: subject,
+      html: htmlContent
+    })
+  } catch (err) {
+    console.error('[Email Error] Failed to send driver reassigned email:', err)
+    return null
+  }
 }
