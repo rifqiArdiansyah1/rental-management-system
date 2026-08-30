@@ -75,7 +75,7 @@ export default async function AdminDriversPage({
           <h1 className="text-3xl font-bold text-zinc-900">Manajemen Sopir</h1>
           <p className="text-sm text-zinc-500 mt-1">Kelola data armada sopir, tarif penugasan, dan jadwal cuti terencana.</p>
         </div>
-        <CreateDriverButton branches={branches} userRole={adminUser.role} />
+        <CreateDriverButton branches={branches} userRole={adminUser.role} userBranchId={adminUser.branchId} />
       </div>
 
       <DriverFilterBar branches={branches} userRole={adminUser.role} />
@@ -118,7 +118,7 @@ export default async function AdminDriversPage({
                       {driver.status.toUpperCase().replace('_', ' ')}
                     </span>
                   )}
-                  <DriverRowActions driver={driver} branches={branches} userRole={adminUser.role} />
+                  <DriverRowActions driver={driver} branches={branches} userRole={adminUser.role} userBranchId={adminUser.branchId} />
                 </div>
               </div>
               
@@ -235,7 +235,7 @@ export default async function AdminDriversPage({
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <DriverRowActions driver={driver} branches={branches} userRole={adminUser.role} />
+                      <DriverRowActions driver={driver} branches={branches} userRole={adminUser.role} userBranchId={adminUser.branchId} />
                     </td>
                   </tr>
                 )

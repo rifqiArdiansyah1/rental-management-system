@@ -15,6 +15,12 @@ let staffAEmail = 'staff_a@test.com';
 let staffAPassword = 'Password123!';
 let staffBEmail = 'staff_b@test.com';
 
+let adminCabangAEmail = 'admin_cabang_a@test.com';
+let adminCabangAPassword = 'Password123!';
+
+let adminPusatEmail = 'admin_pusat_scope@test.com';
+let adminPusatPassword = 'Password123!';
+
 test.describe('Branch Scoping & RBAC Granular', () => {
 
   test.beforeAll(async () => {
@@ -69,6 +75,48 @@ test.describe('Branch Scoping & RBAC Granular', () => {
         where: { id: staffAId },
         update: { role: 'staff_cabang', branchId: branchAId },
         create: { id: staffAId, email: staffAEmail, name: 'Staff A', role: 'staff_cabang', branchId: branchAId }
+      });
+    }
+
+    // Create Admin Cabang A
+    let { data: authDataAdminA } = await supabaseAdmin.auth.admin.createUser({
+      email: adminCabangAEmail,
+      password: adminCabangAPassword,
+      email_confirm: true,
+      app_metadata: { role: 'admin_cabang', branchId: branchAId },
+    });
+    let adminCabangAId = authDataAdminA.user?.id;
+    if (!adminCabangAId) {
+      const { data } = await supabaseAdmin.auth.admin.listUsers();
+      adminCabangAId = data.users.find(u => u.email === adminCabangAEmail)?.id;
+    }
+    if (adminCabangAId) {
+      await supabaseAdmin.auth.admin.updateUserById(adminCabangAId, { app_metadata: { role: 'admin_cabang', branchId: branchAId } });
+      await prisma.user.upsert({
+        where: { id: adminCabangAId },
+        update: { role: 'admin_cabang', branchId: branchAId },
+        create: { id: adminCabangAId, email: adminCabangAEmail, name: 'Admin Cabang Alpha', role: 'admin_cabang', branchId: branchAId }
+      });
+    }
+
+    // Create Admin Pusat
+    let { data: authDataAdminPusat } = await supabaseAdmin.auth.admin.createUser({
+      email: adminPusatEmail,
+      password: adminPusatPassword,
+      email_confirm: true,
+      app_metadata: { role: 'admin_pusat' },
+    });
+    let adminPusatId = authDataAdminPusat.user?.id;
+    if (!adminPusatId) {
+      const { data } = await supabaseAdmin.auth.admin.listUsers();
+      adminPusatId = data.users.find(u => u.email === adminPusatEmail)?.id;
+    }
+    if (adminPusatId) {
+      await supabaseAdmin.auth.admin.updateUserById(adminPusatId, { app_metadata: { role: 'admin_pusat' } });
+      await prisma.user.upsert({
+        where: { id: adminPusatId },
+        update: { role: 'admin_pusat' },
+        create: { id: adminPusatId, email: adminPusatEmail, name: 'Admin Pusat Scope', role: 'admin_pusat' }
       });
     }
 
@@ -129,4 +177,63 @@ test.describe('Branch Scoping & RBAC Granular', () => {
     await expect(page.locator('text=Cust B')).not.toBeVisible();
   });
 
+  test('Branch Placement in Create Driver/Vehicle Modal is restricted for Admin Cabang but unrestricted for Admin Pusat', async ({ page }) => {
+    // 1. Login as Admin Cabang A
+    await page.context().clearCookies();
+    await page.goto('/admin/login');
+    await page.fill('input[type="email"]', adminCabangAEmail);
+    await page.fill('input[type="password"]', adminCabangAPassword);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/admin/dashboard');
+
+    // 2. Open Drivers Page and click "+ Tambah Sopir"
+    await page.goto('/admin/drivers');
+    await page.getByRole('button', { name: '+ Tambah Sopir' }).click();
+
+    // Verify branch select is disabled and only contains Cabang Alpha
+    const driverBranchSelect = page.locator('select').filter({ has: page.locator('option:has-text("Cabang Alpha")') });
+    await expect(driverBranchSelect).toBeVisible();
+    await expect(driverBranchSelect).toBeDisabled();
+    await expect(driverBranchSelect.locator('option')).toHaveCount(1);
+    await expect(driverBranchSelect).toContainText('Cabang Alpha');
+    await expect(driverBranchSelect).not.toContainText('Cabang Beta');
+
+    // Close modal
+    await page.getByRole('button', { name: 'Batal' }).click();
+
+    // 3. Open Vehicles Page and click "+ Tambah Kendaraan"
+    await page.goto('/admin/vehicles');
+    await page.getByRole('button', { name: '+ Tambah Kendaraan' }).click();
+
+    const vehicleBranchSelect = page.locator('select').filter({ has: page.locator('option:has-text("Cabang Alpha")') });
+    await expect(vehicleBranchSelect).toBeVisible();
+    await expect(vehicleBranchSelect).toBeDisabled();
+    await expect(vehicleBranchSelect.locator('option')).toHaveCount(1);
+    await expect(vehicleBranchSelect).toContainText('Cabang Alpha');
+    await expect(vehicleBranchSelect).not.toContainText('Cabang Beta');
+
+    // Close modal
+    await page.getByRole('button', { name: 'Batal' }).click();
+
+    // 4. Logout & Login as Admin Pusat
+    await page.context().clearCookies();
+    await page.goto('/admin/login');
+    await page.fill('input[type="email"]', adminPusatEmail);
+    await page.fill('input[type="password"]', adminPusatPassword);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/admin/dashboard');
+
+    // 5. Open Drivers Page and click "+ Tambah Sopir"
+    await page.goto('/admin/drivers');
+    await page.getByRole('button', { name: '+ Tambah Sopir' }).click();
+
+    // Admin Pusat should see full branch options with placeholder
+    const adminDriverBranchSelect = page.locator('select').filter({ has: page.locator('option:has-text("-- Pilih Cabang --")') });
+    await expect(adminDriverBranchSelect).toBeVisible();
+    await expect(adminDriverBranchSelect).toBeEnabled();
+    await expect(adminDriverBranchSelect).toContainText('Cabang Alpha');
+    await expect(adminDriverBranchSelect).toContainText('Cabang Beta');
+  });
+
 });
+

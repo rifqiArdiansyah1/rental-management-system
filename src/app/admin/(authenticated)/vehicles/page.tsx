@@ -75,7 +75,7 @@ export default async function AdminVehiclesPage({
           <h1 className="text-3xl font-bold text-zinc-900">Manajemen Armada</h1>
           <p className="text-sm text-zinc-500 mt-1">Kelola data inventaris, identitas armada, dan status ketersediaan.</p>
         </div>
-        <CreateVehicleButton branches={branches} categories={categories} userRole={adminUser.role} />
+        <CreateVehicleButton branches={branches} categories={categories} userRole={adminUser.role} userBranchId={adminUser.branchId} />
       </div>
       
       <VehicleFilterBar branches={branches} categories={categories} userRole={adminUser.role} />
@@ -122,7 +122,7 @@ export default async function AdminVehiclesPage({
                       {vehicle.status.toUpperCase()}
                     </span>
                   )}
-                  <VehicleRowActions vehicle={vehicle} categories={categories} branches={branches} userRole={adminUser.role} />
+                  <VehicleRowActions vehicle={vehicle} categories={categories} branches={branches} userRole={adminUser.role} userBranchId={adminUser.branchId} />
                 </div>
               </div>
               
@@ -217,7 +217,7 @@ export default async function AdminVehiclesPage({
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <VehicleRowActions vehicle={vehicle} categories={categories} branches={branches} userRole={adminUser.role} />
+                      <VehicleRowActions vehicle={vehicle} categories={categories} branches={branches} userRole={adminUser.role} userBranchId={adminUser.branchId} />
                     </td>
                   </tr>
                 )

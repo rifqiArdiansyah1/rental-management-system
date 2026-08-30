@@ -225,24 +225,44 @@ function PhotoManager({ photos, onChange, maxPhotos = 6 }: {
 }
 
 // -- Create Vehicle Modal --
-export function CreateVehicleButton({ branches, categories, userRole }: {
+export function CreateVehicleButton({ branches, categories, userRole, userBranchId }: {
   branches: Array<{id: string, name: string}>,
   categories: Array<{id: string, name: string}>,
-  userRole: string 
+  userRole: string,
+  userBranchId?: string | null
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
 
+  const defaultBranchId = userRole === 'admin_pusat' ? '' : (userBranchId || (branches.length === 1 ? branches[0].id : ''))
+
   const [form, setForm] = useState({
     name: '',
     plateNumber: '',
     categoryId: '',
-    branchId: '',
+    branchId: defaultBranchId,
     dailyRate: '',
     photos: [] as string[]
   })
+
+  const availableBranches = userRole === 'admin_pusat'
+    ? branches
+    : branches.filter(b => b.id === userBranchId)
+
+  const handleOpen = () => {
+    setForm({
+      name: '',
+      plateNumber: '',
+      categoryId: '',
+      branchId: userRole === 'admin_pusat' ? '' : (userBranchId || (branches.length === 1 ? branches[0].id : '')),
+      dailyRate: '',
+      photos: []
+    })
+    setError(null)
+    setIsOpen(true)
+  }
 
   // Disable completely for staff
   if (userRole === 'staff_cabang') return null
@@ -251,11 +271,16 @@ export function CreateVehicleButton({ branches, categories, userRole }: {
     e.preventDefault()
     startTransition(async () => {
       setError(null)
+      const targetBranchId = userRole === 'admin_pusat' ? form.branchId : (userBranchId || form.branchId)
+      if (!targetBranchId) {
+        setError('Cabang wajib dipilih')
+        return
+      }
       const res = await createVehicle({
         name: form.name,
         plateNumber: form.plateNumber,
         categoryId: form.categoryId,
-        branchId: form.branchId,
+        branchId: targetBranchId,
         dailyRate: Number(form.dailyRate),
         photos: form.photos
       })
@@ -266,7 +291,7 @@ export function CreateVehicleButton({ branches, categories, userRole }: {
           name: '',
           plateNumber: '',
           categoryId: '',
-          branchId: '',
+          branchId: defaultBranchId,
           dailyRate: '',
           photos: []
         })
@@ -278,7 +303,7 @@ export function CreateVehicleButton({ branches, categories, userRole }: {
   return (
     <>
       <button 
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
       >
         + Tambah Kendaraan
@@ -346,15 +371,25 @@ export function CreateVehicleButton({ branches, categories, userRole }: {
 
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 mb-1">Cabang *</label>
-                  <select 
-                    required
-                    value={form.branchId}
-                    onChange={e => setForm({...form, branchId: e.target.value})}
-                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">-- Pilih Cabang --</option>
-                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
+                  {userRole === 'admin_pusat' ? (
+                    <select 
+                      required
+                      value={form.branchId}
+                      onChange={e => setForm({...form, branchId: e.target.value})}
+                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- Pilih Cabang --</option>
+                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  ) : (
+                    <select 
+                      disabled
+                      value={userBranchId || form.branchId}
+                      className="w-full text-zinc-700 bg-zinc-100 border border-zinc-300 rounded-md p-2 text-sm cursor-not-allowed"
+                    >
+                      {availableBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  )}
                 </div>
               </div>
 
@@ -394,11 +429,12 @@ export function CreateVehicleButton({ branches, categories, userRole }: {
 }
 
 // -- Row Actions --
-export function VehicleRowActions({ vehicle, categories, branches, userRole }: { 
+export function VehicleRowActions({ vehicle, categories, branches, userRole, userBranchId }: { 
   vehicle: any,
   categories: any[],
   branches: any[],
-  userRole: string
+  userRole: string,
+  userBranchId?: string | null
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [openUpward, setOpenUpward] = useState(false)
@@ -632,13 +668,23 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole }: {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 mb-1">Cabang *</label>
-                  <select 
-                    value={form.branchId}
-                    onChange={e => setForm({...form, branchId: e.target.value})}
-                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
+                  {userRole === 'admin_pusat' ? (
+                    <select 
+                      value={form.branchId}
+                      onChange={e => setForm({...form, branchId: e.target.value})}
+                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  ) : (
+                    <select 
+                      disabled
+                      value={vehicle.branchId}
+                      className="w-full text-zinc-700 bg-zinc-100 border border-zinc-300 rounded-md p-2 text-sm cursor-not-allowed"
+                    >
+                      {branches.filter(b => b.id === vehicle.branchId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  )}
                 </div>
               </div>
 
