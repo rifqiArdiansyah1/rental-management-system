@@ -43,7 +43,7 @@ test.describe('Payment Cancellation & Vehicle Lock Release', () => {
 
     // 3. Simulate Webhook (Payment Cancel/Deny)
     // First, click "Bayar Sekarang" to generate Payment record
-    const payBtn = page.getByRole('button', { name: /Bayar/i });
+    const payBtn = page.getByRole('button', { name: 'Bayar Sekarang' });
     await payBtn.waitFor({ state: 'visible', timeout: 5000 });
     await payBtn.click();
     await page.waitForTimeout(2000); // wait for payment creation

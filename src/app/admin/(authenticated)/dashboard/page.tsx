@@ -1,6 +1,10 @@
 import { prisma } from '@/utils/prisma'
 import { getStaffScope, buildScopeWhere } from '@/lib/auth/scope'
 import { Car, CalendarCheck, CalendarClock } from 'lucide-react'
+import { CronHealthWidget } from '@/components/admin/CronHealthWidget'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default async function AdminDashboardPage() {
   const scope = await getStaffScope()
@@ -32,6 +36,27 @@ export default async function AdminDashboardPage() {
     }
   })
 
+  // 4. Observability: Cron Heartbeat (Global infrastructure telemetry)
+  const cronHeartbeat = await prisma.cronHeartbeat.findUnique({
+    where: { jobName: 'cancel-bookings' }
+  })
+
+  // 5. Observability: Oldest Pending Booking (Scoped by branch for staff_cabang, global for admin_pusat)
+  const oldestPendingBooking = await prisma.booking.findFirst({
+    where: {
+      ...pickupBranchScope,
+      status: 'pending_payment'
+    },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, createdAt: true }
+  })
+
+  let branchName: string | undefined = undefined
+  if (scope.scope === 'branch' && scope.branchId) {
+    const b = await prisma.branch.findUnique({ where: { id: scope.branchId }, select: { name: true } })
+    branchName = b?.name
+  }
+
   let branchBreakdowns: any[] = []
   if (scope.scope === 'all') {
     // Breakdown for admin_pusat
@@ -62,11 +87,20 @@ export default async function AdminDashboardPage() {
   return (
     <div className="p-8">
       <h1 className="text-3xl font-bold text-zinc-900 mb-2">Dashboard</h1>
-      <p className="text-zinc-500 mb-8">
+      <p className="text-zinc-500 mb-6">
         {scope.scope === 'branch' 
           ? `Menampilkan statistik untuk cabang Anda.` 
           : `Menampilkan statistik keseluruhan semua cabang.`}
       </p>
+
+      {/* Widget Observabilitas Pembersihan Otomatis & Deteksi Anomali */}
+      <CronHealthWidget
+        cronHeartbeat={cronHeartbeat}
+        oldestPendingBooking={oldestPendingBooking}
+        userScope={scope.scope}
+        branchName={branchName}
+        expectedIntervalMinutes={parseInt(process.env.CRON_CLEANUP_INTERVAL_MINUTES || '15', 10)}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         

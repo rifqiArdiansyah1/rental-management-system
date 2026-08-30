@@ -224,6 +224,9 @@ model Booking {
   @@index([pickupBranchId, status])
   @@index([status, startDate])
   @@index([createdAt])
+  // Indeks komposit observabilitas query oldest pending booking (global & per-cabang)
+  @@index([status, createdAt])
+  @@index([pickupBranchId, status, createdAt])
 }
 
 model Payment {
@@ -289,4 +292,18 @@ model User {
 
   @@index([branchId, role])
   @@index([branchId, isActive])
+}
+
+model CronHeartbeat {
+  id                String   @id @default(uuid())
+  jobName           String   @unique
+  lastRunAt         DateTime
+  bookingsCancelled Int
+  status            String   @default("success") // "success" | "failed"
+  lastError         String?
+  executionTimeMs   Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([jobName])
 }

@@ -62,7 +62,8 @@ export default defineConfig({
       MIDTRANS_SERVER_KEY: process.env.MIDTRANS_SERVER_KEY || '',
       MIDTRANS_CLIENT_KEY: process.env.MIDTRANS_CLIENT_KEY || process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || '',
       MIDTRANS_IS_PRODUCTION: process.env.MIDTRANS_IS_PRODUCTION || process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION || '',
-      CRON_MANUAL_SECRET: process.env.CRON_MANUAL_SECRET || '',
+      CRON_MANUAL_SECRET: process.env.CRON_MANUAL_SECRET || 'test-cron-manual-secret',
+      CRON_CLEANUP_INTERVAL_MINUTES: process.env.CRON_CLEANUP_INTERVAL_MINUTES || '15',
       RESEND_API_KEY: process.env.RESEND_API_KEY || 're_placeholder_key_here',
       EMAIL_FROM: process.env.EMAIL_FROM || 'onboarding@resend.dev',
       APP_URL: 'http://localhost:3001'
