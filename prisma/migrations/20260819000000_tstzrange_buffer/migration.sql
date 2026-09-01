@@ -2,6 +2,10 @@
 ALTER TABLE "Booking" DROP CONSTRAINT IF EXISTS booking_vehicle_no_overlap;
 ALTER TABLE "Booking" DROP CONSTRAINT IF EXISTS booking_driver_no_overlap;
 
+-- Alter column types to timestamptz
+ALTER TABLE "Booking" ALTER COLUMN "startDate" TYPE timestamptz USING "startDate" AT TIME ZONE 'UTC';
+ALTER TABLE "Booking" ALTER COLUMN "endDate" TYPE timestamptz USING "endDate" AT TIME ZONE 'UTC';
+
 -- Re-create the constraint for vehicle with tstzrange and 3-hour buffer
 -- A new booking's start time cannot overlap with an existing booking's (end time + 3 hours)
 ALTER TABLE "Booking"

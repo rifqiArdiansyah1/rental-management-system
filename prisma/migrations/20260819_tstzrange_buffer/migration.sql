@@ -3,7 +3,7 @@ ALTER TABLE "Booking" ADD COLUMN "rental_period" tstzrange;
 
 -- 2. Populate new column based on existing startDate and endDate
 UPDATE "Booking" 
-SET "rental_period" = tstzrange("startDate", "endDate" + interval '3 hours', '[)');
+SET "rental_period" = tstzrange("startDate" AT TIME ZONE 'UTC', ("endDate" AT TIME ZONE 'UTC' + interval '3 hours') AT TIME ZONE 'UTC', '[)');
 
 -- 3. Drop existing exclusion constraints (based on daterange)
 ALTER TABLE "Booking" DROP CONSTRAINT IF EXISTS booking_vehicle_no_overlap;

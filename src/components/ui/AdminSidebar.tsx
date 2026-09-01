@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, CalendarRange, Car, LogOut, Users, Building2, UserCog, Menu, X } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Car, LogOut, Users, Building2, UserCog, ScrollText, Menu, X } from 'lucide-react'
 
 type AdminSidebarProps = {
   userRole: string;
@@ -34,6 +34,7 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
   const normalizedRole = (userRole || '').toLowerCase().replace(/\s+/g, '_')
   const isAdminPusat = normalizedRole === 'admin_pusat'
   const canManageStaff = isAdminPusat || normalizedRole === 'admin_cabang'
+  const canViewAuditLog = isAdminPusat || normalizedRole === 'admin_cabang'
 
   const navLinks = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -42,6 +43,7 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
     { href: '/admin/drivers', icon: Users, label: 'Manajemen Sopir' },
     ...(isAdminPusat ? [{ href: '/admin/branches', icon: Building2, label: 'Manajemen Cabang' }] : []),
     ...(canManageStaff ? [{ href: '/admin/staff', icon: UserCog, label: 'Manajemen Staf' }] : []),
+    ...(canViewAuditLog ? [{ href: '/admin/audit-logs', icon: ScrollText, label: 'Audit Log' }] : []),
   ]
 
   const displayRole = userRole ? userRole.replace(/_/g, ' ') : ''

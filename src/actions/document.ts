@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getStaffScope } from '@/lib/auth/scope'
+import { logAudit } from '@/lib/audit'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'application/pdf']
@@ -152,7 +153,31 @@ export async function generateSignedDocumentUrl(fileUrl: string) {
     }
   }
 
+  // Ambil konteks cabang target dari pesanan customer
+  const targetBooking = await prisma.booking.findFirst({
+    where: { customerId: targetDocument.customerId },
+    orderBy: { createdAt: 'desc' }
+  })
+  const targetBranchId = targetBooking?.pickupBranchId ?? null
+
   if (!isAuthorized) {
+    const actorUser = await prisma.user.findUnique({ where: { id: user.id } })
+    if (actorUser) {
+      logAudit({
+        actorId: actorUser.id,
+        actorRole: actorUser.role,
+        branchId: targetBranchId,
+        action: 'document.view_denied',
+        entityType: 'Document',
+        entityId: targetDocument.id,
+        metadata: {
+          reason: 'Cross-branch access denied',
+          documentType: targetDocument.type,
+          customerId: targetDocument.customerId,
+          requestedFileUrl: fileUrl
+        }
+      })
+    }
     return { error: 'Anda tidak memiliki akses ke dokumen ini' }
   }
 
@@ -166,6 +191,26 @@ export async function generateSignedDocumentUrl(fileUrl: string) {
     if (error || !data) {
       console.error('Signed URL Error:', error)
       return { error: 'Gagal membuat tautan akses' }
+    }
+
+    // Catat audit log jika diakses oleh akun internal (bukan oleh customer pemilik sendiri)
+    if (targetDocument.customerId !== user.id) {
+      const actorUser = await prisma.user.findUnique({ where: { id: user.id } })
+      if (actorUser) {
+        logAudit({
+          actorId: actorUser.id,
+          actorRole: actorUser.role,
+          branchId: targetBranchId,
+          action: 'document.view',
+          entityType: 'Document',
+          entityId: targetDocument.id,
+          metadata: {
+            documentType: targetDocument.type,
+            customerId: targetDocument.customerId,
+            expiresInSeconds: 300
+          }
+        })
+      }
     }
 
     return { url: data.signedUrl }

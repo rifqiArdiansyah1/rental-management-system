@@ -289,6 +289,7 @@ model User {
 
   cancelledBookings   Booking[] @relation("AdminCanceler")
   reassignedBookings  Booking[] @relation("AdminReassigner")
+  auditLogs           AuditLog[] @relation("UserAuditLogs")
 
   @@index([branchId, role])
   @@index([branchId, isActive])
@@ -307,3 +308,24 @@ model CronHeartbeat {
 
   @@index([jobName])
 }
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  actorId    String
+  actorRole  UserRole  // Snapshot role saat aksi terjadi (bebas efek demosi/promosi masa depan)
+  branchId   String?   // Konteks cabang entitas target saat aksi terjadi
+  action     String    // Contoh: "staff.create", "booking.cancel", "driver.reassign", "document.view", "document.view_denied"
+  entityType String    // "Booking", "Vehicle", "Driver", "Branch", "User", "Document", "Customer", "DriverLeave"
+  entityId   String    // ID entitas target (polimorfik tanpa FK constraint agar permanen)
+  metadata   Json?     // Payload before/after, alasan, note, dsb
+  createdAt  DateTime  @default(now())
+
+  actor User @relation("UserAuditLogs", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([branchId, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+}
+

@@ -4,6 +4,7 @@ import { prisma } from '@/utils/prisma'
 import { requireAdminSession } from '@/actions/admin'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
 import { DriverStatus, Prisma } from '@prisma/client'
+import { logAudit } from '@/lib/audit'
 
 export async function createDriver(data: {
   name: string
@@ -50,6 +51,22 @@ export async function createDriver(data: {
         dailyFee: new Prisma.Decimal(data.dailyFee),
         status: 'available',
         isActive: true,
+      }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: data.branchId,
+      action: 'driver.create',
+      entityType: 'Driver',
+      entityId: driver.id,
+      metadata: {
+        name: driver.name,
+        phone: driver.phone,
+        licenseNumber: driver.licenseNumber,
+        branchId: driver.branchId,
+        dailyFee: Number(driver.dailyFee)
       }
     })
 
@@ -121,6 +138,31 @@ export async function updateDriver(id: string, data: {
       }
     })
 
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: data.branchId ?? existingDriver.branchId,
+      action: 'driver.update',
+      entityType: 'Driver',
+      entityId: id,
+      metadata: {
+        before: {
+          name: existingDriver.name,
+          phone: existingDriver.phone,
+          licenseNumber: existingDriver.licenseNumber,
+          branchId: existingDriver.branchId,
+          dailyFee: Number(existingDriver.dailyFee)
+        },
+        after: {
+          name: data.name.trim(),
+          phone: data.phone.trim(),
+          licenseNumber: normalizedLicense,
+          branchId: data.branchId,
+          dailyFee: Number(data.dailyFee)
+        }
+      }
+    })
+
     return { success: true }
   } catch (error: any) {
     if (error.code === 'P2002') return { error: 'Nomor SIM sudah terdaftar di sistem' }
@@ -131,7 +173,7 @@ export async function updateDriver(id: string, data: {
 
 export async function updateDriverStatus(id: string, newStatus: DriverStatus) {
   try {
-    await requireAdminSession()
+    const adminUser = await requireAdminSession()
 
     const driver = await prisma.driver.findUnique({ where: { id } })
     if (!driver) return { error: 'Sopir tidak ditemukan' }
@@ -156,6 +198,20 @@ export async function updateDriverStatus(id: string, newStatus: DriverStatus) {
         where: { id },
         data: { status: newStatus }
       })
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: driver.branchId,
+      action: 'driver.status_change',
+      entityType: 'Driver',
+      entityId: id,
+      metadata: {
+        name: driver.name,
+        oldStatus: driver.status,
+        newStatus
+      }
     })
 
     return { success: true }
@@ -195,6 +251,20 @@ export async function softDeleteDriver(id: string, isActive: boolean) {
         where: { id },
         data: { isActive }
       })
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: driver.branchId,
+      action: 'driver.delete',
+      entityType: 'Driver',
+      entityId: id,
+      metadata: {
+        name: driver.name,
+        licenseNumber: driver.licenseNumber,
+        isActive
+      }
     })
 
     return { success: true }
@@ -275,6 +345,22 @@ export async function createDriverLeave(data: {
       })
     })
 
+    const adminUser = await requireAdminSession()
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: driver.branchId,
+      action: 'driver.leave_create',
+      entityType: 'DriverLeave',
+      entityId: data.driverId,
+      metadata: {
+        driverName: driver.name,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        reason: data.reason?.trim() || null
+      }
+    })
+
     return { success: true }
   } catch (error: any) {
     return { error: error.message || 'Terjadi kesalahan saat mendaftarkan cuti' }
@@ -283,7 +369,7 @@ export async function createDriverLeave(data: {
 
 export async function deleteDriverLeave(leaveId: string) {
   try {
-    await requireAdminSession()
+    const adminUser = await requireAdminSession()
 
     const leave = await prisma.driverLeave.findUnique({
       where: { id: leaveId },
@@ -303,6 +389,21 @@ export async function deleteDriverLeave(leaveId: string) {
 
     await prisma.driverLeave.delete({
       where: { id: leaveId }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: leave.driver.branchId,
+      action: 'driver.leave_delete',
+      entityType: 'DriverLeave',
+      entityId: leaveId,
+      metadata: {
+        driverId: leave.driverId,
+        driverName: leave.driver.name,
+        startDate: leave.startDate.toISOString(),
+        endDate: leave.endDate.toISOString()
+      }
     })
 
     return { success: true }

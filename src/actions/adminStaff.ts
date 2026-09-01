@@ -5,6 +5,7 @@ import { requireAdminSession } from '@/actions/admin'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { UserRole } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
+import { logAudit } from '@/lib/audit'
 
 export async function createStaff(data: {
   name: string
@@ -88,6 +89,21 @@ export async function createStaff(data: {
           isActive: true
         },
         include: { branch: true }
+      })
+
+      logAudit({
+        actorId: adminUser.id,
+        actorRole: adminUser.role,
+        branchId: effectiveBranchId,
+        action: 'staff.create',
+        entityType: 'User',
+        entityId: user.id,
+        metadata: {
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          branchId: effectiveBranchId
+        }
       })
 
       revalidatePath('/admin/staff')
@@ -202,6 +218,20 @@ export async function updateStaff(id: string, data: {
       }
     })
 
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: effectiveBranchId ?? target.branchId,
+      action: 'staff.update',
+      entityType: 'User',
+      entityId: id,
+      metadata: {
+        before: { name: target.name, role: target.role, branchId: target.branchId },
+        after: { name: data.name.trim(), role: data.role, branchId: effectiveBranchId },
+        passwordChanged: Boolean(data.password && data.password.trim().length >= 10)
+      }
+    })
+
     // 3. Force Session Revocation if role or branch changed (Mitigate JWT staleness)
     if (target.role !== data.role || target.branchId !== effectiveBranchId) {
       await supabaseAdmin.auth.admin.signOut(id).catch(err => {
@@ -273,6 +303,22 @@ export async function softDeleteStaff(id: string, isActive: boolean) {
     await prisma.user.update({
       where: { id },
       data: { isActive }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: target.branchId,
+      action: isActive ? 'staff.activate' : 'staff.deactivate',
+      entityType: 'User',
+      entityId: id,
+      metadata: {
+        name: target.name,
+        email: target.email,
+        role: target.role,
+        branchId: target.branchId,
+        isActive
+      }
     })
 
     revalidatePath('/admin/staff')

@@ -5,6 +5,7 @@ import { prisma } from '@/utils/prisma'
 import { revalidatePath } from 'next/cache'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
 import { sendDriverReassignedEmail } from '@/utils/email'
+import { logAudit } from '@/lib/audit'
 
 // Valid roles
 const VALID_ROLES = ['staff_cabang', 'admin_cabang', 'admin_pusat']
@@ -113,6 +114,21 @@ export async function startRental(bookingId: string) {
       }
     })
 
+    const adminUser = await requireAdminSession()
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: booking.pickupBranchId,
+      action: 'rental.start',
+      entityType: 'Booking',
+      entityId: bookingId,
+      metadata: {
+        vehicleId: booking.vehicleId,
+        driverId: booking.driverId,
+        startedAt: new Date().toISOString()
+      }
+    })
+
     revalidatePath('/admin/bookings')
     revalidatePath('/admin/vehicles')
     revalidatePath('/admin/dashboard')
@@ -179,6 +195,21 @@ export async function endRental(bookingId: string) {
         if (driverUpdate.count === 0) {
           throw new Error('Inkonsistensi data sopir (tidak berstatus on_trip).')
         }
+      }
+    })
+
+    const adminUser = await requireAdminSession()
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: booking.returnBranchId ?? booking.pickupBranchId,
+      action: 'rental.end',
+      entityType: 'Booking',
+      entityId: bookingId,
+      metadata: {
+        vehicleId: booking.vehicleId,
+        driverId: booking.driverId,
+        endedAt: new Date().toISOString()
       }
     })
 
@@ -267,6 +298,27 @@ export async function verifyDocument(documentId: string, status: 'verified' | 'r
     } catch (e) {
       console.error('Failed to send document status email:', e)
     }
+
+    const adminUser = await requireAdminSession()
+    const targetBooking = await prisma.booking.findFirst({
+      where: { customerId },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: targetBooking?.pickupBranchId ?? null,
+      action: 'document.verify',
+      entityType: 'Customer',
+      entityId: customerId,
+      metadata: {
+        documentId: document.id,
+        documentType: document.type,
+        status,
+        reason: reason || null
+      }
+    })
     
     revalidatePath('/admin/bookings')
     // We will revalidate specific booking ID path in client by calling useRouter().refresh() or we can revalidate all bookings detail
@@ -458,6 +510,22 @@ export async function assignDriver(bookingId: string, driverId: string, reason?:
       })
     }
 
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: booking.pickupBranchId,
+      action: isReassignment ? 'driver.reassign' : 'driver.assign',
+      entityType: 'Booking',
+      entityId: bookingId,
+      metadata: {
+        oldDriverId: oldDriverId || null,
+        newDriverId: driverId,
+        reason: reason?.trim() || null,
+        isReassignment,
+        bookingStatus: booking.status
+      }
+    })
+
     // 6. Revalidasi Cache Mendalam (Admin dan Customer)
     revalidatePath('/admin/bookings')
     revalidatePath('/admin/bookings/[id]', 'page')
@@ -533,6 +601,20 @@ export async function adminCancelBooking(bookingId: string, reason: string, reje
       // Untuk MVP kita abaikan implementasi aktual pengiriman email, cukup beri penanda
       console.log(`[Email Mock] Sending cancellation email to customer ${booking.customerId} for booking ${bookingId}`)
     }
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: booking.pickupBranchId,
+      action: 'booking.cancel',
+      entityType: 'Booking',
+      entityId: bookingId,
+      metadata: {
+        reason: reason.trim(),
+        previousStatus: booking.status,
+        rejectCustomerDoc
+      }
+    })
     
     revalidatePath('/admin/bookings')
     revalidatePath(`/admin/bookings/${bookingId}`)

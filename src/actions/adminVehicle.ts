@@ -5,6 +5,7 @@ import { requireAdminSession } from '@/actions/admin'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
 import { VehicleStatus, Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
+import { logAudit } from '@/lib/audit'
 
 export async function createVehicle(data: {
   name: string
@@ -39,6 +40,22 @@ export async function createVehicle(data: {
         photos: data.photos || [],
         status: 'available',
         isActive: true,
+      }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: data.branchId,
+      action: 'vehicle.create',
+      entityType: 'Vehicle',
+      entityId: vehicle.id,
+      metadata: {
+        name: vehicle.name,
+        plateNumber: vehicle.plateNumber,
+        categoryId: vehicle.categoryId,
+        branchId: vehicle.branchId,
+        dailyRate: Number(vehicle.dailyRate)
       }
     })
 
@@ -104,6 +121,31 @@ export async function updateVehicle(id: string, data: {
         branchId: data.branchId,
         dailyRate: new Prisma.Decimal(data.dailyRate),
         photos: data.photos || [],
+      }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: data.branchId ?? existingVehicle.branchId,
+      action: 'vehicle.update',
+      entityType: 'Vehicle',
+      entityId: id,
+      metadata: {
+        before: {
+          name: existingVehicle.name,
+          plateNumber: existingVehicle.plateNumber,
+          categoryId: existingVehicle.categoryId,
+          branchId: existingVehicle.branchId,
+          dailyRate: Number(existingVehicle.dailyRate)
+        },
+        after: {
+          name: data.name.trim(),
+          plateNumber: normalizedPlate,
+          categoryId: data.categoryId,
+          branchId: data.branchId,
+          dailyRate: Number(data.dailyRate)
+        }
       }
     })
 
@@ -193,6 +235,20 @@ export async function updateVehicleStatus(id: string, newStatus: VehicleStatus) 
       timeout: 20000
     })
 
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: vehicle.branchId,
+      action: 'vehicle.status_change',
+      entityType: 'Vehicle',
+      entityId: id,
+      metadata: {
+        plateNumber: vehicle.plateNumber,
+        oldStatus: vehicle.status,
+        newStatus
+      }
+    })
+
     // 4. Revalidasi cache mendalam
     revalidatePath('/admin/vehicles')
     revalidatePath('/admin/dashboard')
@@ -240,6 +296,20 @@ export async function softDeleteVehicle(id: string, isActive: boolean) {
       })
 
       return updated
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: vehicle.branchId,
+      action: 'vehicle.delete',
+      entityType: 'Vehicle',
+      entityId: id,
+      metadata: {
+        plateNumber: vehicle.plateNumber,
+        name: vehicle.name,
+        isActive
+      }
     })
 
     revalidatePath('/admin/vehicles')

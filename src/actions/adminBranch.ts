@@ -3,6 +3,7 @@
 import { prisma } from '@/utils/prisma'
 import { requireAdminSession } from '@/actions/admin'
 import { revalidatePath } from 'next/cache'
+import { logAudit } from '@/lib/audit'
 
 export async function createBranch(data: {
   name: string
@@ -43,6 +44,21 @@ export async function createBranch(data: {
         openTime: data.openTime?.trim() || '08:00',
         closeTime: data.closeTime?.trim() || '21:00',
         isActive: true,
+      }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: branch.id,
+      action: 'branch.create',
+      entityType: 'Branch',
+      entityId: branch.id,
+      metadata: {
+        name: branch.name,
+        city: branch.city,
+        address: branch.address,
+        phone: branch.phone
       }
     })
 
@@ -102,6 +118,33 @@ export async function updateBranch(id: string, data: {
         phone: data.phone.trim(),
         openTime: data.openTime?.trim() || existing.openTime,
         closeTime: data.closeTime?.trim() || existing.closeTime,
+      }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: id,
+      action: 'branch.update',
+      entityType: 'Branch',
+      entityId: id,
+      metadata: {
+        before: {
+          name: existing.name,
+          city: existing.city,
+          address: existing.address,
+          phone: existing.phone,
+          openTime: existing.openTime,
+          closeTime: existing.closeTime
+        },
+        after: {
+          name: data.name.trim(),
+          city: data.city.trim(),
+          address: data.address.trim(),
+          phone: data.phone.trim(),
+          openTime: data.openTime?.trim() || existing.openTime,
+          closeTime: data.closeTime?.trim() || existing.closeTime
+        }
       }
     })
 
@@ -175,6 +218,20 @@ export async function softDeleteBranch(id: string, isActive: boolean) {
         where: { id },
         data: { isActive }
       })
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: id,
+      action: 'branch.status_change',
+      entityType: 'Branch',
+      entityId: id,
+      metadata: {
+        name: existing.name,
+        city: existing.city,
+        isActive
+      }
     })
 
     revalidatePath('/admin/branches')
