@@ -46,16 +46,18 @@ export default async function Home({
           {/* Hero Content */}
           <div className="relative z-10 w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
             <div className="max-w-2xl">
-              <span className="font-label-caps text-label-caps text-secondary mb-4 block tracking-widest uppercase">The Premier Collection</span>
+              <span className="font-label-caps text-xs text-secondary mb-4 block tracking-widest uppercase font-semibold">
+                Koleksi Armada Eksklusif
+              </span>
               <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-6 drop-shadow-md">
-                Exclusive Car Collection
+                Kenyamanan & Kemewahan Perjalanan Terbaik
               </h1>
-              <p className="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-lg leading-relaxed">
-                Nikmati kenyamanan dan kemewahan armada pilihan dengan standar pemeliharaan terbaik untuk mobilitas eksekutif dan keluarga Anda.
+              <p className="font-body-lg text-base md:text-lg text-on-surface-variant mb-10 max-w-lg leading-relaxed">
+                Solusi mobilitas premium dengan standar inspeksi ketat, reservasi online instan, serta perlindungan privasi dokumen untuk perjalanan bisnis maupun personal Anda.
               </p>
               <a 
                 href="#vehicles" 
-                className="btn-primary bg-secondary text-on-secondary font-button text-button px-8 py-4 rounded-DEFAULT inline-flex items-center gap-2 cursor-pointer hover:bg-secondary-fixed transition-colors"
+                className="btn-primary bg-secondary text-on-secondary font-button text-sm font-semibold px-8 py-4 rounded-DEFAULT inline-flex items-center gap-2 cursor-pointer hover:bg-secondary-fixed transition-colors"
               >
                 Jelajahi Armada <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </a>

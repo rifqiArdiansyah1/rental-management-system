@@ -19,10 +19,10 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Column 1: Layanan & Armada */}
+          {/* Column 1: Layanan & Informasi */}
           <div className="col-span-1">
             <h4 className="font-label-caps text-xs tracking-widest text-secondary uppercase mb-4 font-semibold">
-              Layanan & Armada
+              Layanan & Profil
             </h4>
             <ul className="flex flex-col gap-3 font-body-md text-sm">
               <li>
@@ -39,6 +39,14 @@ export default function Footer() {
                   className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
                 >
                   Lokasi Cabang
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/about" 
+                  className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
+                >
+                  Tentang Kami
                 </Link>
               </li>
               <li>
@@ -116,7 +124,10 @@ export default function Footer() {
           <p>
             © 2026 Prestige Motion. Seluruh hak cipta dilindungi undang-undang.
           </p>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap gap-6">
+            <Link href="/about" className="hover:text-zinc-300 transition-colors">
+              Tentang Kami
+            </Link>
             <Link href="/privacy" className="hover:text-zinc-300 transition-colors">
               Privasi
             </Link>
