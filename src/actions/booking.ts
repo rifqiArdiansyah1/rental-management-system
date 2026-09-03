@@ -69,3 +69,49 @@ export async function createDraftBookingAction(payload: BookingFormPayload) {
     return { success: false, error: err.message || 'Terjadi kesalahan saat membuat pesanan.' }
   }
 }
+
+/**
+ * Self-service cancellation by customer.
+ * Only allowed for bookings in `pending_payment` status (before payment is made).
+ * Confirmed/paid bookings must go through adminCancelBooking (Issue #18).
+ */
+export async function customerCancelBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { success: false, error: 'Anda harus login untuk membatalkan pesanan.' }
+  }
+
+  // Fetch booking and verify ownership
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { id: true, customerId: true, status: true, pickupBranchId: true }
+  })
+
+  if (!booking) {
+    return { success: false, error: 'Pesanan tidak ditemukan.' }
+  }
+
+  // Guard: ownership check
+  if (booking.customerId !== user.id) {
+    return { success: false, error: 'Anda tidak berhak membatalkan pesanan ini.' }
+  }
+
+  // Guard: only pending_payment can be self-cancelled
+  if (booking.status !== 'pending_payment') {
+    return { success: false, error: 'Hanya pesanan yang belum dibayar yang dapat dibatalkan secara mandiri.' }
+  }
+
+  // Cancel the booking
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: {
+      status: 'cancelled',
+      cancellationNote: 'Dibatalkan oleh customer sebelum pembayaran.',
+      cancelledBy: user.id,
+    }
+  })
+
+  return { success: true }
+}

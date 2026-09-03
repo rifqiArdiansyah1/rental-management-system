@@ -1,7 +1,13 @@
-import { redirect } from 'next/navigation'
+﻿import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import DocumentUploadForm from '@/components/DocumentUploadForm'
+import BookingList from './BookingList'
+import DocumentSection from './DocumentSection'
+import EditProfileModal from './EditProfileModal'
+import Navbar from '@/components/Navbar'
+
+export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -11,128 +17,112 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Fetch customer details and documents
+  // Enriched query: vehicle name + photos + driver info
   const customer = await prisma.customer.findUnique({
     where: { id: user.id },
     include: {
-      documents: true,
+      documents: {
+        select: { id: true, type: true, fileUrl: true }
+      },
       bookings: {
         orderBy: { createdAt: 'desc' },
-        take: 5,
-        include: { vehicle: true }
+        take: 20,
+        include: {
+          vehicle: {
+            select: {
+              name: true,
+              plateNumber: true,
+              photos: true,
+              category: { select: { name: true } }
+            }
+          },
+          driver: {
+            select: { name: true, phone: true }
+          }
+        }
       }
     }
   })
 
   if (!customer) {
-    // If not a customer, redirect or show error
     redirect('/')
   }
 
-  const ktpDoc = customer.documents.find(d => d.type === 'ktp')
-  const simDoc = customer.documents.find(d => d.type === 'sim')
+  const ktpDoc = customer.documents.find(d => d.type === 'ktp') ?? null
+  const simDoc = customer.documents.find(d => d.type === 'sim') ?? null
+
+  // Serialize bookings (Dates and Decimals must be serializable for client components)
+  const serializedBookings = customer.bookings.map(b => ({
+    id: b.id,
+    status: b.status,
+    rentalType: b.rentalType,
+    startDate: b.startDate,
+    endDate: b.endDate,
+    totalPrice: Number(b.totalPrice),
+    vehicle: {
+      name: b.vehicle.name,
+      plateNumber: b.vehicle.plateNumber,
+      photos: b.vehicle.photos,
+      category: { name: b.vehicle.category.name }
+    },
+    driver: b.driver ? { name: b.driver.name, phone: b.driver.phone } : null
+  }))
 
   return (
-    <div className="flex-grow flex flex-col items-center bg-background min-h-screen py-10 px-4">
-      <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8">
-        
-        {/* Left Column: Profile & Docs */}
-        <div className="flex flex-col gap-6">
-          <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm">
-            <h2 className="font-display-sm text-on-surface mb-2">Profil Pelanggan</h2>
-            <div className="flex flex-col gap-2">
-              <p><span className="text-on-surface-variant">Nama:</span> {customer.name}</p>
-              <p><span className="text-on-surface-variant">Email:</span> {customer.email}</p>
-              <p><span className="text-on-surface-variant">Telepon:</span> {customer.phone}</p>
-              
-              <div className="mt-4 pt-4 border-t border-surface-variant">
-                <p className="text-sm font-medium text-on-surface-variant mb-2">Status Verifikasi Identitas</p>
-                {customer.verificationStatus === 'verified' && (
-                  <span className="inline-flex items-center gap-1 bg-success/20 text-success px-3 py-1 rounded-full text-sm font-medium">
-                    <span className="material-symbols-outlined text-sm">check_circle</span> Verified
+    <div className="flex flex-col min-h-screen bg-background">
+      <Navbar />
+
+      <main className="flex-grow py-10 px-margin-mobile md:px-margin-desktop max-w-4xl mx-auto w-full">
+        <h1 className="text-2xl font-bold text-on-surface mb-8 tracking-tight">Dashboard Saya</h1>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+          {/* ── Left Column: Profile & Docs ── */}
+          <div className="flex flex-col gap-6">
+
+            {/* Profile Card */}
+            <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm">
+              <h2 className="font-semibold text-on-surface text-lg mb-4">Profil Pelanggan</h2>
+              <div className="flex flex-col gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-on-surface-variant">Nama</span>
+                  <span className="text-on-surface font-medium">{customer.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-on-surface-variant">Email</span>
+                  <span className="text-on-surface">{customer.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-on-surface-variant">Telepon</span>
+                  <span className={customer.phone && customer.phone !== '-' ? 'text-on-surface' : 'text-zinc-500 italic'}>
+                    {customer.phone && customer.phone !== '-' ? customer.phone : 'Belum diisi'}
                   </span>
-                )}
-                {customer.verificationStatus === 'pending' && (
-                  <span className="inline-flex items-center gap-1 bg-secondary/20 text-secondary-fixed px-3 py-1 rounded-full text-sm font-medium">
-                    <span className="material-symbols-outlined text-sm">schedule</span> Pending Review
-                  </span>
-                )}
-                {customer.verificationStatus === 'rejected' && (
-                  <span className="inline-flex items-center gap-1 bg-error/20 text-error px-3 py-1 rounded-full text-sm font-medium">
-                    <span className="material-symbols-outlined text-sm">cancel</span> Rejected
-                  </span>
-                )}
+                </div>
               </div>
+              <EditProfileModal initialName={customer.name} initialPhone={customer.phone ?? '-'} />
+            </div>
+
+            {/* Verification Status + Document View */}
+            <DocumentSection
+              verificationStatus={customer.verificationStatus}
+              ktpDoc={ktpDoc ? { id: ktpDoc.id, type: ktpDoc.type } : null}
+              simDoc={simDoc ? { id: simDoc.id, type: simDoc.type } : null}
+            />
+
+            {/* Upload Form (anchored for rejected CTA scroll) */}
+            <div id="document-upload-form">
+              <DocumentUploadForm />
             </div>
           </div>
 
-          <DocumentUploadForm />
-          
-          {(ktpDoc || simDoc) && (
-            <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm">
-              <h3 className="font-headline-sm text-on-surface mb-4">Dokumen Tersimpan</h3>
-              <ul className="flex flex-col gap-3">
-                {ktpDoc && (
-                  <li className="flex justify-between items-center bg-surface-variant p-3 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary">badge</span>
-                      <span className="font-medium text-on-surface">KTP</span>
-                    </div>
-                    <span className="text-sm text-on-surface-variant">{customer.ktpNumber}</span>
-                  </li>
-                )}
-                {simDoc && (
-                  <li className="flex justify-between items-center bg-surface-variant p-3 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary">directions_car</span>
-                      <span className="font-medium text-on-surface">SIM</span>
-                    </div>
-                    <span className="text-sm text-on-surface-variant">{customer.simNumber}</span>
-                  </li>
-                )}
-              </ul>
-              {customer.verificationStatus === 'rejected' && (
-                <p className="text-xs text-error mt-4">
-                  * Dokumen Anda ditolak. Silakan unggah ulang dokumen yang valid melalui form di atas.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+          {/* ── Right Column: Booking History ── */}
+          <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm h-fit">
+            <h2 className="font-semibold text-on-surface text-lg mb-6">Riwayat Pemesanan</h2>
+            <BookingList bookings={serializedBookings} />
+          </div>
 
-        {/* Right Column: Recent Bookings */}
-        <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm h-fit">
-          <h2 className="font-display-sm text-on-surface mb-6">Riwayat Pemesanan</h2>
-          
-          {customer.bookings.length === 0 ? (
-            <p className="text-on-surface-variant text-center py-10">Belum ada pemesanan.</p>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {customer.bookings.map(booking => (
-                <a 
-                  key={booking.id} 
-                  href={`/booking/${booking.id}`}
-                  className="block p-4 rounded-lg border border-surface-variant hover:border-primary transition-colors group"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-on-surface group-hover:text-primary transition-colors">
-                      {booking.vehicle.plateNumber}
-                    </h4>
-                    <span className="text-xs font-label-caps uppercase bg-surface-variant px-2 py-1 rounded text-on-surface-variant">
-                      {booking.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                  <div className="text-sm text-on-surface-variant flex gap-4">
-                    <span>Mulai: {booking.startDate.toLocaleDateString()}</span>
-                    <span>Selesai: {booking.endDate.toLocaleDateString()}</span>
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
         </div>
-
-      </div>
+      </main>
     </div>
   )
 }
