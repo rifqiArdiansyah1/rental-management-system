@@ -248,12 +248,13 @@ model Payment {
 }
 
 model Document {
-  id         String    @id @default(uuid())
-  type       String // 'ktp', 'sim', 'kontrak'
-  fileUrl    String
-  verifiedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id              String    @id @default(uuid())
+  type            String // 'ktp', 'sim', 'kontrak'
+  fileUrl         String
+  verifiedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   // Dipecah jadi 2 FK nullable (bukan 1 kolom ownerId polymorphic) karena
   // satu foreign key tidak bisa merujuk ke 2 tabel berbeda sekaligus.

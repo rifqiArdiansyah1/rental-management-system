@@ -225,8 +225,9 @@ export default async function AdminBookingsPage({
                   </div>
                   <div>
                     <span className="text-xs text-zinc-500 block mb-1">Armada & Sopir</span>
-                    <div className="font-medium text-zinc-900">{booking.vehicle.plateNumber}</div>
-                    <div className="text-xs text-zinc-500">
+                    <div className="font-medium text-zinc-900">{booking.vehicle.name || booking.vehicle.plateNumber}</div>
+                    <div className="text-xs font-mono text-zinc-500">{booking.vehicle.plateNumber}</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">
                       {booking.rentalType === 'with_driver'
                         ? booking.driver
                           ? `Sopir: ${booking.driver.name}`
@@ -321,9 +322,9 @@ export default async function AdminBookingsPage({
 
                       {/* Vehicle & Driver */}
                       <td className="px-6 py-4 align-top">
-                        <div className="font-bold text-zinc-900 font-mono">{booking.vehicle.plateNumber}</div>
-                        <div className="text-xs text-zinc-500">
-                          {booking.vehicle.name || booking.vehicle.category.name}
+                        <div className="font-bold text-zinc-900">{booking.vehicle.name || booking.vehicle.plateNumber}</div>
+                        <div className="text-xs font-mono text-zinc-500">
+                          {booking.vehicle.plateNumber} • {booking.vehicle.category.name}
                         </div>
                         <div className="mt-1 text-xs">
                           {booking.rentalType === 'with_driver' ? (

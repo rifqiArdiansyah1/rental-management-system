@@ -80,7 +80,7 @@ export async function getSnapToken(bookingId: string) {
       id: booking.vehicleId,
       price: grossAmount,
       quantity: 1,
-      name: `Sewa ${booking.vehicle.plateNumber}`
+      name: `Sewa ${booking.vehicle.name || booking.vehicle.plateNumber}`
     }],
     expiry: {
       unit: "minutes",

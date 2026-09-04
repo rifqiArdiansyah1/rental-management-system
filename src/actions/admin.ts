@@ -130,6 +130,7 @@ export async function startRental(bookingId: string) {
     })
 
     revalidatePath('/admin/bookings')
+    revalidatePath(`/admin/bookings/${bookingId}`)
     revalidatePath('/admin/vehicles')
     revalidatePath('/admin/dashboard')
 
@@ -214,6 +215,7 @@ export async function endRental(bookingId: string) {
     })
 
     revalidatePath('/admin/bookings')
+    revalidatePath(`/admin/bookings/${bookingId}`)
     revalidatePath('/admin/vehicles')
     revalidatePath('/admin/dashboard')
 
@@ -259,12 +261,12 @@ export async function verifyDocument(documentId: string, status: 'verified' | 'r
       if (status === 'verified') {
         await tx.document.update({
           where: { id: documentId },
-          data: { verifiedAt: new Date() }
+          data: { verifiedAt: new Date(), rejectionReason: null }
         })
       } else {
         await tx.document.update({
           where: { id: documentId },
-          data: { verifiedAt: null }
+          data: { verifiedAt: null, rejectionReason: reason || null }
         })
       }
       
@@ -288,16 +290,15 @@ export async function verifyDocument(documentId: string, status: 'verified' | 'r
       }
     })
     
-    try {
-      await sendDocumentStatusEmail({
-        toEmail: document.customer.email,
-        customerName: document.customer.name,
-        status: status,
-        reason: reason
-      })
-    } catch (e) {
+    // Non-blocking fire-and-forget email so network latency doesn't stall the UI response
+    sendDocumentStatusEmail({
+      toEmail: document.customer.email,
+      customerName: document.customer.name,
+      status: status,
+      reason: reason
+    }).catch((e) => {
       console.error('Failed to send document status email:', e)
-    }
+    })
 
     const adminUser = await requireAdminSession()
     const targetBooking = await prisma.booking.findFirst({
@@ -321,7 +322,9 @@ export async function verifyDocument(documentId: string, status: 'verified' | 'r
     })
     
     revalidatePath('/admin/bookings')
-    // We will revalidate specific booking ID path in client by calling useRouter().refresh() or we can revalidate all bookings detail
+    if (targetBooking) {
+      revalidatePath(`/admin/bookings/${targetBooking.id}`)
+    }
     
     return { success: true }
   } catch (error: any) {

@@ -40,6 +40,9 @@ async function main() {
       WHERE ("driverId" IS NOT NULL AND status IN ('pending_payment', 'confirmed', 'ongoing'));
     `);
 
+    console.log('Ensuring Document.rejectionReason column exists...');
+    await pool.query(`ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "rejectionReason" TEXT;`);
+
     console.log('Done!');
   } catch (e) {
     console.error('Error executing SQL:', e);

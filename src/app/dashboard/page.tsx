@@ -1,4 +1,4 @@
-﻿import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import DocumentUploadForm from '@/components/DocumentUploadForm'
@@ -22,7 +22,7 @@ export default async function DashboardPage() {
     where: { id: user.id },
     include: {
       documents: {
-        select: { id: true, type: true, fileUrl: true }
+        select: { id: true, type: true, fileUrl: true, rejectionReason: true }
       },
       bookings: {
         orderBy: { createdAt: 'desc' },
@@ -107,6 +107,7 @@ export default async function DashboardPage() {
               verificationStatus={customer.verificationStatus}
               ktpDoc={ktpDoc ? { id: ktpDoc.id, type: ktpDoc.type } : null}
               simDoc={simDoc ? { id: simDoc.id, type: simDoc.type } : null}
+              rejectionNote={ktpDoc?.rejectionReason || simDoc?.rejectionReason || null}
             />
 
             {/* Upload Form (anchored for rejected CTA scroll) */}

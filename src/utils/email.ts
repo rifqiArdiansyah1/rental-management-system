@@ -14,6 +14,15 @@ interface BookingConfirmedData {
 }
 
 export async function sendBookingConfirmedEmail(data: BookingConfirmedData) {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.APP_URL?.includes('3001') ||
+    !process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_KEY.includes('dummy') ||
+    data.toEmail.endsWith('@test.com')
+  ) {
+    return { id: 'mock-test-email-id' }
+  }
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -101,6 +110,15 @@ interface DocumentStatusData {
 }
 
 export async function sendDocumentStatusEmail(data: DocumentStatusData) {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.APP_URL?.includes('3001') ||
+    !process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_KEY.includes('dummy') ||
+    data.toEmail.endsWith('@test.com')
+  ) {
+    return { id: 'mock-test-email-id' }
+  }
   const isVerified = data.status === 'verified'
   const subject = isVerified 
     ? 'Verifikasi Identitas Berhasil' 
@@ -187,7 +205,12 @@ export interface DriverReassignedData {
 
 export async function sendDriverReassignedEmail(data: DriverReassignedData) {
   try {
-    if (process.env.NODE_ENV === 'test' || !process.env.RESEND_API_KEY) {
+    if (
+      process.env.NODE_ENV === 'test' ||
+      process.env.APP_URL?.includes('3001') ||
+      !process.env.RESEND_API_KEY ||
+      data.toEmail.endsWith('@test.com')
+    ) {
       return { id: 'mock-test-email-id' }
     }
 

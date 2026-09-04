@@ -1,13 +1,12 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { prisma } from '@/utils/prisma'
 
 /**
  * GET /api/document/preview?type=ktp|sim
  *
  * Generates a 5-minute Signed URL for the customer's own KTP or SIM document.
- * Authorization is handled by Supabase RLS ("Users can read own files") —
- * no additional server-side scope validation needed for self-access.
  */
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -22,7 +21,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Parameter type harus ktp atau sim.' }, { status: 400 })
   }
 
-  // Find the document record
+  // Find the document record belonging to the authenticated customer
   const doc = await prisma.document.findFirst({
     where: { customerId: user.id, type }
   })
@@ -31,24 +30,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Dokumen tidak ditemukan.' }, { status: 404 })
   }
 
-  // Extract the storage path from the fileUrl
-  // fileUrl format: https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
-  const bucketName = 'customer-documents'
-  const urlParts = doc.fileUrl.split(`/${bucketName}/`)
-  if (urlParts.length < 2) {
-    return NextResponse.json({ error: 'Format URL dokumen tidak valid.' }, { status: 500 })
-  }
-  const storagePath = urlParts[1]
+  const bucketName = 'documents'
+  let storagePath = doc.fileUrl
 
-  // Generate 5-minute signed URL using the user's own session (RLS enforces ownership)
-  const { data: signedData, error: signedError } = await supabase
-    .storage
-    .from(bucketName)
-    .createSignedUrl(storagePath, 300) // 300 seconds = 5 minutes
-
-  if (signedError || !signedData?.signedUrl) {
-    return NextResponse.json({ error: 'Gagal membuat URL pratinjau.' }, { status: 500 })
+  // Handle case where fileUrl is stored as a full URL
+  if (storagePath.startsWith('http://') || storagePath.startsWith('https://')) {
+    if (!storagePath.includes(`/${bucketName}/`)) {
+      // External mock URL (e.g. from test seeds or mock storage)
+      return NextResponse.json({ url: storagePath })
+    }
+    const urlParts = storagePath.split(`/${bucketName}/`)
+    storagePath = urlParts[1]
   }
 
-  return NextResponse.json({ url: signedData.signedUrl })
+  try {
+    const adminClient = createAdminClient()
+    const { data: signedData, error: signedError } = await adminClient
+      .storage
+      .from(bucketName)
+      .createSignedUrl(storagePath, 300) // 300 seconds = 5 minutes
+
+    if (signedError || !signedData?.signedUrl) {
+      console.error('Storage signedUrl error:', signedError)
+      return NextResponse.json({ error: 'Gagal membuat URL pratinjau.' }, { status: 500 })
+    }
+
+    return NextResponse.json({ url: signedData.signedUrl })
+  } catch (err: any) {
+    console.error('Error generating document preview URL:', err)
+    return NextResponse.json({ error: 'Terjadi kesalahan sistem saat memproses pratinjau dokumen.' }, { status: 500 })
+  }
 }

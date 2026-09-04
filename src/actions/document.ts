@@ -182,11 +182,24 @@ export async function generateSignedDocumentUrl(fileUrl: string) {
   }
 
   try {
+    let storagePath = fileUrl
+    const bucketName = 'documents'
+
+    // Handle case where fileUrl is a full URL
+    if (storagePath.startsWith('http://') || storagePath.startsWith('https://')) {
+      if (!storagePath.includes(`/${bucketName}/`)) {
+        // External URL (e.g. mock seeds or external CDN)
+        return { url: storagePath }
+      }
+      const urlParts = storagePath.split(`/${bucketName}/`)
+      storagePath = urlParts[1]
+    }
+
     // Generate signed URL via Service Role
     const adminClient = createAdminClient()
     const { data, error } = await adminClient.storage
-      .from('documents')
-      .createSignedUrl(fileUrl, 5 * 60) // Berlaku 5 menit
+      .from(bucketName)
+      .createSignedUrl(storagePath, 5 * 60) // Berlaku 5 menit
 
     if (error || !data) {
       console.error('Signed URL Error:', error)

@@ -151,7 +151,7 @@ test.describe('Admin Cancel Booking', () => {
 
     // Go to bookings list, verify it does NOT show in "Perlu Refund" yet
     await page.goto('/admin/bookings')
-    await expect(page.locator('text=Perlu Tindak Lanjut Refund')).not.toBeVisible()
+    await expect(page.locator('text=Perlu Refund')).not.toBeVisible()
 
     // Go to booking detail
     await page.goto(`/admin/bookings/${booking.id}`)
@@ -180,7 +180,7 @@ test.describe('Admin Cancel Booking', () => {
 
     // Go back to bookings list, verify "Perlu Refund" is now visible
     await page.goto('/admin/bookings')
-    await expect(page.locator('text=Perlu Tindak Lanjut Refund')).toBeVisible()
+    await expect(page.locator('text=Perlu Refund').first()).toBeVisible()
     await expect(page.locator(`text=${booking.id.substring(0, 8)}`).first()).toBeVisible()
 
     // Mark as refunded
@@ -199,7 +199,7 @@ test.describe('Admin Cancel Booking', () => {
 
     // Verify it disappears from "Perlu Refund"
     await page.goto('/admin/bookings')
-    await expect(page.locator('text=Perlu Tindak Lanjut Refund')).not.toBeVisible()
+    await expect(page.locator('text=Perlu Refund')).not.toBeVisible()
   })
 
   test('Cannot force cancel an ongoing booking', async ({ page }) => {
@@ -219,6 +219,7 @@ test.describe('Admin Cancel Booking', () => {
     })
 
     // Login as admin
+    await page.context().clearCookies()
     await page.goto('/admin/login')
     await page.fill('input[name="email"]', adminEmail)
     await page.fill('input[name="password"]', 'Password123!')
