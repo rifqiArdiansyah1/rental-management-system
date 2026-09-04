@@ -356,8 +356,8 @@ export function AssignDriverForm({ bookingId, availableDrivers, currentDriverId 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2 mt-2">
-      <div className="flex gap-2">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2.5 mt-2">
+      <div>
         <select
           value={selectedDriver}
           onChange={(e) => {
@@ -365,7 +365,7 @@ export function AssignDriverForm({ bookingId, availableDrivers, currentDriverId 
             setError(null)
           }}
           disabled={isPending}
-          className="flex-1 border border-zinc-300 rounded-md p-2 text-sm text-zinc-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full border border-zinc-300 rounded-md p-2 text-sm text-zinc-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">-- Pilih Sopir --</option>
           {availableDrivers.map((d) => (
@@ -374,19 +374,10 @@ export function AssignDriverForm({ bookingId, availableDrivers, currentDriverId 
             </option>
           ))}
         </select>
-        
-        <button
-          type="submit"
-          disabled={isPending || !selectedDriver || selectedDriver === currentDriverId}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          <UserCheck className="w-4 h-4" />
-          {isReassignment ? 'Ganti' : 'Tugaskan'}
-        </button>
       </div>
 
       {isReassignment && selectedDriver && selectedDriver !== currentDriverId && (
-        <div className="mt-2">
+        <div>
           <label className="block text-xs font-medium text-zinc-700 mb-1">
             Alasan Pergantian Sopir <span className="text-red-500">*</span>
           </label>
@@ -394,13 +385,22 @@ export function AssignDriverForm({ bookingId, availableDrivers, currentDriverId 
             type="text"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Contoh: Sopir sakit mendadak, izin keluarga, dsb."
+            placeholder="Alasan pergantian sopir (opsional)"
             disabled={isPending}
             required
             className="w-full border border-zinc-300 rounded-md p-2 text-xs text-zinc-900 bg-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
       )}
+
+      <button
+        type="submit"
+        disabled={isPending || !selectedDriver || selectedDriver === currentDriverId}
+        className="w-full flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+      >
+        <UserCheck className="w-4 h-4" />
+        {isPending ? 'Memproses...' : isReassignment ? 'Ganti Sopir' : 'Tugaskan Sopir'}
+      </button>
 
       {error && <span className="text-xs text-red-600 mt-1">{error}</span>}
     </form>
