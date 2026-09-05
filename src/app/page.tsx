@@ -100,36 +100,52 @@ export default async function Home({
         </section>
 
         {/* Value Proposition / 3-Pillar Banner */}
-        <section className="w-full bg-surface-container-lowest border-y border-surface-variant/40 py-16 mt-auto">
-          <div className="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 text-center">
-            <div className="flex flex-col items-center px-4">
-              <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
-                <span className="material-symbols-outlined text-[28px]">diamond</span>
-              </div>
-              <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Armada Terawat & Bersih</h4>
-              <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
-                Setiap unit melalui inspeksi berkala serta jeda pembersihan dan pengecekan menyeluruh 3 jam sebelum diserahkan.
+        <section className="w-full bg-surface-container-lowest border-y border-surface-variant/40 py-20 mt-auto">
+          <div className="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
+            {/* Section Header Hook */}
+            <div className="max-w-2xl mx-auto text-center mb-14">
+              <span className="font-label-caps text-xs text-secondary tracking-widest uppercase font-semibold block mb-3">
+                Alasan Memilih Kami
+              </span>
+              <h2 className="font-display-lg text-2xl md:text-3xl lg:text-4xl text-on-surface font-bold tracking-tight mb-4">
+                Standar Tertinggi untuk Kenyamanan & Keamanan Anda
+              </h2>
+              <p className="font-body-md text-sm md:text-base text-on-surface-variant leading-relaxed">
+                Kami menetapkan tolok ukur baru dalam layanan transportasi premium: armada terawat dengan inspeksi ketat, kemudahan reservasi online, serta perlindungan privasi tanpa kompromi.
               </p>
             </div>
 
-            <div className="flex flex-col items-center px-4">
-              <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
-                <span className="material-symbols-outlined text-[28px]">schedule</span>
+            {/* 3 Pillars Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 text-center">
+              <div className="flex flex-col items-center px-4">
+                <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
+                  <span className="material-symbols-outlined text-[28px]">diamond</span>
+                </div>
+                <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Armada Terawat & Bersih</h4>
+                <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                  Setiap unit melalui inspeksi berkala serta jeda pembersihan dan pengecekan menyeluruh 3 jam sebelum diserahkan.
+                </p>
               </div>
-              <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Reservasi Online 24/7</h4>
-              <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
-                Pemesanan online aktif 24 jam dengan layanan pelanggan responsif selama jam operasional cabang (08:00–21:00 WIB).
-              </p>
-            </div>
 
-            <div className="flex flex-col items-center px-4">
-              <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
-                <span className="material-symbols-outlined text-[28px]">lock</span>
+              <div className="flex flex-col items-center px-4">
+                <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
+                  <span className="material-symbols-outlined text-[28px]">schedule</span>
+                </div>
+                <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Reservasi Online 24/7</h4>
+                <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                  Pemesanan online aktif 24 jam dengan layanan pelanggan responsif selama jam operasional cabang (08:00–21:00 WIB).
+                </p>
               </div>
-              <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Privasi Terlindungi Ketat</h4>
-              <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
-                Dokumen identitas (KTP/SIM) dan riwayat sewa Anda diamankan sesuai standar UU PDP dengan kontrol akses berjenjang.
-              </p>
+
+              <div className="flex flex-col items-center px-4">
+                <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
+                  <span className="material-symbols-outlined text-[28px]">lock</span>
+                </div>
+                <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Privasi Terlindungi Ketat</h4>
+                <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                  Dokumen identitas (KTP/SIM) dan riwayat sewa Anda diamankan sesuai standar UU PDP dengan kontrol akses berjenjang.
+                </p>
+              </div>
             </div>
           </div>
         </section>

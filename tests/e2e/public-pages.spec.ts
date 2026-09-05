@@ -23,7 +23,9 @@ test.describe('Footer & Halaman Publik', () => {
     await expect(page.locator('text=Kategori Kendaraan')).toBeVisible();
     await expect(page.locator('text=Terapkan Filter')).toBeVisible();
 
-    // 3. Verify Value Proposition 3 Pillars
+    // 3. Verify Value Proposition Hook & 3 Pillars
+    await expect(page.locator('text=Alasan Memilih Kami')).toBeVisible();
+    await expect(page.locator('text=Standar Tertinggi untuk Kenyamanan & Keamanan Anda')).toBeVisible();
     await expect(page.locator('text=Armada Terawat & Bersih')).toBeVisible();
     await expect(page.locator('text=Reservasi Online 24/7')).toBeVisible();
     await expect(page.locator('text=Privasi Terlindungi Ketat')).toBeVisible();
