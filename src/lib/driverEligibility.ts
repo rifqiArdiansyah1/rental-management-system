@@ -1,4 +1,5 @@
 import { prisma } from '@/utils/prisma'
+import { TURNOVER_BUFFER_MS } from '@/lib/constants'
 
 export interface EligibleDriver {
   id: string
@@ -38,8 +39,8 @@ export async function getEligibleDrivers(
     : (excludeBookingIdOrOptions || {})
 
   const effectiveStart = options.effectiveStartDate || startDate
-  const bufferEnd = new Date(endDate.getTime() + 3 * 60 * 60 * 1000)
-  const bufferStart = new Date(effectiveStart.getTime() - 3 * 60 * 60 * 1000)
+  const bufferEnd = new Date(endDate.getTime() + TURNOVER_BUFFER_MS)
+  const bufferStart = new Date(effectiveStart.getTime() - TURNOVER_BUFFER_MS)
 
   // Query all active drivers in the branch with their active bookings and leaves
   const drivers = await prisma.driver.findMany({

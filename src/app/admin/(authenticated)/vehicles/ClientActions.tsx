@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle } from '@/actions/adminVehicle'
 import { uploadVehiclePhoto } from '@/actions/vehiclePhoto'
 import { VehicleStatus } from '@prisma/client'
+import { MIN_VEHICLE_DAILY_RATE } from '@/lib/constants'
 
 // -- Filter Bar --
 export function VehicleFilterBar({ branches, categories, userRole }: { 
@@ -276,6 +277,10 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
         setError('Cabang wajib dipilih')
         return
       }
+      if (!form.dailyRate || Number(form.dailyRate) < MIN_VEHICLE_DAILY_RATE) {
+        setError(`Tarif harian minimal ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(MIN_VEHICLE_DAILY_RATE)} / hari`)
+        return
+      }
       const res = await createVehicle({
         name: form.name,
         plateNumber: form.plateNumber,
@@ -345,13 +350,14 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
                   <input 
                     required
                     type="number"
-                    min="0"
-                    step="1000"
+                    min={MIN_VEHICLE_DAILY_RATE}
+                    step="10000"
                     placeholder="500000"
                     value={form.dailyRate}
                     onChange={e => setForm({...form, dailyRate: e.target.value})}
                     className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <p className="text-[11px] text-zinc-500 mt-1">Minimal Rp 250.000 / hari</p>
                 </div>
               </div>
               
@@ -494,6 +500,10 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
   const handleEdit = () => {
     startTransition(async () => {
       setError(null)
+      if (!form.dailyRate || Number(form.dailyRate) < MIN_VEHICLE_DAILY_RATE) {
+        setError(`Tarif harian minimal ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(MIN_VEHICLE_DAILY_RATE)} / hari`)
+        return
+      }
       const res = await updateVehicle(vehicle.id, {
         name: form.name,
         plateNumber: form.plateNumber,
@@ -648,10 +658,13 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                   <label className="block text-sm font-medium text-zinc-700 mb-1">Tarif Harian (Rp) *</label>
                   <input 
                     type="number"
+                    min={MIN_VEHICLE_DAILY_RATE}
+                    step="10000"
                     value={form.dailyRate}
                     onChange={e => setForm({...form, dailyRate: e.target.value})}
                     className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <p className="text-[11px] text-zinc-500 mt-1">Minimal Rp 250.000 / hari</p>
                 </div>
               </div>
 

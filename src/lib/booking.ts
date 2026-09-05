@@ -1,6 +1,7 @@
 import { prisma } from '@/utils/prisma'
 import { calculateDaysDifference } from './utils/date'
 import { RentalType, BookingStatus } from '@prisma/client'
+import { TURNOVER_BUFFER_MS } from '@/lib/constants'
 
 import { calculateEstimatedPrice } from './pricing'
 export async function checkVehicleAvailability(vehicleId: string, startDate: Date, endDate: Date): Promise<boolean> {
@@ -17,9 +18,8 @@ export async function checkVehicleAvailability(vehicleId: string, startDate: Dat
   // 2. Overlap Check: Half-open range [startDate, endDate + 3 hours)
   // Interval overlap condition for [A, B+3) and [X, Y+3): A < Y+3 AND B+3 > X
   // Which translates to: existingStartDate < newEndDate + 3h AND existingEndDate > newStartDate - 3h
-  const BUFFER_MS = 3 * 60 * 60 * 1000;
-  const newEndWithBuffer = new Date(endDate.getTime() + BUFFER_MS);
-  const newStartWithBuffer = new Date(startDate.getTime() - BUFFER_MS);
+  const newEndWithBuffer = new Date(endDate.getTime() + TURNOVER_BUFFER_MS);
+  const newStartWithBuffer = new Date(startDate.getTime() - TURNOVER_BUFFER_MS);
 
   const overlappingBookings = await prisma.booking.count({
     where: {

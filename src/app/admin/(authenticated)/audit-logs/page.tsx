@@ -149,7 +149,7 @@ export default async function AuditLogsPage({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl md:text-3xl font-bold text-zinc-900">Audit Log & Jejak Aktivitas</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-zinc-900">Log Audit & Jejak Aktivitas</h1>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
               <ShieldCheck className="w-3.5 h-3.5" />
               Immutable

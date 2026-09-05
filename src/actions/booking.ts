@@ -4,6 +4,7 @@ import { checkVehicleAvailability, createDraftBookingCore, CreateDraftBookingPay
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import { RentalType } from '@prisma/client'
+import { TURNOVER_BUFFER_MS, isWithinOperatingHoursWIB } from '@/lib/constants'
 
 export async function checkVehicleAvailabilityAction(vehicleId: string, startDate: Date, endDate: Date): Promise<boolean> {
   return await checkVehicleAvailability(vehicleId, startDate, endDate)
@@ -56,9 +57,13 @@ export async function createDraftBookingAction(payload: BookingFormPayload) {
     rentalType: payload.rentalType,
   }
 
-  const minStartDate = new Date(Date.now() + 3 * 60 * 60 * 1000)
+  const minStartDate = new Date(Date.now() + TURNOVER_BUFFER_MS)
   if (corePayload.startDate < minStartDate) {
     return { success: false, error: 'Waktu pengambilan minimal 3 jam dari waktu pemesanan saat ini.' }
+  }
+
+  if (!isWithinOperatingHoursWIB(corePayload.startDate) || !isWithinOperatingHoursWIB(corePayload.endDate)) {
+    return { success: false, error: 'Waktu pengambilan dan pengembalian kendaraan harus berada dalam jam operasional cabang (08:00 – 21:00 WIB).' }
   }
 
   try {

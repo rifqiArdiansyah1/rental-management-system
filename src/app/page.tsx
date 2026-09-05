@@ -1,4 +1,4 @@
-﻿import Link from 'next/link'
+import Link from 'next/link'
 import FilterBar from '@/components/ui/FilterBar'
 import VehicleCard from '@/components/ui/VehicleCard'
 import { getVehicles, getBranches, getCategories } from '@/actions/vehicle'
@@ -35,14 +35,16 @@ export default async function Home({
       <main className="flex-grow flex flex-col">
         {/* Hero Section */}
         <section className="relative w-full h-[614px] min-h-[500px] flex items-center justify-start overflow-hidden">
-          {/* Background Image */}
+          {/* Background Image with Permanent High-Contrast Multi-Stop Gradients (WCAG AA Compliant) */}
           <div className="absolute inset-0 z-0 hero-bg">
-            <div 
-              className="w-full h-full bg-cover bg-center opacity-60 mix-blend-overlay" 
+            <div
+              className="w-full h-full bg-cover bg-center opacity-60 mix-blend-overlay"
               style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBga3N00tvVjnWRBlNFMhx5PdAQdb2qcibWhp0IUmG0_gyHmehwI_HoSkUKJD6pAJoJDIYXRBnYdrSNnYgG1Z80P1z0MB313r4fA0lSYJdC445j0n6Dc1YCApFNibsLTNY1YK1c1WuASQOB_0cvSwSmUCabPFlwFLICbo01mlIUHemSJs5O7ZtlLAK8NWjhSDLnVQ1Qi1hdM5fBHHejtkm2CrGgRE7-ZXHbrIPvDTU2WCFZCfHeYql5')" }}
             ></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30"></div>
           </div>
-          
+
           {/* Hero Content */}
           <div className="relative z-10 w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
             <div className="max-w-2xl">
@@ -55,8 +57,8 @@ export default async function Home({
               <p className="font-body-lg text-base md:text-lg text-on-surface-variant mb-10 max-w-lg leading-relaxed">
                 Solusi mobilitas premium dengan standar inspeksi ketat, reservasi online instan, serta perlindungan privasi dokumen untuk perjalanan bisnis maupun personal Anda.
               </p>
-              <a 
-                href="#vehicles" 
+              <a
+                href="#vehicles"
                 className="btn-primary bg-secondary text-on-secondary font-button text-sm font-semibold px-8 py-4 rounded-DEFAULT inline-flex items-center gap-2 cursor-pointer hover:bg-secondary-fixed transition-colors"
               >
                 Jelajahi Armada <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
@@ -76,13 +78,13 @@ export default async function Home({
               <p className="font-body-md text-body-md text-on-surface-variant mt-2">Armada terawat yang siap digunakan untuk perjalanan Anda.</p>
             </div>
           </div>
-          
+
           {/* Bento-style Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {vehicles.map((vehicle: any, index: number) => (
-              <VehicleCard 
-                key={vehicle.id} 
-                vehicle={vehicle} 
+              <VehicleCard
+                key={vehicle.id}
+                vehicle={vehicle}
                 isPopular={index === 1}
               />
             ))}
@@ -109,7 +111,7 @@ export default async function Home({
                 Setiap unit melalui inspeksi berkala serta jeda pembersihan dan pengecekan menyeluruh 3 jam sebelum diserahkan.
               </p>
             </div>
-            
+
             <div className="flex flex-col items-center px-4">
               <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
                 <span className="material-symbols-outlined text-[28px]">schedule</span>
@@ -119,7 +121,7 @@ export default async function Home({
                 Pemesanan online aktif 24 jam dengan layanan pelanggan responsif selama jam operasional cabang (08:00–21:00 WIB).
               </p>
             </div>
-            
+
             <div className="flex flex-col items-center px-4">
               <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
                 <span className="material-symbols-outlined text-[28px]">lock</span>

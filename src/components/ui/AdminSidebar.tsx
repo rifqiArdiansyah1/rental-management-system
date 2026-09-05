@@ -43,7 +43,7 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
     { href: '/admin/drivers', icon: Users, label: 'Manajemen Sopir' },
     ...(isAdminPusat ? [{ href: '/admin/branches', icon: Building2, label: 'Manajemen Cabang' }] : []),
     ...(canManageStaff ? [{ href: '/admin/staff', icon: UserCog, label: 'Manajemen Staf' }] : []),
-    ...(canViewAuditLog ? [{ href: '/admin/audit-logs', icon: ScrollText, label: 'Audit Log' }] : []),
+    ...(canViewAuditLog ? [{ href: '/admin/audit-logs', icon: ScrollText, label: 'Log Audit' }] : []),
   ]
 
   const displayRole = userRole ? userRole.replace(/_/g, ' ') : ''

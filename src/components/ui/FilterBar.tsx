@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useState } from 'react'
@@ -47,7 +47,7 @@ export default function FilterBar({ branches, categories }: FilterBarProps) {
             <select 
               value={branchId}
               onChange={(e) => setBranchId(e.target.value)}
-              className="w-full bg-surface border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none text-sm"
+              className="w-full min-h-[44px] h-[46px] bg-surface border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none text-sm"
             >
               <option value="all">Semua Cabang</option>
               {branches.map((b) => (
@@ -67,7 +67,7 @@ export default function FilterBar({ branches, categories }: FilterBarProps) {
             <select 
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full bg-surface border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none text-sm"
+              className="w-full min-h-[44px] h-[46px] bg-surface border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none text-sm"
             >
               <option value="all">Semua Kategori</option>
               {categories.map((c) => (
@@ -82,7 +82,7 @@ export default function FilterBar({ branches, categories }: FilterBarProps) {
         <div className="w-full md:w-auto md:ml-auto">
           <button 
             onClick={applyFilters}
-            className="w-full md:w-auto bg-surface-container-lowest border border-secondary text-secondary font-button text-sm font-semibold px-8 py-3 rounded-DEFAULT hover:bg-secondary/10 transition-colors flex items-center justify-center gap-2 h-[46px] cursor-pointer"
+            className="w-full md:w-auto min-h-[44px] h-[46px] bg-surface-container-lowest border border-secondary text-secondary font-button text-sm font-semibold px-8 py-3 rounded-DEFAULT hover:bg-secondary/10 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">search</span>
             Terapkan Filter

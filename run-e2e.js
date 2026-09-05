@@ -14,7 +14,8 @@ function main() {
     }
 
     console.log('🚀 Running Playwright tests...');
-    const result = spawnSync('npx', ['playwright', 'test'], { stdio: 'inherit', shell: true });
+    const extraArgs = process.argv.slice(2);
+    const result = spawnSync('npx', ['playwright', 'test', ...extraArgs], { stdio: 'inherit', shell: true });
     
     // Instead of process.exit which skips finally, store status and exit later
     process.exitCode = result.status;

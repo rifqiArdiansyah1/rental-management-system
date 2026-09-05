@@ -138,4 +138,107 @@ test.describe('Footer & Halaman Publik', () => {
     await expect(page.locator('h1')).toBeVisible();
   });
 
+  test('8. Vehicle Cards display localized Indonesian labels, deduplicated specs, and normalized names', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // 1. Verify localized labels
+    await expect(page.locator('text=Tarif Harian').first()).toBeVisible();
+    await expect(page.locator('text=Kursi').first()).toBeVisible();
+    await expect(page.locator('text=UNGGULAN').first()).toBeVisible();
+
+    // 2. Verify no anomalous fallback names like "Sports Car (B334B)" or "MPV (B333B)"
+    await expect(page.locator('text=Sports Car (B334B)')).toHaveCount(0);
+    await expect(page.locator('text=MPV (B333B)')).toHaveCount(0);
+
+    // Verify card titles do not contain plate numbers in parentheses
+    const cardTitles = await page.locator('#vehicles h3').allTextContents();
+    expect(cardTitles.length).toBeGreaterThan(0);
+    for (const title of cardTitles) {
+      expect(title).not.toMatch(/\([A-Z0-9\s]+\)/);
+    }
+
+    // 3. Verify HTML validity: no <button> nested directly inside card <Link> (<a>)
+    const cardButtons = page.locator('#vehicles a button');
+    await expect(cardButtons).toHaveCount(0);
+  });
+
+  test('9. Mobile navigation drawer opens and exposes all public links on small viewports', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Hamburger button should be visible
+    const hamburgerBtn = page.getByRole('button', { name: 'Buka navigasi' });
+    await expect(hamburgerBtn).toBeVisible();
+
+    // Open drawer
+    await hamburgerBtn.click();
+    const closeBtn = page.getByRole('button', { name: 'Tutup navigasi' });
+    await expect(closeBtn).toBeVisible();
+
+    // Verify links inside drawer (scoped to nav to avoid collision with footer links)
+    const nav = page.locator('nav');
+    await expect(nav.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Armada', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Cabang', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Tentang', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Kontak', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Masuk', exact: true })).toBeVisible();
+
+    // Close drawer
+    await closeBtn.click();
+    await expect(page.getByRole('button', { name: 'Buka navigasi' })).toBeVisible();
+  });
+
+  test('10. User Profile Dropdown renders cleanly when logged in, without rogue blue/slate button', async ({ page }) => {
+    // Login as customer
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+    await page.fill('input[name="email"]', 'customer1@test.com');
+    await page.fill('input[name="password"]', 'Password123!');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/', { timeout: 15000 });
+
+    // Verify rogue blue/slate button is completely gone
+    const slateButtons = page.locator('button[style*="#32343e"]');
+    await expect(slateButtons).toHaveCount(0);
+
+    // Verify User Dropdown trigger is visible
+    const userTrigger = page.getByRole('button', { name: 'Menu profil pengguna' });
+    await expect(userTrigger).toBeVisible();
+
+    // Open dropdown
+    await userTrigger.click();
+    await expect(page.getByRole('menuitem', { name: /Dashboard Saya/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /Keluar/i })).toBeVisible();
+
+    // Close via Escape key
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menuitem', { name: /Dashboard Saya/i })).toHaveCount(0);
+  });
+
+  test('11. Booking page guides branch operating hours (08:00–21:00 WIB)', async ({ page }) => {
+    // Login first because BookingPage requires authenticated session
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+    await page.fill('input[name="email"]', 'customer1@test.com');
+    await page.fill('input[name="password"]', 'Password123!');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/', { timeout: 15000 });
+
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { status: 'available', isActive: true }
+    });
+
+    if (vehicle) {
+      await page.goto(`/vehicles/${vehicle.id}/book`);
+      await page.waitForLoadState('networkidle');
+
+      // Verify operating hours notice
+      await expect(page.locator('text=08:00 – 21:00 WIB')).toBeVisible();
+      await expect(page.locator('text=minimal 3 jam')).toBeVisible();
+    }
+  });
+
 });

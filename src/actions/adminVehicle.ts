@@ -6,6 +6,7 @@ import { getStaffScope, assertInScope } from '@/lib/auth/scope'
 import { VehicleStatus, Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { logAudit } from '@/lib/audit'
+import { MIN_VEHICLE_DAILY_RATE } from '@/lib/constants'
 
 export async function createVehicle(data: {
   name: string
@@ -23,6 +24,12 @@ export async function createVehicle(data: {
 
     if (!data.name || data.name.trim() === '') {
       return { error: 'Nama kendaraan wajib diisi' }
+    }
+
+    if (!data.dailyRate || Number(data.dailyRate) < MIN_VEHICLE_DAILY_RATE) {
+      return { 
+        error: `Tarif harian minimal ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(MIN_VEHICLE_DAILY_RATE)} per hari` 
+      }
     }
 
     const scope = await getStaffScope()
@@ -89,6 +96,12 @@ export async function updateVehicle(id: string, data: {
 
     if (!data.name || data.name.trim() === '') {
       return { error: 'Nama kendaraan wajib diisi' }
+    }
+
+    if (!data.dailyRate || Number(data.dailyRate) < MIN_VEHICLE_DAILY_RATE) {
+      return { 
+        error: `Tarif harian minimal ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(MIN_VEHICLE_DAILY_RATE)} per hari` 
+      }
     }
 
     const existingVehicle = await prisma.vehicle.findUnique({

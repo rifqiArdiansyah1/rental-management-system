@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createDraftBookingAction, BookingFormPayload } from '@/actions/booking'
 import { calculateEstimatedPrice } from '@/lib/pricing'
 import { RentalType } from '@prisma/client'
+import { TURNOVER_BUFFER_MS, isWithinOperatingHoursWIB } from '@/lib/constants'
 
 type Branch = {
   id: string
@@ -29,13 +30,17 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
   const [branchId, setBranchId] = useState<string>(defaultBranchId)
   const [rentalType, setRentalType] = useState<RentalType>('self_drive')
 
-  const isFormValid = startDate && endDate && new Date(startDate) <= new Date(endDate) && branchId
+  const parsedStartDate = startDate ? new Date(`${startDate}+07:00`) : null
+  const parsedEndDate = endDate ? new Date(`${endDate}+07:00`) : null
+
+  const isStartInHours = parsedStartDate ? isWithinOperatingHoursWIB(parsedStartDate) : true
+  const isEndInHours = parsedEndDate ? isWithinOperatingHoursWIB(parsedEndDate) : true
+  const isOperatingHoursValid = isStartInHours && isEndInHours
+
+  const isFormValid = startDate && endDate && new Date(startDate) <= new Date(endDate) && branchId && isOperatingHoursValid
   
   let pricing = null
-  if (startDate && endDate) {
-    // Explicitly parse string as WIB (+07:00) to avoid environment timezone bugs
-    const parsedStartDate = new Date(`${startDate}+07:00`)
-    const parsedEndDate = new Date(`${endDate}+07:00`)
+  if (startDate && endDate && parsedStartDate && parsedEndDate) {
     pricing = calculateEstimatedPrice(dailyRate, parsedStartDate, parsedEndDate, rentalType)
   }
 
@@ -75,8 +80,8 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
   }
 
   const getLocalMinDateTime = () => {
-    // Minimum time is 3 hours from now
-    const d = new Date(Date.now() + 3 * 60 * 60 * 1000)
+    // Minimum time is buffer from now (3 hours)
+    const d = new Date(Date.now() + TURNOVER_BUFFER_MS)
     // Convert to WIB string (+7 hours) for datetime-local naive format
     const wibDate = new Date(d.getTime() + 7 * 60 * 60 * 1000)
     return wibDate.toISOString().slice(0, 16)
@@ -95,29 +100,45 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
       <form onSubmit={handleSubmit} className="flex flex-col gap-8">
         
         {/* Date Inputs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2">
-            <label className="font-label-caps text-on-surface-variant uppercase">Pick-up Time</label>
-            <input 
-              type="datetime-local" 
-              required
-              min={getLocalMinDateTime()}
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="bg-surface-container border border-outline-variant rounded p-3 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-colors"
-            />
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="font-label-caps text-on-surface-variant uppercase">Pick-up Time</label>
+              <input 
+                type="datetime-local" 
+                required
+                min={getLocalMinDateTime()}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-surface-container border border-outline-variant rounded p-3 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-label-caps text-on-surface-variant uppercase">Return Time</label>
+              <input 
+                type="datetime-local" 
+                required
+                min={startDate || getLocalMinDateTime()}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-surface-container border border-outline-variant rounded p-3 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-colors"
+              />
+            </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-label-caps text-on-surface-variant uppercase">Return Time</label>
-            <input 
-              type="datetime-local" 
-              required
-              min={startDate || getLocalMinDateTime()}
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="bg-surface-container border border-outline-variant rounded p-3 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-colors"
-            />
+
+          {/* Operating hours guidance note */}
+          <div className="flex items-center gap-2 text-xs text-on-surface-variant bg-surface-container p-2.5 rounded-md border border-outline-variant/40">
+            <span className="material-symbols-outlined text-[16px] text-secondary">schedule</span>
+            <span>Jam layanan operasional cabang: <strong>08:00 – 21:00 WIB</strong> (minimal 3 jam dari waktu pemesanan).</span>
           </div>
+
+          {/* Warning if selected time is outside operating hours */}
+          {!isOperatingHoursValid && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg text-xs flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] flex-shrink-0">warning</span>
+              <span>Waktu penjemputan dan pengembalian harus berada dalam rentang jam operasional cabang (08:00 – 21:00 WIB).</span>
+            </div>
+          )}
         </div>
 
         {/* Branch Selection (MVP: Single Branch for Pickup and Return) */}
