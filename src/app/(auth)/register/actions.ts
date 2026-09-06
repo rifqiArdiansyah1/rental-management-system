@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
+import { MIN_PASSWORD_LENGTH } from '@/lib/constants'
+import { getAuthErrorMessage } from '@/lib/authErrors'
 
 export async function signup(formData: FormData) {
   const supabase = await createClient()
@@ -13,6 +15,10 @@ export async function signup(formData: FormData) {
     password: formData.get('password') as string,
     name: formData.get('name') as string,
     phone: formData.get('phone') as string,
+  }
+
+  if (!data.password || data.password.length < MIN_PASSWORD_LENGTH) {
+    redirect(`/register?message=${encodeURIComponent(`Kata sandi minimal harus terdiri dari ${MIN_PASSWORD_LENGTH} karakter.`)}`)
   }
 
   const existingName = await prisma.customer.findFirst({
@@ -47,7 +53,7 @@ export async function signup(formData: FormData) {
   })
 
   if (error) {
-    redirect(`/register?message=${encodeURIComponent(error.message)}`)
+    redirect(`/register?message=${encodeURIComponent(getAuthErrorMessage(error))}`)
   }
 
   // Create row in Prisma Customer table

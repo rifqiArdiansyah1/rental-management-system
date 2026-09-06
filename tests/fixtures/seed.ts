@@ -167,39 +167,45 @@ async function seed() {
     }
   }
 
-  // 6. Create Admin in Supabase Auth & Prisma
-  const adminEmail = 'admin@test.com';
-  const { data: adminAuthData, error: adminError } = await supabaseAdmin.auth.admin.createUser({
-    email: adminEmail,
-    password: 'Password123!',
-    email_confirm: true,
-    app_metadata: { role: 'admin_pusat' },
-  });
-  
-  let adminUserId = adminAuthData.user?.id;
-  if (!adminUserId && adminError?.message?.includes('already been registered')) {
-    const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
-    adminUserId = listData.users.find(u => u.email === adminEmail)?.id;
+  // 6. Create Admins in Supabase Auth & Prisma
+  const adminList = [
+    { email: 'admin@test.com', name: 'Test Admin' },
+    { email: 'admin@rental.com', name: 'Super Admin Rental' },
+  ];
+
+  for (const admin of adminList) {
+    const { data: adminAuthData, error: adminError } = await supabaseAdmin.auth.admin.createUser({
+      email: admin.email,
+      password: 'Password123!',
+      email_confirm: true,
+      app_metadata: { role: 'admin_pusat' },
+    });
+    
+    let adminUserId = adminAuthData.user?.id;
+    if (!adminUserId && adminError?.message?.includes('already been registered')) {
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+      adminUserId = listData.users.find(u => u.email === admin.email)?.id;
+      if (adminUserId) {
+        await supabaseAdmin.auth.admin.updateUserById(adminUserId, {
+          password: 'Password123!',
+          app_metadata: { role: 'admin_pusat' },
+          email_confirm: true
+        });
+      }
+    }
+
     if (adminUserId) {
-      await supabaseAdmin.auth.admin.updateUserById(adminUserId, {
-        password: 'Password123!',
-        app_metadata: { role: 'admin_pusat' },
-        email_confirm: true
+      await prisma.user.upsert({
+        where: { id: adminUserId },
+        update: { role: 'admin_pusat' },
+        create: {
+          id: adminUserId,
+          email: admin.email,
+          name: admin.name,
+          role: 'admin_pusat'
+        }
       });
     }
-  }
-
-  if (adminUserId) {
-    await prisma.user.upsert({
-      where: { id: adminUserId },
-      update: { role: 'admin_pusat' },
-      create: {
-        id: adminUserId,
-        email: adminEmail,
-        name: 'Test Admin',
-        role: 'admin_pusat'
-      }
-    });
   }
 
   console.log('✅ Testing seed data created successfully.');

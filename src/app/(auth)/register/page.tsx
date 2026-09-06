@@ -1,91 +1,163 @@
+import { Metadata } from 'next'
+import Link from 'next/link'
 import { signup } from './actions'
+import { MIN_PASSWORD_LENGTH } from '@/lib/constants'
+import { User, Phone, Mail, Lock, AlertCircle } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Daftar Akun Baru | Prestige Motion',
+  description: 'Buat akun pelanggan Prestige Motion untuk pengalaman reservasi kendaraan premium yang mulus.',
+}
 
 export default async function RegisterPage({
   searchParams,
 }: {
   searchParams: Promise<{ message?: string }>
 }) {
-  const resolvedSearchParams = await searchParams;
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-[#121212] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-            Daftar Akun Baru
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Mulai perjalanan Anda bersama kami
-          </p>
-        </div>
-        {resolvedSearchParams.message && (
-          <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-md">
-            <p className="text-sm text-red-600 dark:text-red-400 text-center">
-              {resolvedSearchParams.message}
-            </p>
-          </div>
-        )}
-        <form className="mt-8 space-y-6" action={signup}>
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="name" className="sr-only">Nama Lengkap</label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 text-gray-900 dark:text-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Nama Lengkap"
-              />
-            </div>
-            <div>
-              <label htmlFor="phone" className="sr-only">Nomor Telepon</label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                required
-                className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 text-gray-900 dark:text-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Nomor Telepon"
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="sr-only">Email address</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 text-gray-900 dark:text-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Email address"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 text-gray-900 dark:text-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Password"
-              />
-            </div>
-          </div>
+  const resolvedSearchParams = await searchParams
 
-          <div>
-            <button
-              type="submit"
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            >
-              Daftar
-            </button>
-          </div>
-        </form>
-        <div className="text-center">
-          <a href="/login" className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400">
-            Sudah punya akun? Masuk
-          </a>
+  return (
+    <div className="max-w-md w-full bg-surface-container-lowest/80 backdrop-blur-xl border border-surface-variant/40 rounded-xl shadow-2xl p-8 sm:p-10 transition-all">
+      {/* Header Form */}
+      <div className="text-center mb-8">
+        <span className="font-label-caps text-xs text-secondary tracking-widest uppercase font-semibold block mb-2">
+          Prestige Motion
+        </span>
+        <h1 className="font-display-lg text-2xl sm:text-3xl text-on-surface font-bold tracking-tight">
+          Daftar Akun Baru
+        </h1>
+        <p className="font-body-md text-sm text-on-surface-variant mt-2">
+          Mulai pengalaman mobilitas kelas atas Anda bersama kami.
+        </p>
+      </div>
+
+      {resolvedSearchParams.message && (
+        <div
+          role="alert"
+          data-testid="auth-alert"
+          className="mb-6 p-3.5 rounded-lg text-sm flex items-start gap-3 bg-error-container/20 border border-error/40 text-error transition-all"
+        >
+          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <p className="leading-relaxed flex-1">{resolvedSearchParams.message}</p>
         </div>
+      )}
+
+      <form className="space-y-4" action={signup}>
+        {/* Nama Lengkap */}
+        <div>
+          <label
+            htmlFor="name"
+            className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-1.5"
+          >
+            Nama Lengkap
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+              <User className="w-4 h-4" />
+            </div>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              required
+              placeholder="Nama sesuai KTP"
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-2.5 pl-10 text-sm transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Nomor Telepon */}
+        <div>
+          <label
+            htmlFor="phone"
+            className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-1.5"
+          >
+            Nomor Telepon / WhatsApp
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+              <Phone className="w-4 h-4" />
+            </div>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              required
+              placeholder="08xxxxxxxxxx"
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-2.5 pl-10 text-sm transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Alamat Email */}
+        <div>
+          <label
+            htmlFor="email"
+            className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-1.5"
+          >
+            Alamat Email
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+              <Mail className="w-4 h-4" />
+            </div>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              placeholder="nama@email.com"
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-2.5 pl-10 text-sm transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Kata Sandi */}
+        <div>
+          <label
+            htmlFor="password"
+            className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-1.5"
+          >
+            Kata Sandi (Min. {MIN_PASSWORD_LENGTH} Karakter)
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+              <Lock className="w-4 h-4" />
+            </div>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              placeholder={`Minimal ${MIN_PASSWORD_LENGTH} karakter`}
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-2.5 pl-10 text-sm transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Tombol Submit */}
+        <div className="pt-3">
+          <button
+            type="submit"
+            className="w-full bg-secondary text-on-secondary font-bold text-sm tracking-wide rounded-lg py-3 px-4 hover:bg-secondary/90 transition-all shadow-lg shadow-secondary/15 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+          >
+            Daftar Sekarang
+          </button>
+        </div>
+      </form>
+
+      {/* Footer Navigasi */}
+      <div className="text-center mt-6 pt-6 border-t border-surface-variant/30">
+        <p className="text-sm text-on-surface-variant">
+          Sudah memiliki akun?{' '}
+          <Link
+            href="/login"
+            className="text-secondary font-semibold hover:underline transition-colors inline-block ml-1 cursor-pointer"
+          >
+            Masuk ke akun Anda
+          </Link>
+        </p>
       </div>
     </div>
   )

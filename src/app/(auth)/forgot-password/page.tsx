@@ -1,15 +1,15 @@
 import { Metadata } from 'next'
-import LoginForm from './LoginForm'
+import ForgotPasswordForm from './ForgotPasswordForm'
 
 export const metadata: Metadata = {
-  title: 'Masuk ke Akun | Prestige Motion',
-  description: 'Masuk ke portal akun pelanggan Prestige Motion untuk mengelola reservasi dan dokumen Anda.',
+  title: 'Lupa Kata Sandi | Prestige Motion',
+  description: 'Atur ulang kata sandi akun pelanggan Prestige Motion Anda dengan tautan pemulihan aman.',
 }
 
-export default async function LoginPage({
+export default async function ForgotPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ message?: string; redirectTo?: string }>
+  searchParams: Promise<{ message?: string; type?: string }>
 }) {
   const resolvedSearchParams = await searchParams
 
@@ -21,17 +21,17 @@ export default async function LoginPage({
           Prestige Motion
         </span>
         <h1 className="font-display-lg text-2xl sm:text-3xl text-on-surface font-bold tracking-tight">
-          Masuk ke Akun Anda
+          Lupa Kata Sandi
         </h1>
         <p className="font-body-md text-sm text-on-surface-variant mt-2">
-          Layanan transportasi premium dengan kenyamanan dan keamanan tanpa kompromi.
+          Masukkan alamat email akun Anda untuk menerima instruksi pemulihan kata sandi.
         </p>
       </div>
 
-      {/* Komponen Form Login */}
-      <LoginForm
+      {/* Komponen Form */}
+      <ForgotPasswordForm
         initialMessage={resolvedSearchParams.message}
-        redirectTo={resolvedSearchParams.redirectTo}
+        messageType={resolvedSearchParams.type}
       />
     </div>
   )

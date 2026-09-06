@@ -49,3 +49,10 @@ export function isWithinOperatingHoursWIB(date: Date): boolean {
 
   return true
 }
+
+/**
+ * Panjang minimum karakter kata sandi (8 karakter) yang diterapkan seragam
+ * pada seluruh alur autentikasi (Registrasi Akun dan Pemulihan/Reset Kata Sandi).
+ */
+export const MIN_PASSWORD_LENGTH = 8
+
