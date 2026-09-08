@@ -46,6 +46,28 @@ export async function createDraftBookingAction(payload: BookingFormPayload) {
     })
   }
 
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { id: payload.vehicleId },
+    select: {
+      branchId: true,
+      isActive: true,
+      branch: {
+        select: { name: true }
+      }
+    }
+  })
+
+  if (!vehicle || !vehicle.isActive) {
+    return { success: false, error: 'Armada tidak ditemukan atau sedang tidak aktif.' }
+  }
+
+  if (vehicle.branchId !== payload.branchId) {
+    return {
+      success: false,
+      error: `Armada ini hanya tersedia di cabang ${vehicle.branch?.name || 'asalnya'}. Pemesanan tidak dapat dilakukan di cabang lain.`
+    }
+  }
+
   const corePayload: CreateDraftBookingPayload = {
     customerId,
     vehicleId: payload.vehicleId,

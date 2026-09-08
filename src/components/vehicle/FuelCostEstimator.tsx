@@ -59,11 +59,10 @@ export default function FuelCostEstimator({
               key={preset.distanceKm}
               type="button"
               onClick={() => setDistanceKm(preset.distanceKm)}
-              className={`px-3.5 py-2 rounded-lg text-xs font-medium border transition-all text-left flex flex-col gap-0.5 cursor-pointer ${
-                distanceKm === preset.distanceKm
+              className={`px-3.5 py-2 rounded-lg text-xs font-medium border transition-all text-left flex flex-col gap-0.5 cursor-pointer ${distanceKm === preset.distanceKm
                   ? 'bg-secondary/15 border-secondary text-on-surface font-semibold ring-1 ring-secondary/50'
                   : 'bg-surface-container-high/40 border-white/10 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
-              }`}
+                }`}
             >
               <span>{preset.label}</span>
               <span className="text-[11px] font-mono text-secondary">{preset.distanceKm} km</span>
@@ -149,7 +148,7 @@ export default function FuelCostEstimator({
       <div className="p-3.5 rounded-lg bg-secondary/10 border border-secondary/20 flex items-start gap-2.5">
         <span className="material-symbols-outlined text-secondary text-sm shrink-0 mt-0.5">info</span>
         <div className="text-xs text-on-surface-variant leading-relaxed">
-          <strong className="text-on-surface">Kebijakan Biaya Operasional (Opsi A):</strong>{' '}
+          <strong className="text-on-surface">Kebijakan Biaya Operasional :</strong>{' '}
           Kalkulator ini bersifat murni estimasi informasional untuk membantu perencanaan perjalanan Anda. Biaya bahan bakar dan tarif tol ditanggung langsung oleh penyewa di lapangan dan tidak ditagihkan ke dalam invoice rental Prestige Motion.
         </div>
       </div>

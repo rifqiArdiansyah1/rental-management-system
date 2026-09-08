@@ -53,11 +53,22 @@ export type CreateDraftBookingPayload = {
 export async function createDraftBookingCore(payload: CreateDraftBookingPayload) {
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: payload.vehicleId },
-    select: { dailyRate: true, isActive: true }
+    select: {
+      dailyRate: true,
+      isActive: true,
+      branchId: true,
+      branch: {
+        select: { name: true }
+      }
+    }
   })
 
   if (!vehicle || !vehicle.isActive) {
     throw new Error('Vehicle not found or inactive')
+  }
+
+  if (vehicle.branchId !== payload.pickupBranchId) {
+    throw new Error(`Armada hanya tersedia di cabang ${vehicle.branch?.name || 'asalnya'}.`)
   }
 
   // Calculate price purely on the server

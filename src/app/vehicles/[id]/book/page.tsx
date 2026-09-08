@@ -93,6 +93,10 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
                   {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(vehicle.dailyRate))}
                 </span>
               </div>
+              <div className="flex flex-col">
+                <span className="font-label-caps text-on-surface-variant">Branch Location</span>
+                <span className="font-body-md text-on-surface">{vehicle.branch?.name || 'Cabang Terdaftar'}</span>
+              </div>
             </div>
           </div>
         </section>
@@ -104,6 +108,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             dailyRate={Number(vehicle.dailyRate)} 
             branches={branches}
             defaultBranchId={vehicle.branchId}
+            vehicleBranch={vehicle.branch}
           />
         </section>
         

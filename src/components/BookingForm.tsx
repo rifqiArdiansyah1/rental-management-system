@@ -18,13 +18,16 @@ type Props = {
   dailyRate: number
   branches: Branch[]
   defaultBranchId: string
+  vehicleBranch?: Branch | null
 }
 
-export default function BookingForm({ vehicleId, dailyRate, branches, defaultBranchId }: Props) {
+export default function BookingForm({ vehicleId, dailyRate, branches, defaultBranchId, vehicleBranch }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   
+  const assignedBranch = vehicleBranch || branches.find(b => b.id === defaultBranchId) || branches[0]
+
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
   const [branchId, setBranchId] = useState<string>(defaultBranchId)
@@ -37,7 +40,7 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
   const isEndInHours = parsedEndDate ? isWithinOperatingHoursWIB(parsedEndDate) : true
   const isOperatingHoursValid = isStartInHours && isEndInHours
 
-  const isFormValid = startDate && endDate && new Date(startDate) <= new Date(endDate) && branchId && isOperatingHoursValid
+  const isFormValid = startDate && endDate && new Date(startDate) <= new Date(endDate) && branchId === defaultBranchId && isOperatingHoursValid
   
   let pricing = null
   if (startDate && endDate && parsedStartDate && parsedEndDate) {
@@ -47,6 +50,11 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isFormValid) return
+
+    if (branchId !== defaultBranchId) {
+      setErrorMsg(`Armada ini hanya tersedia di ${assignedBranch?.name || 'cabang asalnya'}. Pemesanan tidak dapat dilakukan di cabang lain.`)
+      return
+    }
 
     setErrorMsg(null)
     
@@ -141,18 +149,55 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
           )}
         </div>
 
-        {/* Branch Selection (MVP: Single Branch for Pickup and Return) */}
+        {/* Branch Location (Locked to Vehicle's Stationed Branch) */}
         <div className="flex flex-col gap-2">
-          <label className="font-label-caps text-on-surface-variant uppercase">Branch Location</label>
-          <select 
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-            className="bg-surface-container border border-outline-variant rounded p-3 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none"
-          >
-            {branches.map(b => (
-              <option key={b.id} value={b.id}>{b.name} - {b.address}</option>
-            ))}
-          </select>
+          <div className="flex items-center justify-between">
+            <label className="font-label-caps text-on-surface-variant uppercase">Branch Location</label>
+            <span className="text-[11px] text-secondary/90 bg-secondary/10 px-2 py-0.5 rounded border border-secondary/20 flex items-center gap-1 font-medium">
+              <span className="material-symbols-outlined text-[13px]">location_on</span>
+              Lokasi Armada
+            </span>
+          </div>
+
+          <div className="relative">
+            <select 
+              value={branchId}
+              onChange={(e) => {
+                const selectedId = e.target.value
+                if (selectedId !== defaultBranchId) {
+                  setErrorMsg(`Armada ini hanya tersedia di ${assignedBranch?.name || 'cabang asalnya'}. Tidak dapat dipesan dari cabang lain.`)
+                  return
+                }
+                setBranchId(selectedId)
+                setErrorMsg(null)
+              }}
+              className="w-full bg-surface-container border border-outline-variant rounded p-3 pr-10 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none"
+            >
+              {branches.map(b => {
+                const isCurrentBranch = b.id === defaultBranchId
+                return (
+                  <option 
+                    key={b.id} 
+                    value={b.id} 
+                    disabled={!isCurrentBranch}
+                  >
+                    {b.name} - {b.address} {isCurrentBranch ? '✓ (Lokasi Armada)' : '— (Armada Tidak Tersedia)'}
+                  </option>
+                )
+              })}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
+              <span className="material-symbols-outlined text-sm">expand_more</span>
+            </div>
+          </div>
+
+          {/* Operating branch guidance note */}
+          <div className="flex items-start gap-2 text-xs text-on-surface-variant bg-surface-container p-2.5 rounded-md border border-outline-variant/40">
+            <span className="material-symbols-outlined text-[16px] text-secondary flex-shrink-0 mt-0.5">info</span>
+            <span>
+              Armada ini berbasis di <strong>{assignedBranch?.name || 'cabang ini'}</strong>. Pengambilan dan pengembalian wajib dilakukan di cabang yang bersangkutan.
+            </span>
+          </div>
         </div>
 
         {/* Rental Type Toggle */}
