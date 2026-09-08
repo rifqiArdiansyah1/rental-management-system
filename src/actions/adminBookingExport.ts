@@ -10,6 +10,8 @@ import {
   formatWibDateOnly
 } from '@/lib/bookingFilters'
 
+import { findConflictRiskBookingIds } from '@/lib/scheduleConflict'
+
 function escapeCsvField(field: any): string {
   if (field === null || field === undefined) return '""'
   const str = String(field).replace(/"/g, '""')
@@ -20,9 +22,12 @@ export async function exportBookingsCsv(filterParams: BookingFilterParams) {
   try {
     const adminUser = await requireAdminSession()
     const scope = await getStaffScope()
+    const conflictRiskBookingIds = filterParams.tab === 'action_required'
+      ? await findConflictRiskBookingIds(scope)
+      : []
 
     // Enforce EXACT same where clause & branch scope
-    const where = buildBookingWhereClause(filterParams, scope)
+    const where = buildBookingWhereClause(filterParams, scope, conflictRiskBookingIds)
 
     // Hard safety cap at 5000 rows to protect serverless memory
     const bookings = await prisma.booking.findMany({

@@ -43,7 +43,7 @@ export async function requireAdminSession() {
   return user
 }
 
-export async function startRental(bookingId: string) {
+export async function startRental(bookingId: string, options?: { odometerStart?: number }) {
   try {
     const scope = await getStaffScope()
 
@@ -79,12 +79,20 @@ export async function startRental(bookingId: string) {
       }
     }
 
+    const rawOdo = options?.odometerStart
+    const odometerStart = (rawOdo !== undefined && rawOdo !== null && !isNaN(Number(rawOdo)) && Number(rawOdo) >= 0)
+      ? Math.round(Number(rawOdo))
+      : undefined
+
     // 4. Eksekusi Atomik (Transaction + updateMany guards)
     await prisma.$transaction(async (tx) => {
       // Ubah status Booking (Guard: pastikan masih 'confirmed')
       const bookingUpdate = await tx.booking.updateMany({
         where: { id: bookingId, status: 'confirmed' },
-        data: { status: 'ongoing' }
+        data: {
+          status: 'ongoing',
+          odometerStart: odometerStart !== undefined ? odometerStart : undefined,
+        }
       })
 
       if (bookingUpdate.count === 0) {
@@ -125,6 +133,7 @@ export async function startRental(bookingId: string) {
       metadata: {
         vehicleId: booking.vehicleId,
         driverId: booking.driverId,
+        odometerStart: odometerStart ?? null,
         startedAt: new Date().toISOString()
       }
     })
@@ -140,13 +149,137 @@ export async function startRental(bookingId: string) {
   }
 }
 
-export async function endRental(bookingId: string) {
+import { calculateLateFee } from '@/lib/lateFee'
+import { STANDARD_DRIVER_FEE } from '@/lib/pricing'
+import { calculateDaysDifference } from '@/lib/utils/date'
+import { MIN_VEHICLE_DAILY_RATE } from '@/lib/constants'
+
+export interface EndRentalOptions {
+  actualReturnAt?: Date | string
+  lateFeeAmount?: number
+  lateFeeNote?: string
+  waiveLateFee?: boolean
+  paymentMethod?: 'cash_late_fee' | 'midtrans_late_fee'
+  odometerEnd?: number
+}
+
+interface LateFeeResolution {
+  lateMinutes: number
+  finalLateFeeAmount: number
+  isWaived: boolean
+  lateFeeNote: string | null
+  agreedDailyRate: number
+}
+
+function resolveLateFeeSettlement(
+  booking: {
+    startDate: Date
+    endDate: Date
+    totalPrice: any
+    agreedDailyRate: any
+    rentalType: string
+    vehicle: { dailyRate: any }
+  },
+  actualReturnAt: Date,
+  options?: EndRentalOptions
+): LateFeeResolution {
+  let agreedDailyRate: number
+  if (booking.agreedDailyRate) {
+    agreedDailyRate = Number(booking.agreedDailyRate)
+  } else {
+    const rentalDays = Math.max(1, calculateDaysDifference(booking.startDate, booking.endDate))
+    if (booking.rentalType === 'with_driver') {
+      const driverTotal = STANDARD_DRIVER_FEE * rentalDays
+      const calculatedRate = (Number(booking.totalPrice) - driverTotal) / rentalDays
+      agreedDailyRate = calculatedRate >= MIN_VEHICLE_DAILY_RATE ? calculatedRate : Number(booking.vehicle.dailyRate)
+    } else {
+      const calculatedRate = Number(booking.totalPrice) / rentalDays
+      agreedDailyRate = calculatedRate >= MIN_VEHICLE_DAILY_RATE ? calculatedRate : Number(booking.vehicle.dailyRate)
+    }
+  }
+
+  const feeCalc = calculateLateFee(booking.endDate, actualReturnAt, agreedDailyRate)
+  const isWaived = Boolean(options?.waiveLateFee)
+
+  let finalLateFeeAmount: number
+  if (isWaived) {
+    finalLateFeeAmount = 0
+  } else if (options?.lateFeeAmount !== undefined) {
+    finalLateFeeAmount = Math.max(0, options.lateFeeAmount)
+  } else {
+    finalLateFeeAmount = feeCalc.suggestedLateFee
+  }
+
+  const lateFeeNote = isWaived
+    ? (options?.lateFeeNote?.trim() || 'Denda dibebaskan oleh otoritas cabang/pusat')
+    : (options?.lateFeeNote?.trim() || null)
+
+  return {
+    lateMinutes: feeCalc.lateMinutes,
+    finalLateFeeAmount,
+    isWaived,
+    lateFeeNote,
+    agreedDailyRate,
+  }
+}
+
+interface OdometerResolution {
+  odometerEnd: number | undefined
+  isAnomaly: boolean
+  anomalyReason: string | null
+}
+
+function resolveOdometerTrip(
+  booking: { odometerStart?: number | null },
+  options?: EndRentalOptions
+): OdometerResolution {
+  const rawOdo = options?.odometerEnd
+  if (rawOdo === undefined || rawOdo === null || isNaN(Number(rawOdo)) || Number(rawOdo) < 0) {
+    return {
+      odometerEnd: undefined,
+      isAnomaly: false,
+      anomalyReason: null,
+    }
+  }
+
+  const odometerEnd = Math.round(Number(rawOdo))
+  const start = booking.odometerStart != null ? Number(booking.odometerStart) : null
+
+  // Non-blocking typo handling: transaksi tetap sukses, hanya menandai anomali
+  if (start != null && odometerEnd < start) {
+    return {
+      odometerEnd,
+      isAnomaly: true,
+      anomalyReason: `Odometer akhir (${odometerEnd} km) lebih kecil dari awal (${start} km)`,
+    }
+  }
+
+  return {
+    odometerEnd,
+    isAnomaly: false,
+    anomalyReason: null,
+  }
+}
+
+export async function endRental(bookingId: string, options?: EndRentalOptions) {
   try {
+    const adminUser = await requireAdminSession()
+
+    // Otorisasi Pembebasan Denda Berbasis Allowlist
+    const ALLOWED_WAIVE_ROLES = ['admin_cabang', 'admin_pusat']
+    if (options?.waiveLateFee && !ALLOWED_WAIVE_ROLES.includes(adminUser.role)) {
+      return { error: 'Hanya Admin Cabang atau Admin Pusat yang berwenang membebaskan denda keterlambatan.' }
+    }
+    if (options?.waiveLateFee && !options?.lateFeeNote?.trim()) {
+      return { error: 'Catatan alasan wajib diisi saat membebaskan denda keterlambatan.' }
+    }
+
     const scope = await getStaffScope()
 
-    // 1. Dapatkan informasi Booking
+    // 1. Dapatkan informasi Booking beserta unit kendaraan
     const booking = await prisma.booking.findUnique({
-      where: { id: bookingId }
+      where: { id: bookingId },
+      include: { vehicle: true }
     })
 
     if (!booking) {
@@ -163,23 +296,37 @@ export async function endRental(bookingId: string) {
       return { error: 'Hanya pesanan yang sedang berjalan (ongoing) yang dapat diselesaikan.' }
     }
 
-    // 2. Eksekusi Atomik
+    const actualReturnAt = options?.actualReturnAt ? new Date(options.actualReturnAt) : new Date()
+
+    // 2. Evaluasi modular denda keterlambatan dan odometer trip
+    const lateFeeRes = resolveLateFeeSettlement(booking, actualReturnAt, options)
+    const odoRes = resolveOdometerTrip(booking, options)
+
+    // 3. Eksekusi Atomik Database Transaction
     await prisma.$transaction(async (tx) => {
       // Ubah status Booking (Guard: pastikan masih 'ongoing')
       const bookingUpdate = await tx.booking.updateMany({
         where: { id: bookingId, status: 'ongoing' },
-        data: { status: 'completed' }
+        data: {
+          status: 'completed',
+          actualReturnAt,
+          lateMinutes: lateFeeRes.lateMinutes,
+          lateFeeAmount: lateFeeRes.finalLateFeeAmount,
+          lateFeeWaived: lateFeeRes.isWaived,
+          lateFeeNote: lateFeeRes.lateFeeNote,
+          agreedDailyRate: booking.agreedDailyRate ? undefined : lateFeeRes.agreedDailyRate,
+          odometerEnd: odoRes.odometerEnd !== undefined ? odoRes.odometerEnd : undefined,
+        }
       })
 
       if (bookingUpdate.count === 0) {
-        throw new Error('Pesanan sudah diproses oleh staf lain.')
+        throw new Error('Pesanan sudah diproses oleh staf lain atau status tidak valid.')
       }
 
       // Ubah status Kendaraan kembali menjadi 'available'
-      // Guard: pastikan statusnya 'rented' sebelum dikembalikan
       const vehicleUpdate = await tx.vehicle.updateMany({
         where: { id: booking.vehicleId, status: 'rented' },
-        data: { status: 'available' } // Di real world bisa jadi 'maintenance' dsb.
+        data: { status: 'available' }
       })
 
       if (vehicleUpdate.count === 0) {
@@ -197,9 +344,26 @@ export async function endRental(bookingId: string) {
           throw new Error('Inkonsistensi data sopir (tidak berstatus on_trip).')
         }
       }
+
+      // Buat pencatatan Payment denda jika ada denda yang wajib dibayar
+      if (lateFeeRes.finalLateFeeAmount > 0 && !lateFeeRes.isWaived) {
+        const paymentMethod = options?.paymentMethod === 'midtrans_late_fee' ? 'midtrans_late_fee' : 'cash_late_fee'
+        const paymentStatus = paymentMethod === 'cash_late_fee' ? 'success' : 'pending'
+        const refPrefix = paymentMethod === 'cash_late_fee' ? 'CASH-LATE' : 'LATE'
+        const gatewayRef = `${refPrefix}-${booking.id.slice(0, 8).toUpperCase()}-${Date.now()}`
+
+        await tx.payment.create({
+          data: {
+            bookingId: booking.id,
+            amount: lateFeeRes.finalLateFeeAmount,
+            method: paymentMethod,
+            status: paymentStatus,
+            gatewayReference: gatewayRef,
+          }
+        })
+      }
     })
 
-    const adminUser = await requireAdminSession()
     logAudit({
       actorId: adminUser.id,
       actorRole: adminUser.role,
@@ -210,7 +374,15 @@ export async function endRental(bookingId: string) {
       metadata: {
         vehicleId: booking.vehicleId,
         driverId: booking.driverId,
-        endedAt: new Date().toISOString()
+        endedAt: actualReturnAt.toISOString(),
+        lateMinutes: lateFeeRes.lateMinutes,
+        lateFeeAmount: lateFeeRes.finalLateFeeAmount,
+        lateFeeWaived: lateFeeRes.isWaived,
+        lateFeeNote: lateFeeRes.lateFeeNote,
+        odometerStart: booking.odometerStart ?? null,
+        odometerEnd: odoRes.odometerEnd ?? null,
+        odometerAnomaly: odoRes.isAnomaly ? odoRes.anomalyReason : null,
+        paymentMethod: lateFeeRes.finalLateFeeAmount > 0 && !lateFeeRes.isWaived ? (options?.paymentMethod || 'cash_late_fee') : null,
       }
     })
 
@@ -218,6 +390,7 @@ export async function endRental(bookingId: string) {
     revalidatePath(`/admin/bookings/${bookingId}`)
     revalidatePath('/admin/vehicles')
     revalidatePath('/admin/dashboard')
+    revalidatePath('/dashboard')
 
     return { success: true }
   } catch (error: any) {

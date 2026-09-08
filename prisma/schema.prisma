@@ -63,6 +63,14 @@ enum UserRole {
   admin_pusat
 }
 
+enum FuelType {
+  pertalite
+  pertamax
+  pertamax_turbo
+  solar
+  dexlite
+}
+
 // -------------------------------------------------------------
 // MODELS
 // -------------------------------------------------------------
@@ -113,6 +121,8 @@ model Vehicle {
   dailyRate   Decimal       @db.Decimal(12, 2)
   status      VehicleStatus @default(available)
   isActive    Boolean       @default(true)
+  fuelType          FuelType @default(pertalite)
+  fuelEfficiencyKmL Decimal? @db.Decimal(5, 2)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -204,6 +214,20 @@ model Booking {
   reassignedBy      String?
   reassignedAt      DateTime?
 
+  // Snapshot tarif harian kendaraan saat booking dibuat (mencegah price drift)
+  agreedDailyRate Decimal? @db.Decimal(12, 2)
+
+  // Bidang resolusi keterlambatan pengembalian armada
+  actualReturnAt DateTime? @db.Timestamptz(6)
+  lateMinutes    Int?
+  lateFeeAmount  Decimal?  @db.Decimal(12, 2)
+  lateFeeWaived  Boolean   @default(false)
+  lateFeeNote    String?
+
+  // Bidang pencatatan odometer (opsional / informasional Opsi A)
+  odometerStart  Int?
+  odometerEnd    Int?
+
   customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   pickupBranch    Branch   @relation("PickupBranch", fields: [pickupBranchId], references: [id], onDelete: Restrict)
@@ -291,9 +315,19 @@ model User {
   cancelledBookings   Booking[] @relation("AdminCanceler")
   reassignedBookings  Booking[] @relation("AdminReassigner")
   auditLogs           AuditLog[] @relation("UserAuditLogs")
+  fuelPriceUpdates    FuelPrice[]
 
   @@index([branchId, role])
   @@index([branchId, isActive])
+}
+
+model FuelPrice {
+  fuelType      FuelType @id
+  pricePerLiter Decimal  @db.Decimal(10, 2)
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+
+  updater       User?    @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
 }
 
 model CronHeartbeat {

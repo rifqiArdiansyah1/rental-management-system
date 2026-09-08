@@ -1,4 +1,4 @@
-﻿import Navbar from '@/components/Navbar'
+import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import Link from 'next/link'
 import { FileCheck, AlertCircle, Clock, Car, RefreshCw } from 'lucide-react'
@@ -94,6 +94,16 @@ export default function TermsOfServicePage() {
                   Sopir profesional bersertifikasi akan ditugaskan ke pesanan Anda. Biaya sewa telah mencakup jasa pengemudi sesuai durasi jadwal yang dipesan.
                 </p>
               </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-surface-container-low/80 border border-secondary/20 text-xs md:text-sm text-zinc-300 leading-relaxed space-y-2">
+              <p className="font-semibold text-secondary flex items-center gap-1.5">
+                <Car className="w-4 h-4 text-secondary" />
+                Ketentuan Bahan Bakar (BBM) & Tol (Kebijakan Opsi A)
+              </p>
+              <p>
+                Seluruh tarif sewa kendaraan yang tertera di situs Prestige Motion (baik layanan Lepas Kunci maupun Dengan Sopir) <strong>belum termasuk biaya bahan bakar (BBM), tarif jalan tol, biaya parkir, dan retribusi jalan</strong> lainnya. Seluruh pengeluaran tersebut ditanggung langsung oleh penyewa selama perjalanan di luar tagihan rental. Pada layanan Dengan Sopir, penyewa dapat mengisi BBM secara mandiri atau memberikan dana operasional langsung kepada sopir di jalan.
+              </p>
             </div>
           </section>
 

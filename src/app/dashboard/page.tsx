@@ -38,6 +38,9 @@ export default async function DashboardPage() {
           },
           driver: {
             select: { name: true, phone: true }
+          },
+          payments: {
+            select: { id: true, method: true, status: true, amount: true }
           }
         }
       }
@@ -59,13 +62,26 @@ export default async function DashboardPage() {
     startDate: b.startDate,
     endDate: b.endDate,
     totalPrice: Number(b.totalPrice),
+    actualReturnAt: b.actualReturnAt ? b.actualReturnAt.toISOString() : null,
+    lateMinutes: b.lateMinutes,
+    lateFeeAmount: b.lateFeeAmount ? Number(b.lateFeeAmount) : null,
+    lateFeeWaived: b.lateFeeWaived,
+    lateFeeNote: b.lateFeeNote,
+    odometerStart: b.odometerStart,
+    odometerEnd: b.odometerEnd,
     vehicle: {
       name: b.vehicle.name,
       plateNumber: b.vehicle.plateNumber,
       photos: b.vehicle.photos,
       category: { name: b.vehicle.category.name }
     },
-    driver: b.driver ? { name: b.driver.name, phone: b.driver.phone } : null
+    driver: b.driver ? { name: b.driver.name, phone: b.driver.phone } : null,
+    payments: b.payments.map(p => ({
+      id: p.id,
+      method: p.method,
+      status: p.status,
+      amount: Number(p.amount)
+    }))
   }))
 
   return (

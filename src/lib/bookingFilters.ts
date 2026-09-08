@@ -65,7 +65,8 @@ export function formatWibDateOnly(date: Date | string): string {
  */
 export function buildBookingWhereClause(
   params: BookingFilterParams,
-  scope: StaffScope
+  scope: StaffScope,
+  conflictRiskBookingIds: string[] = []
 ): Prisma.BookingWhereInput {
   const andConditions: Prisma.BookingWhereInput[] = []
 
@@ -111,7 +112,22 @@ export function buildBookingWhereClause(
         {
           status: BookingStatus.ongoing,
           endDate: { lt: now }
-        }
+        },
+        // f. Booking dengan denda keterlambatan yang belum lunas
+        {
+          lateFeeAmount: { gt: 0 },
+          lateFeeWaived: false,
+          payments: {
+            none: {
+              method: { in: ['cash_late_fee', 'midtrans_late_fee'] },
+              status: 'success'
+            }
+          }
+        },
+        // g. Booking yang berisiko bentrok jadwal armada
+        ...(conflictRiskBookingIds.length > 0
+          ? [{ id: { in: conflictRiskBookingIds } }]
+          : [])
       ]
     })
   } else if (currentTab === 'handover_today') {

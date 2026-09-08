@@ -3,7 +3,7 @@
 import { prisma } from '@/utils/prisma'
 import { requireAdminSession } from '@/actions/admin'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
-import { VehicleStatus, Prisma } from '@prisma/client'
+import { VehicleStatus, Prisma, FuelType } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { logAudit } from '@/lib/audit'
 import { MIN_VEHICLE_DAILY_RATE } from '@/lib/constants'
@@ -15,6 +15,8 @@ export async function createVehicle(data: {
   branchId: string
   dailyRate: number
   photos?: string[]
+  fuelType?: FuelType
+  fuelEfficiencyKmL?: number | null
 }) {
   try {
     const adminUser = await requireAdminSession()
@@ -32,6 +34,10 @@ export async function createVehicle(data: {
       }
     }
 
+    if (data.fuelEfficiencyKmL != null && data.fuelEfficiencyKmL !== undefined && (isNaN(Number(data.fuelEfficiencyKmL)) || Number(data.fuelEfficiencyKmL) <= 0)) {
+      return { error: 'Efisiensi BBM harus berupa angka positif (km/liter).' }
+    }
+
     const scope = await getStaffScope()
     assertInScope([data.branchId], scope)
 
@@ -45,6 +51,8 @@ export async function createVehicle(data: {
         branchId: data.branchId,
         dailyRate: new Prisma.Decimal(data.dailyRate),
         photos: data.photos || [],
+        fuelType: data.fuelType || 'pertalite',
+        fuelEfficiencyKmL: data.fuelEfficiencyKmL ? new Prisma.Decimal(data.fuelEfficiencyKmL) : null,
         status: 'available',
         isActive: true,
       }
@@ -62,7 +70,9 @@ export async function createVehicle(data: {
         plateNumber: vehicle.plateNumber,
         categoryId: vehicle.categoryId,
         branchId: vehicle.branchId,
-        dailyRate: Number(vehicle.dailyRate)
+        dailyRate: Number(vehicle.dailyRate),
+        fuelType: vehicle.fuelType,
+        fuelEfficiencyKmL: vehicle.fuelEfficiencyKmL ? Number(vehicle.fuelEfficiencyKmL) : null,
       }
     })
 
@@ -87,6 +97,8 @@ export async function updateVehicle(id: string, data: {
   branchId: string
   dailyRate: number
   photos?: string[]
+  fuelType?: FuelType
+  fuelEfficiencyKmL?: number | null
 }) {
   try {
     const adminUser = await requireAdminSession()
@@ -102,6 +114,10 @@ export async function updateVehicle(id: string, data: {
       return { 
         error: `Tarif harian minimal ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(MIN_VEHICLE_DAILY_RATE)} per hari` 
       }
+    }
+
+    if (data.fuelEfficiencyKmL != null && data.fuelEfficiencyKmL !== undefined && (isNaN(Number(data.fuelEfficiencyKmL)) || Number(data.fuelEfficiencyKmL) <= 0)) {
+      return { error: 'Efisiensi BBM harus berupa angka positif (km/liter).' }
     }
 
     const existingVehicle = await prisma.vehicle.findUnique({
@@ -134,6 +150,8 @@ export async function updateVehicle(id: string, data: {
         branchId: data.branchId,
         dailyRate: new Prisma.Decimal(data.dailyRate),
         photos: data.photos || [],
+        fuelType: data.fuelType || existingVehicle.fuelType || 'pertalite',
+        fuelEfficiencyKmL: data.fuelEfficiencyKmL ? new Prisma.Decimal(data.fuelEfficiencyKmL) : (data.fuelEfficiencyKmL === null ? null : existingVehicle.fuelEfficiencyKmL),
       }
     })
 
@@ -150,14 +168,18 @@ export async function updateVehicle(id: string, data: {
           plateNumber: existingVehicle.plateNumber,
           categoryId: existingVehicle.categoryId,
           branchId: existingVehicle.branchId,
-          dailyRate: Number(existingVehicle.dailyRate)
+          dailyRate: Number(existingVehicle.dailyRate),
+          fuelType: existingVehicle.fuelType,
+          fuelEfficiencyKmL: existingVehicle.fuelEfficiencyKmL ? Number(existingVehicle.fuelEfficiencyKmL) : null,
         },
         after: {
           name: data.name.trim(),
           plateNumber: normalizedPlate,
           categoryId: data.categoryId,
           branchId: data.branchId,
-          dailyRate: Number(data.dailyRate)
+          dailyRate: Number(data.dailyRate),
+          fuelType: data.fuelType || existingVehicle.fuelType || 'pertalite',
+          fuelEfficiencyKmL: data.fuelEfficiencyKmL ? Number(data.fuelEfficiencyKmL) : (data.fuelEfficiencyKmL === null ? null : (existingVehicle.fuelEfficiencyKmL ? Number(existingVehicle.fuelEfficiencyKmL) : null)),
         }
       }
     })

@@ -2,7 +2,7 @@ import { requireAdminSession } from '@/actions/admin'
 import { prisma } from '@/utils/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, FileText, CheckCircle2, AlertCircle, XCircle, CreditCard, Clock, Calendar, Car, User, ShieldCheck } from 'lucide-react'
+import { ChevronLeft, FileText, CheckCircle2, AlertCircle, AlertTriangle, XCircle, CreditCard, Clock, Calendar, Car, User, ShieldCheck, Gauge } from 'lucide-react'
 import { 
   VerifyDocumentButton, 
   AssignDriverForm, 
@@ -13,6 +13,12 @@ import {
   EndRentalButton
 } from './ClientActions'
 import { getEligibleDrivers } from '@/lib/driverEligibility'
+import { detectScheduleConflict } from '@/lib/scheduleConflict'
+import { formatWibDateTime } from '@/lib/bookingFilters'
+import { getFuelPrices } from '@/actions/fuelPrice'
+import { calculateTripOdometer } from '@/lib/fuelEstimation'
+import { FUEL_TYPE_LABELS } from '@/lib/constants'
+import { FuelType } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,7 +58,8 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
   const durationDays = Math.max(1, Math.ceil(durationMs / (1000 * 60 * 60 * 24)))
 
   // Nilai numerik aman dari serialisasi Decimal
-  const vehicleDailyRate = Number(booking.vehicle.dailyRate)
+  const agreedDailyRate = Number(booking.agreedDailyRate || booking.vehicle.dailyRate)
+  const vehicleDailyRate = agreedDailyRate
   const vehicleSubtotal = vehicleDailyRate * durationDays
   const bookingTotalPrice = Number(booking.totalPrice)
   const isWithDriver = booking.rentalType === 'with_driver'
@@ -92,6 +99,24 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
     availableDrivers = eligible.map(d => ({ id: d.id, name: `${d.name} (${d.licenseNumber})` }))
   }
 
+  const conflict = await detectScheduleConflict(booking.id)
+  const hasUnpaidLateFee = Boolean(
+    booking.lateFeeAmount &&
+    Number(booking.lateFeeAmount) > 0 &&
+    !booking.lateFeeWaived &&
+    !booking.payments.some(p => (p.method === 'cash_late_fee' || p.method === 'midtrans_late_fee') && p.status === 'success')
+  )
+
+  const fuelPrices = await getFuelPrices()
+  const activeFuelPrice = fuelPrices.find(p => p.fuelType === booking.vehicle.fuelType)?.pricePerLiter || 10_000
+
+  const tripOdo = calculateTripOdometer({
+    odometerStart: booking.odometerStart,
+    odometerEnd: booking.odometerEnd,
+    efficiencyKmL: booking.vehicle.fuelEfficiencyKmL ? Number(booking.vehicle.fuelEfficiencyKmL) : null,
+    pricePerLiter: activeFuelPrice
+  })
+
   const humanFriendlyId = `BK-${booking.id.slice(0, 8).toUpperCase()}`
 
   return (
@@ -117,6 +142,43 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
           <CancelBookingButton bookingId={booking.id} />
         )}
       </div>
+
+      {/* Schedule Conflict Alert Banner */}
+      {conflict.hasConflict && (
+        <div className={`p-4 rounded-xl border mb-6 flex items-start gap-3 ${
+          conflict.type === 'ongoing_risk' ? 'bg-purple-50 border-purple-200 text-purple-900' : 'bg-rose-50 border-rose-200 text-rose-900'
+        }`}>
+          <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+            conflict.type === 'ongoing_risk' ? 'text-purple-600' : 'text-rose-600'
+          }`} />
+          <div>
+            <p className="font-bold text-sm">
+              {conflict.type === 'ongoing_risk' ? '⚠️ Berisiko Bentrok Jadwal Armada' : '⚠️ Unit Terancam Terlambat'}
+            </p>
+            <p className="text-xs mt-0.5">
+              {conflict.message}
+              {conflict.conflictedBooking && (
+                <span className="ml-1 font-semibold">
+                  (Pesanan #{conflict.conflictedBooking.id.slice(0, 8).toUpperCase()}: {formatWibDateTime(conflict.conflictedBooking.startDate)} - {formatWibDateTime(conflict.conflictedBooking.endDate)})
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Unpaid Late Fee Banner */}
+      {hasUnpaidLateFee && (
+        <div className="p-4 rounded-xl border mb-6 bg-amber-50 border-amber-300 text-amber-900 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-sm">💰 Tagihan Denda Keterlambatan Belum Lunas</p>
+            <p className="text-xs mt-0.5">
+              Pesanan ini memiliki tagihan denda keterlambatan sebesar <strong>Rp {Number(booking.lateFeeAmount).toLocaleString('id-ID')}</strong> ({booking.lateMinutes || 0} menit keterlambatan) yang belum diselesaikan oleh pelanggan.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -155,11 +217,116 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
               <div>
                 <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Lokasi & Waktu Pengembalian</p>
                 <p className="font-medium text-zinc-900 mt-0.5">
-                  {booking.endDate.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  Rencana: {booking.endDate.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
                 <p className="text-xs text-zinc-600 mt-0.5">{booking.returnBranch.name} ({booking.returnBranch.city})</p>
+                {booking.actualReturnAt && (
+                  <div className="mt-2 pt-2 border-t border-zinc-100 text-xs">
+                    <span className="text-zinc-500">Waktu Aktual Kembali: </span>
+                    <span className="font-semibold text-zinc-800">{formatWibDateTime(booking.actualReturnAt)}</span>
+                    {booking.lateMinutes && booking.lateMinutes > 0 ? (
+                      <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        booking.lateMinutes > 45 ? 'bg-red-100 text-red-800' : 'bg-zinc-100 text-zinc-700'
+                      }`}>
+                        Terlambat {booking.lateMinutes} Menit
+                      </span>
+                    ) : (
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        Tepat Waktu
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
+          </div>
+
+          {/* Pencatatan Odometer & Estimasi Perjalanan (Opsi A) */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-200">
+            <div className="flex items-center justify-between mb-4 border-b pb-2">
+              <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                <Gauge className="w-5 h-5 text-blue-600" /> Pencatatan Odometer & Estimasi Perjalanan
+              </h2>
+              <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+                Opsi A (BBM Mandiri)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Odometer Awal</p>
+                <p className="font-mono font-bold text-zinc-900 text-base mt-1">
+                  {booking.odometerStart != null ? `${booking.odometerStart.toLocaleString('id-ID')} km` : '-'}
+                </p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Saat serah terima kunci</p>
+              </div>
+
+              <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Odometer Akhir</p>
+                <p className="font-mono font-bold text-zinc-900 text-base mt-1">
+                  {booking.odometerEnd != null
+                    ? `${booking.odometerEnd.toLocaleString('id-ID')} km`
+                    : booking.status === 'ongoing'
+                    ? 'Menunggu pengembalian'
+                    : '-'}
+                </p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Saat armada kembali</p>
+              </div>
+
+              <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Jarak Tempuh Trip</p>
+                <p className="font-mono font-bold text-blue-700 text-base mt-1">
+                  {tripOdo.distanceKm != null ? `${tripOdo.distanceKm.toLocaleString('id-ID')} km` : '-'}
+                </p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  {tripOdo.isAnomaly ? 'Anomali terdeteksi' : 'Total jarak pemakaian'}
+                </p>
+              </div>
+            </div>
+
+            {tripOdo.isAnomaly && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-900">Peringatan: Nilai Odometer Terbalik</p>
+                  <p className="mt-0.5">
+                    Odometer akhir tercatat lebih rendah dari odometer awal. Data tetap disimpan dalam sistem, namun kalkulasi estimasi konsumsi BBM otomatis dilewati.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {tripOdo.distanceKm != null && !tripOdo.isAnomaly && (
+              <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 text-xs space-y-2 mb-4">
+                <div className="flex justify-between">
+                  <span className="text-zinc-600">Spesifikasi BBM Kendaraan:</span>
+                  <span className="font-medium text-zinc-900">
+                    {FUEL_TYPE_LABELS[booking.vehicle.fuelType as FuelType] || booking.vehicle.fuelType}
+                    {booking.vehicle.fuelEfficiencyKmL ? ` • ${Number(booking.vehicle.fuelEfficiencyKmL)} km/L` : ' (Efisiensi belum diatur)'}
+                  </span>
+                </div>
+                {tripOdo.litersNeeded != null && (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-600">Estimasi Konsumsi BBM:</span>
+                    <span className="font-semibold text-zinc-900">
+                      ~{tripOdo.litersNeeded.toFixed(1)} Liter
+                    </span>
+                  </div>
+                )}
+                {tripOdo.estimatedCost != null && (
+                  <div className="flex justify-between pt-1 border-t border-blue-200/50">
+                    <span className="text-zinc-700 font-medium">Estimasi Biaya BBM:</span>
+                    <span className="font-bold text-blue-900 text-sm font-mono">
+                      ~{tripOdo.formattedCost || new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(tripOdo.estimatedCost)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p className="text-xs text-zinc-500 leading-relaxed bg-zinc-50 p-2.5 rounded border border-zinc-200/60">
+              ℹ️ <strong>Kebijakan Opsi A:</strong> Biaya bahan bakar dan tol tidak ditagihkan ke dalam invoice rental dan ditanggung langsung oleh penyewa di lapangan. Informasi di atas murni untuk referensi operasional dan analisis efisiensi trip.
+            </p>
           </div>
 
           {/* 2. Rincian Biaya & Riwayat Pembayaran */}
@@ -209,6 +376,44 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                   )}
                 </div>
               )}
+
+              {/* Denda Keterlambatan Row */}
+              {booking.lateFeeAmount && Number(booking.lateFeeAmount) > 0 ? (
+                <div className="flex justify-between items-center text-sm pt-2 border-t border-zinc-200/60">
+                  <div>
+                    <span className="text-red-700 font-semibold block">
+                      Denda Keterlambatan ({booking.lateMinutes || 0} menit)
+                    </span>
+                    {booking.lateFeeNote && (
+                      <span className="text-[11px] text-zinc-500 block italic">{booking.lateFeeNote}</span>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-red-700 block">
+                      + Rp {Number(booking.lateFeeAmount).toLocaleString('id-ID')}
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      hasUnpaidLateFee ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {hasUnpaidLateFee ? 'Belum Lunas' : 'Lunas'}
+                    </span>
+                  </div>
+                </div>
+              ) : booking.lateFeeWaived ? (
+                <div className="flex justify-between items-center text-sm pt-2 border-t border-zinc-200/60">
+                  <div>
+                    <span className="text-emerald-700 font-semibold block">
+                      Denda Keterlambatan: Dibebaskan (Rp 0)
+                    </span>
+                    {booking.lateFeeNote && (
+                      <span className="text-[11px] text-zinc-500 block italic">Alasan: {booking.lateFeeNote}</span>
+                    )}
+                  </div>
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    WAIVED
+                  </span>
+                </div>
+              ) : null}
 
               <div className="pt-2 border-t border-zinc-200 flex justify-between items-center text-base font-bold">
                 <span className="text-zinc-900">Total Nilai Sewa</span>
@@ -390,7 +595,17 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                 )}
 
                 {booking.status === 'ongoing' && (
-                  <EndRentalButton bookingId={booking.id} />
+                  <EndRentalButton
+                    bookingId={booking.id}
+                    endDate={booking.endDate.toISOString()}
+                    agreedDailyRate={agreedDailyRate}
+                    vehicleName={booking.vehicle.name || booking.vehicle.category.name}
+                    userRole={adminUser.role}
+                    odometerStart={booking.odometerStart}
+                    fuelEfficiencyKmL={booking.vehicle.fuelEfficiencyKmL ? Number(booking.vehicle.fuelEfficiencyKmL) : null}
+                    fuelType={booking.vehicle.fuelType}
+                    fuelPricePerLiter={activeFuelPrice}
+                  />
                 )}
 
                 {booking.status === 'completed' && (

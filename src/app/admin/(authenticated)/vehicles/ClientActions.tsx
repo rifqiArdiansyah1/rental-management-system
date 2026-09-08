@@ -4,8 +4,8 @@ import { useState, useTransition, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle } from '@/actions/adminVehicle'
 import { uploadVehiclePhoto } from '@/actions/vehiclePhoto'
-import { VehicleStatus } from '@prisma/client'
-import { MIN_VEHICLE_DAILY_RATE } from '@/lib/constants'
+import { VehicleStatus, FuelType } from '@prisma/client'
+import { MIN_VEHICLE_DAILY_RATE, FUEL_TYPE_LABELS } from '@/lib/constants'
 
 // -- Filter Bar --
 export function VehicleFilterBar({ branches, categories, userRole }: { 
@@ -245,7 +245,9 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
     categoryId: '',
     branchId: defaultBranchId,
     dailyRate: '',
-    photos: [] as string[]
+    photos: [] as string[],
+    fuelType: 'pertalite' as FuelType,
+    fuelEfficiencyKmL: '',
   })
 
   const availableBranches = userRole === 'admin_pusat'
@@ -259,7 +261,9 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
       categoryId: '',
       branchId: userRole === 'admin_pusat' ? '' : (userBranchId || (branches.length === 1 ? branches[0].id : '')),
       dailyRate: '',
-      photos: []
+      photos: [],
+      fuelType: 'pertalite' as FuelType,
+      fuelEfficiencyKmL: '',
     })
     setError(null)
     setIsOpen(true)
@@ -287,7 +291,9 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
         categoryId: form.categoryId,
         branchId: targetBranchId,
         dailyRate: Number(form.dailyRate),
-        photos: form.photos
+        photos: form.photos,
+        fuelType: form.fuelType,
+        fuelEfficiencyKmL: form.fuelEfficiencyKmL ? Number(form.fuelEfficiencyKmL) : null,
       })
       if (res.error) setError(res.error)
       else {
@@ -298,7 +304,9 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
           categoryId: '',
           branchId: defaultBranchId,
           dailyRate: '',
-          photos: []
+          photos: [],
+          fuelType: 'pertalite' as FuelType,
+          fuelEfficiencyKmL: '',
         })
         router.refresh()
       }
@@ -399,6 +407,35 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Jenis Bahan Bakar *</label>
+                  <select 
+                    required
+                    value={form.fuelType}
+                    onChange={e => setForm({...form, fuelType: e.target.value as FuelType})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {Object.entries(FUEL_TYPE_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Efisiensi BBM (km/L)</label>
+                  <input 
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    placeholder="Misal: 12.5 (opsional)"
+                    value={form.fuelEfficiencyKmL}
+                    onChange={e => setForm({...form, fuelEfficiencyKmL: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-[11px] text-zinc-500 mt-1">Estimasi jarak tempuh per liter</p>
+                </div>
+              </div>
+
               {/* Photo Manager */}
               <div className="pt-2 border-t border-zinc-100">
                 <PhotoManager 
@@ -459,7 +496,9 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
     categoryId: vehicle.categoryId,
     branchId: vehicle.branchId,
     dailyRate: vehicle.dailyRate.toString(),
-    photos: (vehicle.photos || []) as string[]
+    photos: (vehicle.photos || []) as string[],
+    fuelType: (vehicle.fuelType || 'pertalite') as FuelType,
+    fuelEfficiencyKmL: vehicle.fuelEfficiencyKmL ? vehicle.fuelEfficiencyKmL.toString() : '',
   })
 
   useEffect(() => {
@@ -470,9 +509,11 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
       categoryId: vehicle.categoryId,
       branchId: vehicle.branchId,
       dailyRate: vehicle.dailyRate.toString(),
-      photos: (vehicle.photos || []) as string[]
+      photos: (vehicle.photos || []) as string[],
+      fuelType: (vehicle.fuelType || 'pertalite') as FuelType,
+      fuelEfficiencyKmL: vehicle.fuelEfficiencyKmL ? vehicle.fuelEfficiencyKmL.toString() : '',
     })
-  }, [vehicle.status, vehicle.name, vehicle.plateNumber, vehicle.categoryId, vehicle.branchId, vehicle.dailyRate, vehicle.photos])
+  }, [vehicle.status, vehicle.name, vehicle.plateNumber, vehicle.categoryId, vehicle.branchId, vehicle.dailyRate, vehicle.photos, vehicle.fuelType, vehicle.fuelEfficiencyKmL])
 
   const canEditOrDelete = userRole !== 'staff_cabang'
 
@@ -510,7 +551,9 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
         categoryId: form.categoryId,
         branchId: form.branchId,
         dailyRate: Number(form.dailyRate),
-        photos: form.photos
+        photos: form.photos,
+        fuelType: form.fuelType,
+        fuelEfficiencyKmL: form.fuelEfficiencyKmL ? Number(form.fuelEfficiencyKmL) : null,
       })
       if (res.error) setError(res.error)
       else {
@@ -698,6 +741,34 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                       {branches.filter(b => b.id === vehicle.branchId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Jenis Bahan Bakar *</label>
+                  <select 
+                    value={form.fuelType}
+                    onChange={e => setForm({...form, fuelType: e.target.value as FuelType})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {Object.entries(FUEL_TYPE_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Efisiensi BBM (km/L)</label>
+                  <input 
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    placeholder="Misal: 12.5 (opsional)"
+                    value={form.fuelEfficiencyKmL}
+                    onChange={e => setForm({...form, fuelEfficiencyKmL: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-[11px] text-zinc-500 mt-1">Estimasi jarak tempuh per liter</p>
                 </div>
               </div>
 

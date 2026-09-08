@@ -40,7 +40,33 @@ export async function POST(req: Request) {
 
     const bookingId = payment.bookingId
 
-    // 3. Process Status
+    // Khusus pembayaran denda keterlambatan sewa (midtrans_late_fee)
+    if (payment.method === 'midtrans_late_fee') {
+      if (transaction_status === 'capture' || transaction_status === 'settlement') {
+        if (transaction_status === 'capture' && fraud_status === 'challenge') {
+          return NextResponse.json({ message: 'Challenge ignored' }, { status: 200 })
+        }
+        await prisma.payment.updateMany({
+          where: { id: payment.id, status: PaymentStatus.pending },
+          data: { status: PaymentStatus.success }
+        })
+        return NextResponse.json({ success: true, message: 'Late fee settled successfully' }, { status: 200 })
+      } else if (
+        transaction_status === 'cancel' ||
+        transaction_status === 'deny' ||
+        transaction_status === 'expire'
+      ) {
+        await prisma.payment.updateMany({
+          where: { id: payment.id, status: PaymentStatus.pending },
+          data: { status: PaymentStatus.failed }
+        })
+        return NextResponse.json({ success: true, message: 'Late fee payment failed' }, { status: 200 })
+      }
+
+      return NextResponse.json({ success: true }, { status: 200 })
+    }
+
+    // 3. Process Status (Standar Sewa Booking Baru)
     if (transaction_status === 'capture' || transaction_status === 'settlement') {
       if (transaction_status === 'capture' && fraud_status === 'challenge') {
         // Pending challenge, ignore for MVP or set to pending

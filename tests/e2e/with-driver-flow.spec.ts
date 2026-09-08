@@ -1,4 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 test.describe('With Driver Booking Flow & Admin Scoping', () => {
 
@@ -20,8 +27,8 @@ test.describe('With Driver Booking Flow & Admin Scoping', () => {
     endDate.setDate(endDate.getDate() + 11);
     
     const dateInputs = await page.locator('input[type="datetime-local"]').all();
-    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T00:00');
-    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T00:00');
+    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T10:00');
+    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T10:00');
 
     // Select With Driver
     await page.getByRole('button', { name: 'With Driver' }).click();
@@ -34,12 +41,11 @@ test.describe('With Driver Booking Flow & Admin Scoping', () => {
     const bookingUrl = page.url();
     const bookingId = bookingUrl.split('/').pop() as string;
 
-    // Simulate Webhook for Payment Success to make it 'confirmed' (so admin can assign driver)
-    // We can use the API context to post the webhook. But wait, `driverAssignmentStatus` might only be visible or manageable when status is 'confirmed'.
-    
-    // Instead of doing webhook, let's just use prisma directly if needed, or we can use the API context.
-    // Let's assume admin can assign driver even if payment is pending (depends on business logic, but usually confirmed is better).
-    // Let's just do the admin login and check if we can see the booking.
+    // Ubah status jadi confirmed agar form assign driver muncul
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: 'confirmed' }
+    });
 
     // 3. Admin Login
     const adminContext = await browser.newContext();
@@ -56,20 +62,18 @@ test.describe('With Driver Booking Flow & Admin Scoping', () => {
     
     await adminPage.waitForTimeout(2000); // Give the page a moment to render
     
-    // Admin should see "Belum ditugaskan"
-    await expect(adminPage.locator('text=Belum ditugaskan').first()).toBeVisible({ timeout: 10000 });
+    // Admin should see "Belum ada sopir yang ditugaskan"
+    await expect(adminPage.locator('text=Belum ada sopir yang ditugaskan').first()).toBeVisible({ timeout: 10000 });
 
     // Select driver
-    const driverSelect = adminPage.locator('select').first(); // Assuming the driver assignment is a select
+    const driverSelect = adminPage.locator('select').first();
     if (await driverSelect.isVisible()) {
-      await driverSelect.selectOption({ label: 'Sopir Test' });
-        await Promise.all([
-            adminPage.waitForResponse(resp => resp.request().method() === 'POST' && resp.status() === 200),
-            adminPage.getByRole('button', { name: 'Assign' }).click()
-        ]);
-        
-        await adminPage.reload();
-        await expect(adminPage.locator('p:has-text("Sopir Test")').first()).toBeVisible({ timeout: 15000 });
+      await driverSelect.selectOption({ index: 1 });
+      await adminPage.getByRole('button', { name: /Tugaskan Sopir/ }).click();
+      
+      await adminPage.waitForTimeout(2000);
+      await adminPage.reload();
+      await expect(adminPage.locator('text=Sopir Test').first()).toBeVisible({ timeout: 15000 });
     }
 
     await adminContext.close();

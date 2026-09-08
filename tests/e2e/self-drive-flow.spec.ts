@@ -28,8 +28,8 @@ test.describe('Self-Drive Booking Flow & Webhook Security', () => {
     endDate.setDate(endDate.getDate() + 2);
     
     const dateInputs = await page.locator('input[type="datetime-local"]').all();
-    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T00:00');
-    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T00:00');
+    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T10:00');
+    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T10:00');
 
     // Ensure Self-Drive is selected (default)
     await page.getByRole('button', { name: 'Self-Drive' }).click();
@@ -45,7 +45,7 @@ test.describe('Self-Drive Booking Flow & Webhook Security', () => {
     await expect(page.locator('text=PENDING PAYMENT').first()).toBeVisible();
 
     // 5. Click "Bayar Sekarang" to generate Payment record
-    const payBtn = page.getByRole('button', { name: /Bayar/i });
+    const payBtn = page.getByRole('button', { name: 'Bayar Sekarang' });
     await payBtn.waitFor({ state: 'visible', timeout: 5000 });
     await payBtn.click();
     // Wait for a bit for the action to complete and payment record to be created

@@ -79,6 +79,7 @@ export async function createDraftBookingCore(payload: CreateDraftBookingPayload)
         endDate: payload.endDate,
         rentalType: payload.rentalType,
         totalPrice: pricing.grandTotal,
+        agreedDailyRate: vehicle.dailyRate,
         status: BookingStatus.pending_payment,
         // driverId and driverAssignmentStatus are intentionally left null for 'with_driver' 
         // until a branch staff assigns a real driver.

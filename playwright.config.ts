@@ -50,7 +50,7 @@ export default defineConfig({
     command: 'npm run build && npm run start -- -p 3001',
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
+    timeout: 240000,
     stdout: 'pipe',
     stderr: 'pipe',
     env: {

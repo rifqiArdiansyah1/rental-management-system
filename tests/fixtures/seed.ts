@@ -66,6 +66,8 @@ async function seed() {
       categoryId: category.id,
       plateNumber: `RACE-${Date.now()}`,
       dailyRate: 500000,
+      fuelType: 'dexlite',
+      fuelEfficiencyKmL: 11.5,
       status: 'available'
     }
   });
@@ -79,6 +81,8 @@ async function seed() {
       categoryId: category.id,
       plateNumber: `SELF-${Date.now()}`,
       dailyRate: 500000,
+      fuelType: 'pertamax',
+      fuelEfficiencyKmL: 13.0,
       status: 'available'
     }
   });
@@ -92,6 +96,8 @@ async function seed() {
       categoryId: category.id,
       plateNumber: `DRIV-${Date.now()}`,
       dailyRate: 500000,
+      fuelType: 'pertamax',
+      fuelEfficiencyKmL: 10.0,
       status: 'available'
     }
   });
@@ -129,41 +135,41 @@ async function seed() {
   ];
 
   for (const c of customers) {
+    let userId: string | undefined;
     const { data: authData, error } = await supabaseAdmin.auth.admin.createUser({
       email: c.email,
       password: 'Password123!',
       email_confirm: true,
     });
 
-    if (error && !error.message.includes('already been registered')) {
-      console.error(`❌ Failed to create auth user ${c.email}:`, error);
+    if (authData?.user?.id) {
+      userId = authData.user.id;
     } else {
-      let userId = authData.user?.id;
-      if (!userId) {
-        // Find existing user if already registered
-        const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
-        userId = listData.users.find(u => u.email === c.email)?.id;
-        if (userId) {
-          // Force update password to ensure login works
-          await supabaseAdmin.auth.admin.updateUserById(userId, {
-            password: 'Password123!',
-            email_confirm: true
-          });
-        }
-      }
-
+      // Find existing user
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+      userId = listData?.users?.find(u => u.email === c.email)?.id;
       if (userId) {
-        await prisma.customer.upsert({
-          where: { id: userId },
-          update: {},
-          create: {
-            id: userId,
-            email: c.email,
-            name: c.name,
-            phone: '08000000000'
-          }
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          password: 'Password123!',
+          email_confirm: true
         });
+      } else {
+        console.error(`❌ Could not find or create customer ${c.email}:`, error);
       }
+    }
+
+    if (userId) {
+      await prisma.customer.upsert({
+        where: { id: userId },
+        update: { verificationStatus: 'verified' },
+        create: {
+          id: userId,
+          email: c.email,
+          name: c.name,
+          phone: '08000000000',
+          verificationStatus: 'verified'
+        }
+      });
     }
   }
 
@@ -174,6 +180,7 @@ async function seed() {
   ];
 
   for (const admin of adminList) {
+    let adminUserId: string | undefined;
     const { data: adminAuthData, error: adminError } = await supabaseAdmin.auth.admin.createUser({
       email: admin.email,
       password: 'Password123!',
@@ -181,31 +188,52 @@ async function seed() {
       app_metadata: { role: 'admin_pusat' },
     });
     
-    let adminUserId = adminAuthData.user?.id;
-    if (!adminUserId && adminError?.message?.includes('already been registered')) {
-      const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
-      adminUserId = listData.users.find(u => u.email === admin.email)?.id;
+    if (adminAuthData?.user?.id) {
+      adminUserId = adminAuthData.user.id;
+    } else {
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+      adminUserId = listData?.users?.find(u => u.email === admin.email)?.id;
       if (adminUserId) {
         await supabaseAdmin.auth.admin.updateUserById(adminUserId, {
           password: 'Password123!',
           app_metadata: { role: 'admin_pusat' },
           email_confirm: true
         });
+      } else {
+        console.error(`❌ Could not find or create admin ${admin.email}:`, adminError);
       }
     }
 
     if (adminUserId) {
       await prisma.user.upsert({
         where: { id: adminUserId },
-        update: { role: 'admin_pusat' },
+        update: { role: 'admin_pusat', isActive: true },
         create: {
           id: adminUserId,
           email: admin.email,
           name: admin.name,
-          role: 'admin_pusat'
+          role: 'admin_pusat',
+          isActive: true
         }
       });
     }
+  }
+
+  // 6. Seed baseline fuel prices
+  const fuelPrices = [
+    { fuelType: 'pertalite', pricePerLiter: 10000 },
+    { fuelType: 'pertamax', pricePerLiter: 12950 },
+    { fuelType: 'pertamax_turbo', pricePerLiter: 14400 },
+    { fuelType: 'solar', pricePerLiter: 6800 },
+    { fuelType: 'dexlite', pricePerLiter: 13050 },
+  ] as const;
+
+  for (const fp of fuelPrices) {
+    await prisma.fuelPrice.upsert({
+      where: { fuelType: fp.fuelType },
+      update: { pricePerLiter: fp.pricePerLiter },
+      create: { fuelType: fp.fuelType, pricePerLiter: fp.pricePerLiter }
+    });
   }
 
   console.log('✅ Testing seed data created successfully.');

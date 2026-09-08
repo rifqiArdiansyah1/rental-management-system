@@ -2,7 +2,8 @@ import { prisma } from '@/utils/prisma'
 import { getStaffScope, buildScopeWhere } from '@/lib/auth/scope'
 import { requireAdminSession } from '@/actions/admin'
 import { VehicleFilterBar, CreateVehicleButton, VehicleRowActions } from './ClientActions'
-import { Prisma } from '@prisma/client'
+import { Prisma, FuelType } from '@prisma/client'
+import { FUEL_TYPE_LABELS } from '@/lib/constants'
 import { Car } from 'lucide-react'
 
 export default async function AdminVehiclesPage({
@@ -130,6 +131,10 @@ export default async function AdminVehiclesPage({
                 <div>
                   <span className="text-xs text-zinc-500 block mb-1">Kategori</span>
                   <div className="font-medium text-zinc-900">{vehicle.category.name}</div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    {FUEL_TYPE_LABELS[vehicle.fuelType as FuelType] || vehicle.fuelType}
+                    {vehicle.fuelEfficiencyKmL ? ` (${Number(vehicle.fuelEfficiencyKmL)} km/L)` : ''}
+                  </div>
                 </div>
                 <div>
                   <span className="text-xs text-zinc-500 block mb-1">Cabang</span>
@@ -192,7 +197,7 @@ export default async function AdminVehiclesPage({
                     <td className="px-6 py-4">
                       <div className="font-medium text-zinc-900">{vehicle.category.name}</div>
                       <div className="text-xs text-zinc-500 mt-0.5">
-                        {vehicle.category.capacity} Kursi • {vehicle.category.transmission}
+                        {vehicle.category.capacity} Kursi • {vehicle.category.transmission} • {FUEL_TYPE_LABELS[vehicle.fuelType as FuelType] || vehicle.fuelType}{vehicle.fuelEfficiencyKmL ? ` (${Number(vehicle.fuelEfficiencyKmL)} km/L)` : ''}
                       </div>
                     </td>
                     {adminUser.role === 'admin_pusat' && (

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, CalendarRange, Car, LogOut, Users, Building2, UserCog, ScrollText, Menu, X } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Car, LogOut, Users, Building2, UserCog, ScrollText, Menu, X, Fuel } from 'lucide-react'
 
 type AdminSidebarProps = {
   userRole: string;
@@ -41,7 +41,10 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
     { href: '/admin/bookings', icon: CalendarRange, label: 'Manajemen Pesanan' },
     { href: '/admin/vehicles', icon: Car, label: 'Manajemen Armada' },
     { href: '/admin/drivers', icon: Users, label: 'Manajemen Sopir' },
-    ...(isAdminPusat ? [{ href: '/admin/branches', icon: Building2, label: 'Manajemen Cabang' }] : []),
+    ...(isAdminPusat ? [
+      { href: '/admin/branches', icon: Building2, label: 'Manajemen Cabang' },
+      { href: '/admin/fuel-prices', icon: Fuel, label: 'Tarif BBM' },
+    ] : []),
     ...(canManageStaff ? [{ href: '/admin/staff', icon: UserCog, label: 'Manajemen Staf' }] : []),
     ...(canViewAuditLog ? [{ href: '/admin/audit-logs', icon: ScrollText, label: 'Log Audit' }] : []),
   ]

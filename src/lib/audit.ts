@@ -1,4 +1,4 @@
-﻿import { prisma } from '@/utils/prisma'
+import { prisma } from '@/utils/prisma'
 import { UserRole, Prisma } from '@prisma/client'
 
 export interface LogAuditParams {
@@ -6,7 +6,7 @@ export interface LogAuditParams {
   actorRole: UserRole
   branchId?: string | null // Konteks cabang target entity
   action: string
-  entityType: 'Booking' | 'Vehicle' | 'Driver' | 'Branch' | 'User' | 'Document' | 'Customer' | 'DriverLeave'
+  entityType: 'Booking' | 'Vehicle' | 'Driver' | 'Branch' | 'User' | 'Document' | 'Customer' | 'DriverLeave' | 'FuelPrice'
   entityId: string
   metadata?: Prisma.InputJsonValue
 }

@@ -43,6 +43,41 @@ async function main() {
     console.log('Ensuring Document.rejectionReason column exists...');
     await pool.query(`ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "rejectionReason" TEXT;`);
 
+    console.log('Ensuring Booking late fee & agreedDailyRate columns exist...');
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "agreedDailyRate" DECIMAL(12, 2);`);
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "actualReturnAt" TIMESTAMPTZ(6);`);
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "lateMinutes" INTEGER;`);
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "lateFeeAmount" DECIMAL(12, 2);`);
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "lateFeeWaived" BOOLEAN NOT NULL DEFAULT false;`);
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "lateFeeNote" TEXT;`);
+
+    console.log('Ensuring Booking odometer & Vehicle fuel columns exist...');
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "odometerStart" INTEGER;`);
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "odometerEnd" INTEGER;`);
+    await pool.query(`DO $$ BEGIN
+      CREATE TYPE "FuelType" AS ENUM ('pertalite', 'pertamax', 'pertamax_turbo', 'solar', 'dexlite');
+    EXCEPTION
+      WHEN duplicate_object THEN null;
+    END $$;`);
+    await pool.query(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "fuelType" "FuelType" NOT NULL DEFAULT 'pertalite';`);
+    await pool.query(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "fuelEfficiencyKmL" DECIMAL(5, 2);`);
+
+    console.log('Ensuring FuelPrice table exists...');
+    await pool.query(`CREATE TABLE IF NOT EXISTS "FuelPrice" (
+      "fuelType" "FuelType" NOT NULL,
+      "pricePerLiter" DECIMAL(10, 2) NOT NULL,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedBy" TEXT,
+      CONSTRAINT "FuelPrice_pkey" PRIMARY KEY ("fuelType")
+    );`);
+    await pool.query(`INSERT INTO "FuelPrice" ("fuelType", "pricePerLiter", "updatedAt") VALUES
+      ('pertalite', 10000, CURRENT_TIMESTAMP),
+      ('pertamax', 12950, CURRENT_TIMESTAMP),
+      ('pertamax_turbo', 14400, CURRENT_TIMESTAMP),
+      ('solar', 6800, CURRENT_TIMESTAMP),
+      ('dexlite', 13050, CURRENT_TIMESTAMP)
+      ON CONFLICT ("fuelType") DO NOTHING;`);
+
     console.log('Done!');
   } catch (e) {
     console.error('Error executing SQL:', e);

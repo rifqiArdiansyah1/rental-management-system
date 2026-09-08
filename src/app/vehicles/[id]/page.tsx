@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getVehicleById } from '@/actions/vehicle'
+import { getFuelPrices } from '@/actions/fuelPrice'
+import FuelCostEstimator from '@/components/vehicle/FuelCostEstimator'
+import { FUEL_TYPE_LABELS } from '@/lib/constants'
+import { FuelType } from '@prisma/client'
 import Navbar from '@/components/Navbar'
 
 export const dynamic = 'force-dynamic'
@@ -13,6 +17,9 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
   if (!vehicle) {
     notFound()
   }
+
+  const fuelPrices = await getFuelPrices()
+  const fuelPricePerLiter = fuelPrices.find(p => p.fuelType === vehicle.fuelType)?.pricePerLiter || 10_000
 
   const { category } = vehicle
   const vehicleName = vehicle.name || `${category.name} (${vehicle.plateNumber})`
@@ -121,7 +128,14 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                   <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
                     <span className="material-symbols-outlined text-secondary opacity-80">local_gas_station</span>
                     <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Fuel Type</span>
-                    <span className="font-body-lg text-body-lg text-on-surface">Premium</span>
+                    <span className="font-body-lg text-body-lg text-on-surface">
+                      {FUEL_TYPE_LABELS[vehicle.fuelType as FuelType] || vehicle.fuelType}
+                    </span>
+                    {vehicle.fuelEfficiencyKmL && (
+                      <span className="text-xs text-on-surface-variant">
+                        ~{Number(vehicle.fuelEfficiencyKmL)} km/Liter
+                      </span>
+                    )}
                   </div>
                   <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
                     <span className="material-symbols-outlined text-secondary opacity-80">group</span>
@@ -135,6 +149,13 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                   </div>
                 </div>
               </div>
+
+              {/* Pre-Trip Fuel Estimator (Opsi A) */}
+              <FuelCostEstimator
+                fuelType={vehicle.fuelType as FuelType}
+                fuelEfficiencyKmL={vehicle.fuelEfficiencyKmL ? Number(vehicle.fuelEfficiencyKmL) : null}
+                pricePerLiter={fuelPricePerLiter}
+              />
 
               {/* Photo Gallery (if multiple photos) */}
               {photos.length > 1 && (

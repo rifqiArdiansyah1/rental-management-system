@@ -4,7 +4,9 @@ import { useState, useTransition, useEffect, useRef } from 'react'
 import { verifyDocument, assignDriver, adminCancelBooking, markPaymentRefunded, startRental, endRental } from '@/actions/admin'
 import { useRouter } from 'next/navigation'
 import { generateSignedDocumentUrl } from '@/actions/document'
-import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw, Play, AlertCircle } from 'lucide-react'
+import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw, Play, AlertCircle, Clock, AlertTriangle, Gauge } from 'lucide-react'
+import { calculateLateFee } from '@/lib/lateFee'
+import { formatWibDateTime } from '@/lib/bookingFilters'
 
 export function ViewDocumentButton({ fileUrl }: { fileUrl: string }) {
   const [isPending, startTransition] = useTransition()
@@ -167,6 +169,7 @@ export function StartRentalButton({
   disabledReason?: string 
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [odometerStart, setOdometerStart] = useState<string>('')
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -174,7 +177,10 @@ export function StartRentalButton({
   const handleConfirmStart = () => {
     startTransition(async () => {
       setError(null)
-      const res = await startRental(bookingId)
+      const parsedOdo = odometerStart.trim() !== '' ? parseInt(odometerStart, 10) : undefined
+      const res = await startRental(bookingId, {
+        odometerStart: parsedOdo
+      })
       if (res.error) {
         setError(res.error)
       } else {
@@ -212,6 +218,24 @@ export function StartRentalButton({
             <p className="text-sm text-zinc-600 mb-4">
               Apakah Anda yakin ingin menyerahkan armada dan kunci ke pelanggan sekarang? Status pesanan akan berganti menjadi <strong>ONGOING</strong>.
             </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-zinc-700 mb-1 flex items-center gap-1.5">
+                <Gauge className="w-4 h-4" /> Odometer Awal (km) <span className="text-zinc-400 font-normal">(opsional)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={odometerStart}
+                onChange={(e) => setOdometerStart(e.target.value)}
+                placeholder="Misal: 45200"
+                className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <p className="text-[11px] text-zinc-500 mt-1">
+                Catatan angka kilometer pada saat serah terima unit ke pelanggan.
+              </p>
+            </div>
+
             {error && (
               <div className="mb-4 p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-700">
                 {error}
@@ -242,16 +266,93 @@ export function StartRentalButton({
   )
 }
 
-export function EndRentalButton({ bookingId }: { bookingId: string }) {
+export interface EndRentalButtonProps {
+  bookingId: string
+  endDate?: string | Date
+  agreedDailyRate?: number
+  vehicleName?: string
+  userRole?: string
+  className?: string
+  buttonText?: string
+  variant?: 'compact' | 'full'
+  odometerStart?: number | null
+  fuelEfficiencyKmL?: number | null
+  fuelType?: string | null
+  fuelPricePerLiter?: number | null
+}
+
+export function EndRentalButton({
+  bookingId,
+  endDate,
+  agreedDailyRate = 0,
+  vehicleName,
+  userRole,
+  className,
+  buttonText,
+  variant = 'full',
+  odometerStart,
+  fuelEfficiencyKmL,
+  fuelType,
+  fuelPricePerLiter,
+}: EndRentalButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
+  const [waiveLateFee, setWaiveLateFee] = useState(false)
+  const [lateFeeNote, setLateFeeNote] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<'cash_late_fee' | 'midtrans_late_fee'>('cash_late_fee')
+  const [customLateFee, setCustomLateFee] = useState<number | ''>('')
+  const [odometerEnd, setOdometerEnd] = useState<string>('')
+
+  const canWaive = userRole === 'admin_cabang' || userRole === 'admin_pusat'
+
+  const endDateTime = endDate ? new Date(endDate) : null
+  const returnDateTime = new Date()
+
+  // Kalkulasi denda secara real-time
+  const feeCalc = endDateTime && agreedDailyRate > 0
+    ? calculateLateFee(endDateTime, returnDateTime, agreedDailyRate)
+    : null
+
+  const suggestedFee = feeCalc ? feeCalc.suggestedLateFee : 0
+  const activeFee = waiveLateFee
+    ? 0
+    : customLateFee !== ''
+    ? Number(customLateFee)
+    : suggestedFee
+
+  // Kalkulasi odometer & estimasi BBM real-time
+  const parsedOdoEnd = odometerEnd.trim() !== '' ? parseInt(odometerEnd, 10) : null
+  const isOdoAnomaly = parsedOdoEnd !== null && odometerStart !== null && odometerStart !== undefined && parsedOdoEnd < odometerStart
+  const tripDistance = parsedOdoEnd !== null && odometerStart !== null && odometerStart !== undefined && !isOdoAnomaly
+    ? parsedOdoEnd - odometerStart
+    : null
+  const estimatedFuelLiters = tripDistance !== null && fuelEfficiencyKmL && fuelEfficiencyKmL > 0
+    ? tripDistance / fuelEfficiencyKmL
+    : null
+  const estimatedFuelCost = estimatedFuelLiters !== null && fuelPricePerLiter && fuelPricePerLiter > 0
+    ? Math.round(estimatedFuelLiters * fuelPricePerLiter)
+    : null
+
   const handleConfirmEnd = () => {
+    if (waiveLateFee && !lateFeeNote.trim()) {
+      setError('Catatan alasan wajib diisi saat membebaskan denda keterlambatan.')
+      return
+    }
+
     startTransition(async () => {
       setError(null)
-      const res = await endRental(bookingId)
+      const res = await endRental(bookingId, {
+        actualReturnAt: returnDateTime.toISOString(),
+        lateFeeAmount: activeFee,
+        lateFeeNote: lateFeeNote.trim() || undefined,
+        waiveLateFee,
+        paymentMethod: activeFee > 0 && !waiveLateFee ? paymentMethod : undefined,
+        odometerEnd: parsedOdoEnd !== null ? parsedOdoEnd : undefined,
+      })
+
       if (res.error) {
         setError(res.error)
       } else {
@@ -263,36 +364,304 @@ export function EndRentalButton({ bookingId }: { bookingId: string }) {
 
   return (
     <div className="flex flex-col gap-1 w-full">
-      <button
-        onClick={() => setIsOpen(true)}
-        disabled={isPending}
-        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm w-full cursor-pointer"
-      >
-        <CheckCircle2 className="w-4 h-4" />
-        Selesaikan Sewa (Armada Kembali)
-      </button>
+      {variant === 'compact' ? (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          disabled={isPending}
+          className={className || "w-full flex items-center justify-center gap-1.5 bg-zinc-900 hover:bg-black text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer"}
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>{buttonText || 'Selesai Sewa'}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          disabled={isPending}
+          className={className || "flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm w-full cursor-pointer"}
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          {buttonText || 'Selesaikan Sewa (Armada Kembali)'}
+        </button>
+      )}
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
 
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-xl max-w-md w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-zinc-900 mb-2 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-blue-600" /> Konfirmasi Selesai Sewa
-            </h3>
-            <p className="text-sm text-zinc-600 mb-4">
-              Konfirmasi bahwa armada telah diperiksa dan diserahkan kembali oleh pelanggan. Status pesanan akan berganti menjadi <strong>COMPLETED</strong> dan armada akan berstatus tersedia kembali.
-            </p>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white p-6 rounded-xl max-w-lg w-full shadow-2xl my-8 text-left">
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-blue-600" /> Konfirmasi Selesai Sewa (Pengembalian Armada)
+              </h3>
+              <span className="text-xs font-mono bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded">
+                #{bookingId.slice(0, 8).toUpperCase()}
+              </span>
+            </div>
+
+            {vehicleName && (
+              <p className="text-sm font-semibold text-zinc-800 mb-3">
+                Unit Armada: {vehicleName}
+              </p>
+            )}
+
+            {/* Box Waktu Jadwal vs Aktual */}
+            <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3.5 text-xs space-y-1.5 mb-4">
+              <div className="flex justify-between">
+                <span className="text-zinc-500 font-medium">Jadwal Selesai Rencana:</span>
+                <span className="font-semibold text-zinc-800">
+                  {endDateTime ? formatWibDateTime(endDateTime) : '-'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500 font-medium">Waktu Aktual Pengembalian:</span>
+                <span className="font-semibold text-zinc-900">
+                  {formatWibDateTime(returnDateTime)}
+                </span>
+              </div>
+              {agreedDailyRate > 0 && (
+                <div className="flex justify-between pt-1 border-t border-zinc-200">
+                  <span className="text-zinc-500 font-medium">Tarif Sewa Harian:</span>
+                  <span className="font-semibold text-zinc-800">
+                    Rp {agreedDailyRate.toLocaleString('id-ID')} / hari
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Box Pencatatan Odometer & Estimasi BBM */}
+            <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3.5 text-xs space-y-3 mb-4">
+              <div className="flex items-center gap-2 text-zinc-800 font-bold">
+                <Gauge className="w-4 h-4 text-blue-600" />
+                <span>Pencatatan Odometer & Estimasi BBM</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-500 font-medium mb-1">Odometer Awal (km)</label>
+                  <div className="p-2 bg-zinc-100 rounded border border-zinc-200 font-mono font-semibold text-zinc-800">
+                    {odometerStart != null ? `${odometerStart.toLocaleString('id-ID')} km` : 'Tidak dicatat'}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-zinc-700 font-medium mb-1">
+                    Odometer Akhir (km) <span className="text-zinc-400 font-normal">(opsional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Misal: 45450"
+                    value={odometerEnd}
+                    onChange={(e) => setOdometerEnd(e.target.value)}
+                    className="w-full text-zinc-900 bg-white border border-zinc-300 rounded p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {isOdoAnomaly && (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded text-amber-800 flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Odometer akhir ({parsedOdoEnd?.toLocaleString('id-ID')} km) lebih kecil dari odometer awal ({odometerStart?.toLocaleString('id-ID')} km). Data tetap disimpan, namun estimasi konsumsi BBM dilewati.
+                  </span>
+                </div>
+              )}
+
+              {tripDistance !== null && (
+                <div className="pt-2 border-t border-zinc-200 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Jarak Tempuh Trip:</span>
+                    <span className="font-semibold text-zinc-900 font-mono">{tripDistance.toLocaleString('id-ID')} km</span>
+                  </div>
+                  {estimatedFuelLiters !== null && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Estimasi Konsumsi BBM:</span>
+                      <span className="font-semibold text-zinc-900">~{estimatedFuelLiters.toFixed(1)} Liter</span>
+                    </div>
+                  )}
+                  {estimatedFuelCost !== null && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Estimasi Biaya BBM:</span>
+                      <span className="font-bold text-amber-700 font-mono">
+                        ~{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(estimatedFuelCost)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <p className="text-[11px] text-zinc-500 italic">
+                ℹ️ Estimasi BBM informasional — BBM ditanggung penyewa penuh di luar tagihan rental (Opsi A).
+              </p>
+            </div>
+
+            {/* Kalkulasi Denda & Status Keterlambatan */}
+            {feeCalc && (
+              <div className="mb-4">
+                {!feeCalc.isLate ? (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-emerald-900">Pengembalian Tepat Waktu / Dalam Toleransi</p>
+                      <p className="text-emerald-700 mt-0.5">{feeCalc.breakdownText}</p>
+                    </div>
+                  </div>
+                ) : feeCalc.isExtremeLate ? (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-900 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-red-900">Keterlambatan Ekstrem (&gt; 3 Jam)</p>
+                      <p className="text-red-700 mt-0.5">{feeCalc.breakdownText}</p>
+                      <p className="text-red-800 font-bold mt-1 text-sm">
+                        Denda Terhitung: Rp {feeCalc.suggestedLateFee.toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-start gap-2">
+                    <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-900">Terlambat Kembali (Overtime Proporsional)</p>
+                      <p className="text-amber-700 mt-0.5">{feeCalc.breakdownText}</p>
+                      <p className="text-amber-800 font-bold mt-1 text-sm">
+                        Denda Terhitung: Rp {feeCalc.suggestedLateFee.toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bagian Penanganan Denda (jika denda terhitung > 0) */}
+            {suggestedFee > 0 && (
+              <div className="border border-zinc-200 rounded-lg p-4 mb-4 bg-zinc-50/50 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 font-medium text-zinc-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={waiveLateFee}
+                      onChange={(e) => {
+                        setWaiveLateFee(e.target.checked)
+                        if (e.target.checked) setError(null)
+                      }}
+                      disabled={!canWaive}
+                      className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                    <span className={!canWaive ? 'text-zinc-400' : ''}>
+                      Bebaskan Denda Keterlambatan (Waive)
+                    </span>
+                  </label>
+                  {!canWaive && (
+                    <span className="text-[10px] bg-zinc-200 text-zinc-600 px-2 py-0.5 rounded font-medium">
+                      Khusus Admin Cabang / Pusat
+                    </span>
+                  )}
+                </div>
+
+                {waiveLateFee ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                      Alasan Pembebasan Denda <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={lateFeeNote}
+                      onChange={(e) => setLateFeeNote(e.target.value)}
+                      placeholder="Contoh: Dispensasi operasional disetujui BM karena kendala armada..."
+                      className="w-full p-2 border border-zinc-300 rounded text-xs focus:ring-1 focus:ring-blue-500 bg-white"
+                      rows={2}
+                      required
+                    />
+                    <p className="text-[11px] text-zinc-500 mt-1">
+                      Denda akan menjadi Rp 0 dan alasan akan dicatat secara permanen di audit trail.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 pt-2 border-t border-zinc-200">
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                        Nominal Denda (Rp)
+                      </label>
+                      <input
+                        type="number"
+                        value={customLateFee !== '' ? customLateFee : suggestedFee}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setCustomLateFee(val === '' ? '' : Math.max(0, parseInt(val, 10) || 0))
+                        }}
+                        className="w-full p-2 border border-zinc-300 rounded text-xs focus:ring-1 focus:ring-blue-500 bg-white font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Metode Pembayaran Denda
+                      </label>
+                      <div className="grid grid-cols-1 gap-2">
+                        <label className={`flex items-center gap-2 p-2.5 rounded border cursor-pointer ${
+                          paymentMethod === 'cash_late_fee' ? 'border-blue-500 bg-blue-50/50' : 'border-zinc-200 bg-white'
+                        }`}>
+                          <input
+                            type="radio"
+                            name={`paymentMethod-${bookingId}`}
+                            value="cash_late_fee"
+                            checked={paymentMethod === 'cash_late_fee'}
+                            onChange={() => setPaymentMethod('cash_late_fee')}
+                            className="text-blue-600"
+                          />
+                          <div>
+                            <span className="font-semibold text-zinc-800 block">💵 Tunai di Kasir / Konter Cabang</span>
+                            <span className="text-[11px] text-zinc-500">Staf menerima uang tunai langsung. Status denda langsung lunas (success).</span>
+                          </div>
+                        </label>
+
+                        <label className={`flex items-center gap-2 p-2.5 rounded border cursor-pointer ${
+                          paymentMethod === 'midtrans_late_fee' ? 'border-blue-500 bg-blue-50/50' : 'border-zinc-200 bg-white'
+                        }`}>
+                          <input
+                            type="radio"
+                            name={`paymentMethod-${bookingId}`}
+                            value="midtrans_late_fee"
+                            checked={paymentMethod === 'midtrans_late_fee'}
+                            onChange={() => setPaymentMethod('midtrans_late_fee')}
+                            className="text-blue-600"
+                          />
+                          <div>
+                            <span className="font-semibold text-zinc-800 block">💳 Tagih Online (Midtrans Snap)</span>
+                            <span className="text-[11px] text-zinc-500">Dibuatkan tagihan invoice online. Status pending sampai customer membayar.</span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 mb-1">
+                        Catatan Keterlambatan (Opsional)
+                      </label>
+                      <input
+                        type="text"
+                        value={lateFeeNote}
+                        onChange={(e) => setLateFeeNote(e.target.value)}
+                        placeholder="Catatan tambahan staf..."
+                        className="w-full p-2 border border-zinc-300 rounded text-xs focus:ring-1 focus:ring-blue-500 bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {error && (
               <div className="mb-4 p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-700">
                 {error}
               </div>
             )}
-            <div className="flex justify-end gap-3 pt-2">
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-zinc-200">
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
                 disabled={isPending}
-                className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 font-medium cursor-pointer"
+                className="px-4 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 cursor-pointer"
               >
                 Batal
               </button>
@@ -300,7 +669,7 @@ export function EndRentalButton({ bookingId }: { bookingId: string }) {
                 type="button"
                 onClick={handleConfirmEnd}
                 disabled={isPending}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
               >
                 {isPending ? 'Memproses...' : 'Ya, Selesaikan Sewa'}
               </button>

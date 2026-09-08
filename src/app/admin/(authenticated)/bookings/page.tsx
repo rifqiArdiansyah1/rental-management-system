@@ -27,8 +27,10 @@ import {
   CheckCircle2,
   XCircle,
   RotateCcw,
-  ChevronRight
+  ChevronRight,
+  DollarSign
 } from 'lucide-react'
+import { findConflictRiskBookingIds, getConflictRiskMap } from '@/lib/scheduleConflict'
 
 export default async function AdminBookingsPage({
   searchParams
@@ -38,6 +40,7 @@ export default async function AdminBookingsPage({
   const resolvedParams = await searchParams
   const adminUser = await requireAdminSession()
   const scope = await getStaffScope()
+  const conflictRiskBookingIds = await findConflictRiskBookingIds(scope)
 
   const currentTab = resolvedParams.tab || 'action_required'
   const page = Math.max(1, parseInt(resolvedParams.page || '1', 10))
@@ -46,14 +49,14 @@ export default async function AdminBookingsPage({
 
   // 1. Fetch live count badges for all tabs concurrently
   const [actionRequiredCount, handoverTodayCount, ongoingCount, allCount] = await Promise.all([
-    prisma.booking.count({ where: buildBookingWhereClause({ tab: 'action_required' }, scope) }),
+    prisma.booking.count({ where: buildBookingWhereClause({ tab: 'action_required' }, scope, conflictRiskBookingIds) }),
     prisma.booking.count({ where: buildBookingWhereClause({ tab: 'handover_today' }, scope) }),
     prisma.booking.count({ where: buildBookingWhereClause({ tab: 'ongoing' }, scope) }),
     prisma.booking.count({ where: buildBookingWhereClause({ tab: 'all' }, scope) })
   ])
 
   // 2. Fetch paginated data, total filtered count, and filter dropdown options concurrently
-  const where = buildBookingWhereClause(resolvedParams, scope)
+  const where = buildBookingWhereClause(resolvedParams, scope, conflictRiskBookingIds)
 
   const [bookings, totalFilteredCount, branches, drivers] = await Promise.all([
     prisma.booking.findMany({
@@ -89,6 +92,8 @@ export default async function AdminBookingsPage({
       orderBy: { name: 'asc' }
     })
   ])
+
+  const conflictMap = await getConflictRiskMap(bookings.map((b) => b.id))
 
   const now = new Date()
   const todayWibStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now)
@@ -142,6 +147,12 @@ export default async function AdminBookingsPage({
               booking.status === 'confirmed' &&
               new Date(booking.startDate) >= startOfTodayWib &&
               new Date(booking.startDate) <= endOfTodayWib
+            const hasUnpaidLateFee =
+              Boolean(booking.lateFeeAmount && Number(booking.lateFeeAmount) > 0 && !booking.lateFeeWaived &&
+                !booking.payments.some((p) => (p.method === 'cash_late_fee' || p.method === 'midtrans_late_fee') && p.status === 'success'))
+            const conflict = conflictMap.get(booking.id)
+            const isConflictRisk = conflict?.type === 'ongoing_risk'
+            const isUpcomingThreat = conflict?.type === 'upcoming_threat'
 
             return (
               <div
@@ -177,7 +188,10 @@ export default async function AdminBookingsPage({
                   isDriverUnassigned ||
                   isOverdueReturn ||
                   isOverdueHandover ||
-                  isHandoverToday) && (
+                  isHandoverToday ||
+                  hasUnpaidLateFee ||
+                  isConflictRisk ||
+                  isUpcomingThreat) && (
                   <div className="px-4 py-2 bg-zinc-50 border-b border-zinc-100 flex flex-wrap gap-1.5 text-xs">
                     {isRefundNeeded && (
                       <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">
@@ -212,6 +226,21 @@ export default async function AdminBookingsPage({
                     {isHandoverToday && (
                       <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-medium">
                         <Clock className="w-3 h-3" /> Serah-Terima Hari Ini
+                      </span>
+                    )}
+                    {hasUnpaidLateFee && (
+                      <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-bold">
+                        <DollarSign className="w-3 h-3 text-amber-700" /> Denda Belum Lunas
+                      </span>
+                    )}
+                    {isConflictRisk && (
+                      <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-full font-bold">
+                        <AlertTriangle className="w-3 h-3 text-purple-700" /> ⚠️ Berisiko Bentrok Jadwal
+                      </span>
+                    )}
+                    {isUpcomingThreat && (
+                      <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-full font-bold">
+                        <AlertTriangle className="w-3 h-3 text-rose-700" /> ⚠️ Unit Terancam Terlambat
                       </span>
                     )}
                   </div>
@@ -255,7 +284,16 @@ export default async function AdminBookingsPage({
                     <ChevronRight className="w-4 h-4 text-blue-500" />
                   </Link>
                   {booking.status === 'confirmed' && <StartRentalButton bookingId={booking.id} />}
-                  {booking.status === 'ongoing' && <EndRentalButton bookingId={booking.id} />}
+                  {booking.status === 'ongoing' && (
+                    <EndRentalButton
+                      bookingId={booking.id}
+                      endDate={booking.endDate.toISOString()}
+                      agreedDailyRate={Number(booking.agreedDailyRate || booking.vehicle.dailyRate)}
+                      vehicleName={booking.vehicle.name || booking.vehicle.category.name}
+                      userRole={adminUser.role}
+                      variant="compact"
+                    />
+                  )}
                 </div>
               </div>
             )
@@ -297,6 +335,12 @@ export default async function AdminBookingsPage({
                     booking.status === 'confirmed' &&
                     new Date(booking.startDate) >= startOfTodayWib &&
                     new Date(booking.startDate) <= endOfTodayWib
+                  const hasUnpaidLateFee =
+                    Boolean(booking.lateFeeAmount && Number(booking.lateFeeAmount) > 0 && !booking.lateFeeWaived &&
+                      !booking.payments.some((p) => (p.method === 'cash_late_fee' || p.method === 'midtrans_late_fee') && p.status === 'success'))
+                  const conflict = conflictMap.get(booking.id)
+                  const isConflictRisk = conflict?.type === 'ongoing_risk'
+                  const isUpcomingThreat = conflict?.type === 'upcoming_threat'
 
                   return (
                     <tr key={booking.id} className="hover:bg-zinc-50 transition-colors">
@@ -405,6 +449,21 @@ export default async function AdminBookingsPage({
                               <Clock className="w-3 h-3" /> Siap Hari Ini
                             </span>
                           )}
+                          {hasUnpaidLateFee && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                              <DollarSign className="w-3 h-3 text-amber-700" /> Denda Belum Lunas
+                            </span>
+                          )}
+                          {isConflictRisk && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                              <AlertTriangle className="w-3 h-3 text-purple-700" /> ⚠️ Berisiko Bentrok Jadwal
+                            </span>
+                          )}
+                          {isUpcomingThreat && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                              <AlertTriangle className="w-3 h-3 text-rose-700" /> ⚠️ Unit Terancam Terlambat
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -419,7 +478,16 @@ export default async function AdminBookingsPage({
                             <ChevronRight className="w-3.5 h-3.5 text-blue-500" />
                           </Link>
                           {booking.status === 'confirmed' && <StartRentalButton bookingId={booking.id} />}
-                          {booking.status === 'ongoing' && <EndRentalButton bookingId={booking.id} />}
+                          {booking.status === 'ongoing' && (
+                            <EndRentalButton
+                              bookingId={booking.id}
+                              endDate={booking.endDate.toISOString()}
+                              agreedDailyRate={Number(booking.agreedDailyRate || booking.vehicle.dailyRate)}
+                              vehicleName={booking.vehicle.name || booking.vehicle.category.name}
+                              userRole={adminUser.role}
+                              variant="compact"
+                            />
+                          )}
                         </div>
                       </td>
                     </tr>

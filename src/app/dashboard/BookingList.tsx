@@ -1,18 +1,27 @@
-﻿'use client'
+'use client'
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import Script from 'next/script'
 import { customerCancelBooking } from '@/actions/booking'
+import { createLateFeeSnapToken, syncLateFeePaymentStatus } from '@/actions/payment'
 import { useRouter } from 'next/navigation'
 
 type BookingWithRelations = {
   id: string
   status: string
   rentalType: string
-  startDate: Date
-  endDate: Date
+  startDate: Date | string
+  endDate: Date | string
   totalPrice: number | string | bigint
+  actualReturnAt?: string | null
+  lateMinutes?: number | null
+  lateFeeAmount?: number | null
+  lateFeeWaived?: boolean
+  lateFeeNote?: string | null
+  odometerStart?: number | null
+  odometerEnd?: number | null
   vehicle: {
     name: string
     plateNumber: string
@@ -20,6 +29,12 @@ type BookingWithRelations = {
     category: { name: string }
   }
   driver: { name: string; phone: string } | null
+  payments?: Array<{
+    id: string
+    method: string
+    status: string
+    amount: number
+  }>
 }
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
@@ -52,7 +67,15 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
   const [page, setPage] = useState(1)
   const [cancelTarget, setCancelTarget] = useState<string | null>(null)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const [snapLoadingId, setSnapLoadingId] = useState<string | null>(null)
+  const [snapError, setSnapError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const isProd = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true'
+  const snapUrl = isProd
+    ? 'https://app.midtrans.com/snap/snap.js'
+    : 'https://app.sandbox.midtrans.com/snap/snap.js'
+  const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ''
 
   const visible = bookings.slice(0, page * PAGE_SIZE)
   const hasMore = visible.length < bookings.length
@@ -77,6 +100,50 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
     })
   }
 
+  function handlePayLateFee(e: React.MouseEvent, bookingId: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    setSnapLoadingId(bookingId)
+    setSnapError(null)
+
+    startTransition(async () => {
+      try {
+        const res = await createLateFeeSnapToken(bookingId)
+        // @ts-ignore
+        if (typeof window !== 'undefined' && window.snap) {
+          // @ts-ignore
+          window.snap.pay(res.token, {
+            onSuccess: async () => {
+              setSnapLoadingId(null)
+              await syncLateFeePaymentStatus(bookingId)
+              router.refresh()
+            },
+            onPending: async () => {
+              setSnapLoadingId(null)
+              await syncLateFeePaymentStatus(bookingId)
+              router.refresh()
+            },
+            onError: () => {
+              setSnapLoadingId(null)
+              setSnapError('Pembayaran denda gagal atau dibatalkan.')
+            },
+            onClose: async () => {
+              setSnapLoadingId(null)
+              await syncLateFeePaymentStatus(bookingId)
+              router.refresh()
+            }
+          })
+        } else {
+          setSnapLoadingId(null)
+          setSnapError('Modul pembayaran sedang dimuat, silakan coba lagi.')
+        }
+      } catch (err: any) {
+        setSnapLoadingId(null)
+        setSnapError(err.message || 'Gagal memulai pembayaran online denda.')
+      }
+    })
+  }
+
   if (bookings.length === 0) {
     return (
       <div className="text-center py-12 text-on-surface-variant">
@@ -88,6 +155,12 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
 
   return (
     <>
+      <Script src={snapUrl} data-client-key={clientKey} strategy="lazyOnload" />
+      {snapError && (
+        <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-400">
+          {snapError}
+        </div>
+      )}
       <div className="flex flex-col gap-4">
         {visible.map((booking) => {
           const badge = STATUS_MAP[booking.status] ?? {
@@ -159,6 +232,75 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-400/70">
                       <span className="material-symbols-outlined text-sm">schedule</span>
                       <span>Sopir belum ditugaskan</span>
+                    </div>
+                  )}
+
+                  {/* Late Fee Display & Online Payment */}
+                  {booking.lateFeeAmount && Number(booking.lateFeeAmount) > 0 ? (
+                    <div className="mt-3 p-2.5 rounded-lg bg-surface border border-red-500/20 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-red-400 font-semibold text-xs block">
+                          Denda Keterlambatan: Rp {Number(booking.lateFeeAmount).toLocaleString('id-ID')}
+                        </span>
+                        <span className="text-zinc-400 text-[11px]">
+                          Terlambat {booking.lateMinutes || 0} menit
+                          {booking.lateFeeNote && ` • ${booking.lateFeeNote}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {booking.payments?.some(p => (p.method === 'cash_late_fee' || p.method === 'midtrans_late_fee') && p.status === 'success') ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            Denda Lunas
+                          </span>
+                        ) : (
+                          <>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                              Belum Lunas
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => handlePayLateFee(e, booking.id)}
+                              disabled={isPending || snapLoadingId === booking.id}
+                              className="px-3 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-zinc-950 font-bold rounded-lg text-xs transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                            >
+                              {snapLoadingId === booking.id ? 'Memuat...' : 'Bayar Denda Online'}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : booking.lateFeeWaived ? (
+                    <div className="mt-2.5 p-2 rounded-lg bg-surface border border-emerald-500/30 text-xs flex items-center justify-between">
+                      <span className="text-emerald-400 font-medium">
+                        Denda Keterlambatan: Dibebaskan
+                      </span>
+                      <span className="text-[10px] text-zinc-400 italic">
+                        {booking.lateFeeNote || 'Dispensasi Operasional'}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {/* Trip Odometer & Fuel Policy Summary */}
+                  {booking.odometerStart != null && booking.odometerEnd != null && (
+                    <div className="mt-2.5 p-2 rounded-lg bg-surface border border-surface-variant text-xs flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-zinc-300">
+                        <span className="material-symbols-outlined text-sm text-secondary">speed</span>
+                        <span>
+                          Trip: <strong className="text-white font-mono">{Math.max(0, booking.odometerEnd - booking.odometerStart)} km</strong>
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-zinc-400">
+                        {booking.rentalType === 'with_driver'
+                          ? 'BBM ditanggung penyewa via sopir'
+                          : 'BBM ditanggung penyewa mandiri'}
+                      </span>
+                    </div>
+                  )}
+
+                  {booking.status === 'ongoing' && booking.odometerStart != null && (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-zinc-400">
+                      <span className="material-symbols-outlined text-sm text-secondary">speed</span>
+                      <span>Odometer Awal: <strong className="text-zinc-200 font-mono">{booking.odometerStart.toLocaleString('id-ID')} km</strong></span>
                     </div>
                   )}
 
