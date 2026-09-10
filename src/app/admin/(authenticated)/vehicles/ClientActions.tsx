@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle } from '@/actions/adminVehicle'
+import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle, updateVehicleUnavailabilityEstimate } from '@/actions/adminVehicle'
 import { uploadVehiclePhoto } from '@/actions/vehiclePhoto'
 import { VehicleStatus, FuelType } from '@prisma/client'
 import { MIN_VEHICLE_DAILY_RATE, FUEL_TYPE_LABELS } from '@/lib/constants'
@@ -482,13 +482,23 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
   const [menuOpen, setMenuOpen] = useState(false)
   const [openUpward, setOpenUpward] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
-  const [modalType, setModalType] = useState<'edit' | 'status' | 'delete' | null>(null)
+  const [modalType, setModalType] = useState<'edit' | 'status' | 'delete' | 'estimate' | null>(null)
   
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
 
+  // Status Modal states
   const [status, setStatus] = useState<VehicleStatus>(vehicle.status)
+  const [statusEstimatedEndAt, setStatusEstimatedEndAt] = useState<string>('')
+  const [statusNote, setStatusNote] = useState<string>('')
+  const [statusTargetBranchId, setStatusTargetBranchId] = useState<string>(vehicle.branchId)
+
+  // Estimate Modal states
+  const [estimateEndAt, setEstimateEndAt] = useState<string>('')
+  const [estimateNote, setEstimateNote] = useState<string>('')
+  const [estimateConflictWarning, setEstimateConflictWarning] = useState<boolean>(false)
+  const [estimateConflictingBookings, setEstimateConflictingBookings] = useState<any[]>([])
   
   const [form, setForm] = useState({
     name: vehicle.name || '',
@@ -521,19 +531,80 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
     if (!menuOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
       const spaceBelow = window.innerHeight - rect.bottom
-      setOpenUpward(spaceBelow < 200)
+      setOpenUpward(spaceBelow < 220)
     }
     setMenuOpen(!menuOpen)
+  }
+
+  const handleOpenStatusModal = () => {
+    setMenuOpen(false)
+    setStatus(vehicle.status)
+    const unavail = vehicle.unavailabilities?.[0]
+    if (unavail?.estimatedEndAt) {
+      const d = new Date(unavail.estimatedEndAt)
+      const wibDate = new Date(d.getTime() + 7 * 60 * 60 * 1000)
+      setStatusEstimatedEndAt(wibDate.toISOString().slice(0, 16))
+    } else {
+      setStatusEstimatedEndAt('')
+    }
+    setStatusNote(unavail?.note || '')
+    setStatusTargetBranchId(vehicle.branchId)
+    setError(null)
+    setModalType('status')
+  }
+
+  const handleOpenEstimateModal = () => {
+    setMenuOpen(false)
+    const unavail = vehicle.unavailabilities?.[0]
+    if (unavail?.estimatedEndAt) {
+      const d = new Date(unavail.estimatedEndAt)
+      const wibDate = new Date(d.getTime() + 7 * 60 * 60 * 1000)
+      setEstimateEndAt(wibDate.toISOString().slice(0, 16))
+    } else {
+      setEstimateEndAt('')
+    }
+    setEstimateNote(unavail?.note || '')
+    setEstimateConflictWarning(false)
+    setEstimateConflictingBookings([])
+    setError(null)
+    setModalType('estimate')
   }
 
   const handleUpdateStatus = () => {
     startTransition(async () => {
       setError(null)
-      const res = await updateVehicleStatus(vehicle.id, status)
+      const res = await updateVehicleStatus(vehicle.id, status, {
+        estimatedEndAt: status === 'maintenance' && statusEstimatedEndAt ? new Date(`${statusEstimatedEndAt}+07:00`) : null,
+        note: statusNote.trim() || null,
+        targetBranchId: (status === 'available' && vehicle.status === 'moved' && statusTargetBranchId) ? statusTargetBranchId : undefined
+      })
       if (res.error) setError(res.error)
       else {
         setModalType(null)
         router.refresh()
+      }
+    })
+  }
+
+  const handleUpdateEstimate = () => {
+    startTransition(async () => {
+      setError(null)
+      setEstimateConflictWarning(false)
+      setEstimateConflictingBookings([])
+      const res = await updateVehicleUnavailabilityEstimate(vehicle.id, {
+        estimatedEndAt: estimateEndAt ? new Date(`${estimateEndAt}+07:00`) : null,
+        note: estimateNote.trim() || null
+      })
+      if (res.error) {
+        setError(res.error)
+      } else {
+        if (res.conflictWarning && res.conflictingBookings && res.conflictingBookings.length > 0) {
+          setEstimateConflictWarning(true)
+          setEstimateConflictingBookings(res.conflictingBookings)
+        } else {
+          setModalType(null)
+          router.refresh()
+        }
       }
     })
   }
@@ -588,7 +659,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)}></div>
-          <div className={`absolute right-0 w-48 bg-white border border-zinc-200 rounded-md shadow-lg z-30 py-1 ${
+          <div className={`absolute right-0 w-52 bg-white border border-zinc-200 rounded-md shadow-lg z-30 py-1 ${
             openUpward ? 'bottom-full mb-1' : 'top-full mt-1'
           }`}>
             {vehicle.status === 'rented' ? (
@@ -607,12 +678,23 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
               </div>
             ) : (
               <button 
-                onClick={() => { setMenuOpen(false); setStatus(vehicle.status); setModalType('status') }}
+                onClick={handleOpenStatusModal}
                 className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
               >
                 Ubah Status
               </button>
             )}
+
+            {vehicle.status === 'maintenance' && vehicle.isActive && (
+              <button 
+                onClick={handleOpenEstimateModal}
+                className="w-full text-left px-4 py-2 text-sm text-amber-800 hover:bg-amber-50 flex items-center justify-between"
+              >
+                <span>Estimasi Maintenance</span>
+                <span className="text-[10px] bg-amber-100 px-1.5 py-0.5 rounded font-medium">Update</span>
+              </button>
+            )}
+
             {canEditOrDelete && (
               <>
                 <button 
@@ -636,22 +718,103 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
       {/* Modals */}
       {modalType === 'status' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-xl max-w-sm w-full shadow-lg">
+          <div className="bg-white p-6 rounded-xl max-w-md w-full shadow-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-zinc-900 mb-1">Ubah Status</h3>
-            <p className="text-xs text-zinc-500 mb-4">Pilih status operasional kendaraan di cabang.</p>
-            <select 
-              value={status}
-              onChange={e => setStatus(e.target.value as VehicleStatus)}
-              className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="available">Tersedia (Available)</option>
-              <option value="maintenance">Perbaikan (Maintenance)</option>
-              <option value="moved">Dipindahkan (Moved)</option>
-            </select>
-            <p className="text-[11px] text-zinc-400 mt-2">
-              Status &quot;Disewa&quot; dikelola otomatis oleh sistem saat Mulai Sewa di Manajemen Pesanan.
+            <p className="text-xs text-zinc-500 mb-4">
+              Armada: <strong>{vehicle.name || vehicle.plateNumber}</strong> ({vehicle.plateNumber})
             </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Pilih Status Baru</label>
+                <select 
+                  value={status}
+                  onChange={e => setStatus(e.target.value as VehicleStatus)}
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="available">Tersedia (Available)</option>
+                  <option value="maintenance">Perbaikan (Maintenance)</option>
+                  <option value="moved">Dipindahkan (Moved)</option>
+                </select>
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  Status &quot;Disewa&quot; dikelola otomatis oleh sistem saat Mulai Sewa di Manajemen Pesanan.
+                </p>
+              </div>
+
+              {/* Conditional Inputs: Maintenance */}
+              {status === 'maintenance' && (
+                <div className="space-y-3 pt-3 border-t border-zinc-100">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">Estimasi Selesai Servis</label>
+                    <input
+                      type="datetime-local"
+                      value={statusEstimatedEndAt}
+                      onChange={e => setStatusEstimatedEndAt(e.target.value)}
+                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-[11px] text-zinc-400 mt-1">
+                      Kosongkan jika durasi belum pasti (unit akan diblokir dari semua pemesanan). Jika diisi, customer dapat memesan untuk jadwal setelah servis + 3 jam buffer.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">Catatan Servis / Bengkel</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Misal: Perbaikan transmisi di bengkel rekanan"
+                      value={statusNote}
+                      onChange={e => setStatusNote(e.target.value)}
+                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Conditional Inputs: Moved */}
+              {status === 'moved' && (
+                <div className="space-y-3 pt-3 border-t border-zinc-100">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
+                    <p className="font-semibold mb-1">Perhatian Mutasi Unit:</p>
+                    <p>Unit yang berstatus &quot;Moved&quot; diblokir penuh dari seluruh katalog pemesanan cabang sampai tiba di tujuan. Transisi akan ditolak jika armada memiliki pesanan aktif di masa depan.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">Catatan / Tujuan Mutasi</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Misal: Mutasi unit ke Cabang Bandung untuk rotasi armada"
+                      value={statusNote}
+                      onChange={e => setStatusNote(e.target.value)}
+                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Conditional Inputs: Moved -> Available (Branch Relocation) */}
+              {status === 'available' && vehicle.status === 'moved' && (
+                <div className="space-y-3 pt-3 border-t border-zinc-100">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
+                    Armada tiba dari proses mutasi. Pilih cabang penempatan operasional baru untuk unit ini:
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">Cabang Penempatan Baru *</label>
+                    <select
+                      value={statusTargetBranchId}
+                      onChange={e => setStatusTargetBranchId(e.target.value)}
+                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} {b.id === vehicle.branchId ? '(Cabang Asal)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {error && <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded-md">{error}</div>}
+            
             <div className="mt-6 flex justify-end gap-2">
               <button 
                 onClick={() => setModalType(null)}
@@ -667,6 +830,90 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
               >
                 {isPending ? 'Menyimpan...' : 'Simpan'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Update Maintenance Estimate */}
+      {modalType === 'estimate' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-xl max-w-md w-full shadow-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-zinc-900 mb-1">Perbarui Estimasi Maintenance</h3>
+            <p className="text-xs text-zinc-500 mb-4">
+              Armada: <strong>{vehicle.name || vehicle.plateNumber}</strong> ({vehicle.plateNumber})
+            </p>
+
+            {estimateConflictWarning && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-900 space-y-2">
+                <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                  <span className="material-symbols-outlined text-base">warning</span>
+                  <span>Peringatan: Jadwal Bentrok Terdeteksi!</span>
+                </div>
+                <p>
+                  Perpanjangan estimasi servis ini bertabrakan dengan {estimateConflictingBookings.length} pesanan sewa aktif:
+                </p>
+                <ul className="list-disc pl-4 space-y-1 font-mono text-[11px]">
+                  {estimateConflictingBookings.map((b: any) => (
+                    <li key={b.id}>
+                      #{b.id.slice(-6).toUpperCase()} ({new Date(b.startDate).toLocaleDateString('id-ID')} - {new Date(b.endDate).toLocaleDateString('id-ID')}) — {b.customerName || 'Customer'}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] text-amber-700 font-medium">
+                  Pesanan telah otomatis ditandai di tab <strong>&quot;Perlu Tindakan&quot;</strong> agar tim operasional segera mengalihkan unit pengganti atau berkoordinasi dengan penyewa.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Estimasi Selesai Servis (WIB)</label>
+                <input
+                  type="datetime-local"
+                  value={estimateEndAt}
+                  onChange={e => setEstimateEndAt(e.target.value)}
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  Kosongkan jika ingin mengubah ke maintenance indefinite (tanpa estimasi selesai).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Catatan Tambahan / Kendala Bengkel</label>
+                <textarea
+                  rows={3}
+                  placeholder="Misal: Menunggu spare part dari distributor utama, estimasi mundur 2 hari"
+                  value={estimateNote}
+                  onChange={e => setEstimateNote(e.target.value)}
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {error && <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded-md">{error}</div>}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button 
+                onClick={() => {
+                  setModalType(null)
+                  if (estimateConflictWarning) router.refresh()
+                }}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 rounded-md"
+              >
+                {estimateConflictWarning ? 'Tutup' : 'Batal'}
+              </button>
+              {!estimateConflictWarning && (
+                <button 
+                  onClick={handleUpdateEstimate}
+                  disabled={isPending}
+                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-md disabled:opacity-50"
+                >
+                  {isPending ? 'Menyimpan...' : 'Perbarui Estimasi'}
+                </button>
+              )}
             </div>
           </div>
         </div>

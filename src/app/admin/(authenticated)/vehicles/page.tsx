@@ -6,6 +6,8 @@ import { Prisma, FuelType } from '@prisma/client'
 import { FUEL_TYPE_LABELS } from '@/lib/constants'
 import { Car } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminVehiclesPage({
   searchParams
 }: {
@@ -55,7 +57,11 @@ export default async function AdminVehiclesPage({
     where,
     include: {
       category: true,
-      branch: true
+      branch: true,
+      unavailabilities: {
+        where: { actualEndAt: null },
+        take: 1
+      }
     },
     orderBy: { createdAt: 'desc' }
   })
@@ -113,11 +119,37 @@ export default async function AdminVehiclesPage({
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-800">
                       NONAKTIF
                     </span>
+                  ) : vehicle.status === 'maintenance' ? (
+                    (() => {
+                      const unavail = vehicle.unavailabilities?.[0]
+                      if (!unavail || !unavail.estimatedEndAt) {
+                        return (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800">
+                            MAINTENANCE
+                          </span>
+                        )
+                      }
+                      const endAt = new Date(unavail.estimatedEndAt)
+                      const isOverdue = new Date() > endAt
+                      const formatted = endAt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                      if (isOverdue) {
+                        return (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-800">
+                            <span>⚠️ OVERDUE</span>
+                          </span>
+                        )
+                      }
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800">
+                          <span>MAINTENANCE</span>
+                          <span className="text-[9px] font-normal lowercase">(s/d {formatted})</span>
+                        </span>
+                      )
+                    })()
                   ) : (
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
                       ${vehicle.status === 'available' ? 'bg-emerald-100 text-emerald-800' : ''}
                       ${vehicle.status === 'rented' ? 'bg-blue-100 text-blue-800' : ''}
-                      ${vehicle.status === 'maintenance' ? 'bg-amber-100 text-amber-800' : ''}
                       ${vehicle.status === 'moved' ? 'bg-zinc-100 text-zinc-800' : ''}
                     `}>
                       {vehicle.status.toUpperCase()}
@@ -210,11 +242,38 @@ export default async function AdminVehiclesPage({
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                           NONAKTIF
                         </span>
+                      ) : vehicle.status === 'maintenance' ? (
+                        (() => {
+                          const unavail = vehicle.unavailabilities?.[0]
+                          if (!unavail || !unavail.estimatedEndAt) {
+                            return (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                MAINTENANCE
+                              </span>
+                            )
+                          }
+                          const endAt = new Date(unavail.estimatedEndAt)
+                          const isOverdue = new Date() > endAt
+                          const formatted = endAt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                          if (isOverdue) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" title={`Jadwal lewat: ${formatted}`}>
+                                <span>⚠️ OVERDUE</span>
+                                <span className="text-[11px] font-normal">({formatted})</span>
+                              </span>
+                            )
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                              <span>MAINTENANCE</span>
+                              <span className="text-[11px] font-normal lowercase">(s/d {formatted})</span>
+                            </span>
+                          )
+                        })()
                       ) : (
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                           ${vehicle.status === 'available' ? 'bg-emerald-100 text-emerald-800' : ''}
                           ${vehicle.status === 'rented' ? 'bg-blue-100 text-blue-800' : ''}
-                          ${vehicle.status === 'maintenance' ? 'bg-amber-100 text-amber-800' : ''}
                           ${vehicle.status === 'moved' ? 'bg-zinc-100 text-zinc-800' : ''}
                         `}>
                           {vehicle.status.toUpperCase()}

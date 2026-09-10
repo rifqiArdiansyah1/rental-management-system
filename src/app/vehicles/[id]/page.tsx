@@ -209,6 +209,30 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                     <span className="font-headline-md text-on-surface text-lg font-bold block">{vehicleName}</span>
                     <span className="text-xs text-secondary">{category.name} • {vehicle.plateNumber}</span>
                   </div>
+
+                  {vehicle.status === 'maintenance' && (
+                    <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                        <span className="material-symbols-outlined text-[16px]">build</span>
+                        <span>Status: Dalam Perawatan Bengkel</span>
+                      </div>
+                      {vehicle.unavailabilities?.[0]?.estimatedEndAt ? (
+                        new Date() > new Date(vehicle.unavailabilities[0].estimatedEndAt) ? (
+                          <p className="text-amber-300/80 leading-relaxed">
+                            Jadwal perbaikan sedang diperbarui oleh tim teknis. Pemesanan dibuka untuk jadwal setelah servis selesai.
+                          </p>
+                        ) : (
+                          <p className="text-amber-300/80 leading-relaxed">
+                            Estimasi selesai servis: <strong>{new Date(vehicle.unavailabilities[0].estimatedEndAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB</strong>. Anda dapat memesan armada ini untuk tanggal setelah masa perawatan (+3 jam buffer).
+                          </p>
+                        )
+                      ) : (
+                        <p className="text-amber-300/80 leading-relaxed">
+                          Perawatan intensif sedang berlangsung. Pemesanan masa depan dibuka segera setelah estimasi selesai ditetapkan.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex justify-between items-center py-4 border-t border-surface-variant mt-2">
@@ -218,9 +242,15 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                   </span>
                 </div>
                 
-                <Link href={`/vehicles/${vehicle.id}/book`} className="block w-full text-center bg-secondary text-on-secondary font-button text-button py-4 rounded hover:bg-secondary-fixed transition-all duration-300 transform hover:-translate-y-1 shadow-[0_10px_20px_-10px_rgba(233,193,118,0.3)]">
-                  Rent This Car
-                </Link>
+                {vehicle.status === 'maintenance' && !vehicle.unavailabilities?.[0]?.estimatedEndAt ? (
+                  <div className="block w-full text-center bg-surface-container-high text-on-surface-variant font-button text-button py-4 rounded border border-outline-variant/40 cursor-not-allowed">
+                    Sedang Perawatan (Belum Dapat Dipesan)
+                  </div>
+                ) : (
+                  <Link href={`/vehicles/${vehicle.id}/book`} className="block w-full text-center bg-secondary text-on-secondary font-button text-button py-4 rounded hover:bg-secondary-fixed transition-all duration-300 transform hover:-translate-y-1 shadow-[0_10px_20px_-10px_rgba(233,193,118,0.3)]">
+                    Rent This Car
+                  </Link>
+                )}
                 <p className="font-label-caps text-label-caps text-on-surface-variant text-center lowercase tracking-normal">Requires security deposit and insurance verification.</p>
               </div>
             </div>

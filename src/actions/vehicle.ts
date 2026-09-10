@@ -6,8 +6,20 @@ import { Prisma } from '@prisma/client'
 export async function getVehicles(filters?: { branchId?: string; categoryId?: string }) {
   try {
     const where: Prisma.VehicleWhereInput = {
-      status: 'available',
       isActive: true,
+      OR: [
+        { status: 'available' },
+        {
+          status: 'maintenance',
+          unavailabilities: {
+            some: {
+              actualEndAt: null,
+              reason: 'maintenance',
+              estimatedEndAt: { not: null },
+            },
+          },
+        },
+      ],
     }
 
     if (filters?.branchId && filters.branchId !== 'all') {
@@ -23,6 +35,10 @@ export async function getVehicles(filters?: { branchId?: string; categoryId?: st
       include: {
         category: true,
         branch: true,
+        unavailabilities: {
+          where: { actualEndAt: null },
+          take: 1,
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -47,6 +63,10 @@ export async function getVehicleById(id: string) {
       include: {
         category: true,
         branch: true,
+        unavailabilities: {
+          where: { actualEndAt: null },
+          take: 1,
+        },
       }
     })
     

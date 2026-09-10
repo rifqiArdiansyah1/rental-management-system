@@ -19,6 +19,11 @@ enum VehicleStatus {
   moved
 }
 
+enum VehicleUnavailabilityReason {
+  maintenance
+  moved
+}
+
 enum VerificationStatus {
   pending
   verified
@@ -129,9 +134,27 @@ model Vehicle {
   branch   Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
   category VehicleCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   bookings Booking[]
+  unavailabilities VehicleUnavailability[]
 
   // Query paling sering: "mobil tersedia di cabang X" -> filter branchId + status
   @@index([branchId, status])
+}
+
+model VehicleUnavailability {
+  id             String                      @id @default(uuid())
+  vehicleId      String
+  reason         VehicleUnavailabilityReason
+  startAt        DateTime                    @db.Timestamptz(6)
+  estimatedEndAt DateTime?                   @db.Timestamptz(6)
+  actualEndAt    DateTime?                   @db.Timestamptz(6)
+  note           String?
+  createdBy      String
+  createdAt      DateTime                    @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, actualEndAt])
+  @@index([vehicleId, startAt, estimatedEndAt])
 }
 
 model Customer {

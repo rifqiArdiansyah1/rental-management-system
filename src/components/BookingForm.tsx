@@ -19,9 +19,10 @@ type Props = {
   branches: Branch[]
   defaultBranchId: string
   vehicleBranch?: Branch | null
+  maintenanceEndAt?: string | null
 }
 
-export default function BookingForm({ vehicleId, dailyRate, branches, defaultBranchId, vehicleBranch }: Props) {
+export default function BookingForm({ vehicleId, dailyRate, branches, defaultBranchId, vehicleBranch, maintenanceEndAt }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -89,7 +90,14 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
 
   const getLocalMinDateTime = () => {
     // Minimum time is buffer from now (3 hours)
-    const d = new Date(Date.now() + TURNOVER_BUFFER_MS)
+    let minTime = Date.now() + TURNOVER_BUFFER_MS
+    if (maintenanceEndAt) {
+      const maintEndTime = new Date(maintenanceEndAt).getTime() + TURNOVER_BUFFER_MS
+      if (maintEndTime > minTime) {
+        minTime = maintEndTime
+      }
+    }
+    const d = new Date(minTime)
     // Convert to WIB string (+7 hours) for datetime-local naive format
     const wibDate = new Date(d.getTime() + 7 * 60 * 60 * 1000)
     return wibDate.toISOString().slice(0, 16)
@@ -102,6 +110,15 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
       {errorMsg && (
         <div className="p-4 bg-error-container/20 border border-error text-error rounded-lg text-body-md">
           {errorMsg}
+        </div>
+      )}
+
+      {maintenanceEndAt && (
+        <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg text-xs flex items-start gap-2">
+          <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">build</span>
+          <span>
+            Armada ini sedang dalam masa perawatan hingga <strong>{new Date(maintenanceEndAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB</strong>. Waktu penjemputan otomatis dibatasi mulai minimal 3 jam setelah masa perawatan berakhir.
+          </span>
         </div>
       )}
 

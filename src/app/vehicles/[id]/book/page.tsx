@@ -109,6 +109,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             branches={branches}
             defaultBranchId={vehicle.branchId}
             vehicleBranch={vehicle.branch}
+            maintenanceEndAt={vehicle.unavailabilities?.[0]?.estimatedEndAt ? new Date(vehicle.unavailabilities[0].estimatedEndAt).toISOString() : null}
           />
         </section>
         

@@ -155,6 +155,8 @@ test.describe('Vehicle Status Consistency & Operational Lifecycle Audit (Issue #
     await modal.locator('select').selectOption('available')
     await modal.getByRole('button', { name: 'Simpan' }).click()
     await expect(modal).not.toBeVisible({ timeout: 15000 })
+
+    await prisma.vehicle.findUnique({ where: { id: vehicleId } })
     await expect(vehicleRow.locator('span', { hasText: 'AVAILABLE' })).toBeVisible({ timeout: 15000 })
 
     const dbVehicleAvailable = await prisma.vehicle.findUnique({ where: { id: vehicleId } })

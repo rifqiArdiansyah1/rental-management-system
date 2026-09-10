@@ -2,7 +2,11 @@ import Link from 'next/link'
 import { Prisma } from '@prisma/client'
 
 type VehicleWithRelations = Prisma.VehicleGetPayload<{
-  include: { category: true; branch: true }
+  include: {
+    category: true
+    branch: true
+    unavailabilities?: true
+  }
 }>
 
 interface VehicleCardProps {
@@ -35,6 +39,37 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
     ? features.slice(0, 3).join(' • ') 
     : 'Standar kenyamanan premium & inspeksi ketat.'
 
+  // Unavailability & Maintenance Availability Badge (Gap 5)
+  const activeUnavail = vehicle.unavailabilities?.[0]
+  const isMaintenance = vehicle.status === 'maintenance' && !!activeUnavail
+  let availabilityBadge = null
+
+  if (isMaintenance && activeUnavail.estimatedEndAt) {
+    const endAt = new Date(activeUnavail.estimatedEndAt)
+    const isOverdue = new Date() > endAt
+    if (isOverdue) {
+      availabilityBadge = (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-medium w-fit">
+          <span className="material-symbols-outlined text-[14px]">build</span>
+          <span>Dalam Perawatan (Jadwal Diperbarui)</span>
+        </div>
+      )
+    } else {
+      const formattedDate = endAt.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+      availabilityBadge = (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-medium w-fit">
+          <span className="material-symbols-outlined text-[14px]">event_available</span>
+          <span>Tersedia Mulai {formattedDate}</span>
+        </div>
+      )
+    }
+  }
+
   return (
     <Link 
       href={`/vehicles/${vehicle.id}`}
@@ -64,6 +99,11 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
         </div>
         
         <div className={`p-6 flex flex-col flex-grow ${isPopular ? 'bg-gradient-to-b from-surface-container-high to-surface-container' : ''}`}>
+          {availabilityBadge && (
+            <div className="mb-2">
+              {availabilityBadge}
+            </div>
+          )}
           <h3 className="font-headline-md text-headline-md text-on-surface mb-2 font-semibold line-clamp-1">{vehicleName}</h3>
           <p className="font-body-md text-sm text-on-surface-variant mb-6 flex-grow line-clamp-2 leading-relaxed">
             {featureSummary}

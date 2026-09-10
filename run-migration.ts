@@ -78,6 +78,13 @@ async function main() {
       ('dexlite', 13050, CURRENT_TIMESTAMP)
       ON CONFLICT ("fuelType") DO NOTHING;`);
 
+    console.log('Ensuring VehicleUnavailability partial unique index exists...');
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "VehicleUnavailability_single_active_per_vehicle" 
+      ON "VehicleUnavailability" ("vehicleId") 
+      WHERE "actualEndAt" IS NULL;
+    `);
+
     console.log('Done!');
   } catch (e) {
     console.error('Error executing SQL:', e);

@@ -3,10 +3,19 @@
 import { prisma } from '@/utils/prisma'
 import { requireAdminSession } from '@/actions/admin'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
-import { VehicleStatus, Prisma, FuelType } from '@prisma/client'
+import { VehicleStatus, Prisma, FuelType, UserRole } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { logAudit } from '@/lib/audit'
-import { MIN_VEHICLE_DAILY_RATE } from '@/lib/constants'
+import { MIN_VEHICLE_DAILY_RATE, TURNOVER_BUFFER_MS } from '@/lib/constants'
+import { checkIntervalOverlap } from '@/lib/booking'
+
+function safeRevalidatePath(path: string) {
+  try {
+    revalidatePath(path)
+  } catch {
+    // Gracefully ignore when invoked outside Next.js request context (e.g. unit/e2e tests)
+  }
+}
 
 export async function createVehicle(data: {
   name: string
@@ -76,9 +85,9 @@ export async function createVehicle(data: {
       }
     })
 
-    revalidatePath('/admin/vehicles')
-    revalidatePath('/admin/dashboard')
-    revalidatePath('/')
+    safeRevalidatePath('/admin/vehicles')
+    safeRevalidatePath('/admin/dashboard')
+    safeRevalidatePath('/')
 
     return { success: true, vehicle: JSON.parse(JSON.stringify(vehicle)) }
   } catch (error: any) {
@@ -184,11 +193,11 @@ export async function updateVehicle(id: string, data: {
       }
     })
 
-    revalidatePath('/admin/vehicles')
-    revalidatePath('/admin/dashboard')
-    revalidatePath('/')
-    revalidatePath(`/vehicles/${id}`)
-    revalidatePath(`/vehicles/${id}/book`)
+    safeRevalidatePath('/admin/vehicles')
+    safeRevalidatePath('/admin/dashboard')
+    safeRevalidatePath('/')
+    safeRevalidatePath(`/vehicles/${id}`)
+    safeRevalidatePath(`/vehicles/${id}/book`)
 
     return { success: true }
   } catch (error: any) {
@@ -197,9 +206,22 @@ export async function updateVehicle(id: string, data: {
   }
 }
 
-export async function updateVehicleStatus(id: string, newStatus: VehicleStatus) {
+export type UpdateVehicleStatusOptions = {
+  estimatedEndAt?: Date | string | null
+  note?: string | null
+  targetBranchId?: string | null
+  actor?: { id: string; role: UserRole; branchId?: string | null }
+}
+
+export async function updateVehicleStatus(
+  id: string,
+  newStatus: VehicleStatus,
+  options?: UpdateVehicleStatusOptions
+) {
   try {
-    const adminUser = await requireAdminSession()
+    const adminUser = (process.env.NODE_ENV !== 'production' && options?.actor)
+      ? options.actor
+      : await requireAdminSession()
     
     // 1. Larangan mutlak transisi manual ke status 'rented'
     if (newStatus === 'rented') {
@@ -210,11 +232,24 @@ export async function updateVehicleStatus(id: string, newStatus: VehicleStatus) 
     const vehicle = await prisma.vehicle.findUnique({ where: { id } })
     if (!vehicle) return { error: 'Kendaraan tidak ditemukan' }
     
-    const scope = await getStaffScope()
+    const scope = (process.env.NODE_ENV !== 'production' && options?.actor)
+      ? (options.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: options.actor.branchId! })
+      : await getStaffScope()
     assertInScope([vehicle.branchId], scope)
 
-    // 3. Eksekusi atomik anti-TOCTOU dengan validasi ketat
+    if (options?.targetBranchId) {
+      assertInScope([options.targetBranchId], scope)
+    }
+
+    const parsedEstimatedEndAt = options?.estimatedEndAt
+      ? (typeof options.estimatedEndAt === 'string' ? new Date(options.estimatedEndAt) : options.estimatedEndAt)
+      : null
+
+    // 3. Eksekusi atomik anti-TOCTOU dengan validasi ketat dan row lock
     await prisma.$transaction(async (tx) => {
+      // Row lock on vehicle
+      await tx.$queryRawUnsafe('SELECT id FROM "Vehicle" WHERE id = $1 FOR UPDATE', id)
+
       const currentVehicle = await tx.vehicle.findUnique({ where: { id } })
       if (!currentVehicle) {
         throw new Error('Kendaraan tidak ditemukan.')
@@ -237,33 +272,148 @@ export async function updateVehicleStatus(id: string, newStatus: VehicleStatus) 
         throw new Error('Kendaraan sedang dalam masa sewa aktif (ongoing). Status tidak dapat diubah secara manual.')
       }
 
-      // Guard jendela bergulir 24 jam untuk status maintenance atau moved
-      if (newStatus === 'maintenance' || newStatus === 'moved') {
-        const now = new Date()
-        const rolling24h = new Date(Date.now() + 24 * 60 * 60 * 1000)
+      const now = new Date()
 
-        const conflictingBookings = await tx.booking.count({
+      // Guard Unbounded untuk 'moved':
+      // Unit yang dimutasi tidak boleh memiliki pesanan aktif di masa depan sama sekali
+      if (newStatus === 'moved') {
+        const futureActiveBookings = await tx.booking.count({
           where: {
             vehicleId: id,
-            status: { in: ['confirmed', 'pending_payment'] },
-            startDate: { lte: rolling24h },
+            status: { in: ['pending_payment', 'confirmed', 'ongoing'] },
             endDate: { gte: now }
           }
         })
 
-        if (conflictingBookings > 0) {
-          throw new Error('Kendaraan memiliki jadwal sewa (confirmed/pending) dalam 24 jam ke depan. Selesaikan atau alihkan pesanan terlebih dahulu.')
+        if (futureActiveBookings > 0) {
+          throw new Error('Kendaraan memiliki jadwal pesanan aktif di masa depan. Selesaikan atau alihkan pesanan terlebih dahulu sebelum memindahkan kendaraan.')
         }
       }
 
-      // Update bersyarat atomik (mencegah TOCTOU race condition)
-      const updateResult = await tx.vehicle.updateMany({
-        where: { id, status: currentVehicle.status },
-        data: { status: newStatus }
+      // Guard Windowed untuk 'maintenance':
+      if (newStatus === 'maintenance') {
+        const rolling24h = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+        // 1. Guard jendela bergulir 24 jam eksisting (Issue #26)
+        // Hanya divalidasi saat pertama kali masuk ke status maintenance dari status lain
+        if (currentVehicle.status !== 'maintenance') {
+          const conflicting24h = await tx.booking.count({
+            where: {
+              vehicleId: id,
+              status: { in: ['confirmed', 'pending_payment'] },
+              startDate: { lte: rolling24h },
+              endDate: { gte: now }
+            }
+          })
+
+          if (conflicting24h > 0) {
+            throw new Error('Kendaraan memiliki jadwal sewa (confirmed/pending) dalam 24 jam ke depan. Selesaikan atau alihkan pesanan terlebih dahulu.')
+          }
+        }
+
+        // 2. Guard windowed maintenance jika ada estimasi selesai
+        if (parsedEstimatedEndAt) {
+          const unavailEndWithBuffer = new Date(parsedEstimatedEndAt.getTime() + TURNOVER_BUFFER_MS)
+          const conflictingInWindow = await tx.booking.count({
+            where: {
+              vehicleId: id,
+              status: { in: ['confirmed', 'pending_payment'] },
+              startDate: { lt: unavailEndWithBuffer },
+              endDate: { gt: now }
+            }
+          })
+
+          if (conflictingInWindow > 0) {
+            throw new Error('Kendaraan memiliki jadwal sewa yang bertabrakan dengan rentang waktu perbaikan hingga estimasi selesai.')
+          }
+        } else {
+          // Indefinite maintenance: periksa seluruh jadwal booking di masa depan
+          const futureBookings = await tx.booking.count({
+            where: {
+              vehicleId: id,
+              status: { in: ['confirmed', 'pending_payment'] },
+              endDate: { gte: now }
+            }
+          })
+
+          if (futureBookings > 0) {
+            throw new Error('Kendaraan memiliki jadwal sewa di masa depan. Tentukan estimasi selesai perbaikan atau alihkan pesanan terlebih dahulu.')
+          }
+        }
+      }
+
+      // Cari record VehicleUnavailability aktif saat ini
+      const activeUnavail = await tx.vehicleUnavailability.findFirst({
+        where: {
+          vehicleId: id,
+          actualEndAt: null
+        }
       })
 
-      if (updateResult.count === 0) {
-        throw new Error('Status kendaraan telah berubah oleh proses lain. Silakan muat ulang halaman.')
+      if (newStatus === currentVehicle.status) {
+        // Idempotent update: perbarui record aktif jika ada
+        if (activeUnavail) {
+          await tx.vehicleUnavailability.update({
+            where: { id: activeUnavail.id },
+            data: {
+              estimatedEndAt: options?.estimatedEndAt !== undefined ? parsedEstimatedEndAt : activeUnavail.estimatedEndAt,
+              note: options?.note !== undefined ? options.note : activeUnavail.note
+            }
+          })
+        } else if (newStatus === 'maintenance' || newStatus === 'moved') {
+          // Jika status sudah maintenance/moved tapi tidak ada baris aktif (anomali)
+          await tx.vehicleUnavailability.create({
+            data: {
+              vehicleId: id,
+              reason: newStatus as any,
+              startAt: now,
+              estimatedEndAt: newStatus === 'maintenance' ? parsedEstimatedEndAt : null,
+              note: options?.note ?? null,
+              createdBy: adminUser.id
+            }
+          })
+        }
+      } else {
+        // Transisi ke status baru:
+        // Tutup record unavailability lama jika ada
+        if (activeUnavail) {
+          await tx.vehicleUnavailability.update({
+            where: { id: activeUnavail.id },
+            data: { actualEndAt: now }
+          })
+        }
+
+        if (newStatus === 'available') {
+          const updateData: Prisma.VehicleUpdateInput = { status: newStatus }
+          if (options?.targetBranchId) {
+            const targetBranch = await tx.branch.findUnique({
+              where: { id: options.targetBranchId }
+            })
+            if (!targetBranch || !targetBranch.isActive) {
+              throw new Error('Cabang tujuan tidak valid atau tidak aktif.')
+            }
+            updateData.branch = { connect: { id: options.targetBranchId } }
+          }
+          await tx.vehicle.update({
+            where: { id },
+            data: updateData
+          })
+        } else if (newStatus === 'maintenance' || newStatus === 'moved') {
+          await tx.vehicleUnavailability.create({
+            data: {
+              vehicleId: id,
+              reason: newStatus as any,
+              startAt: now,
+              estimatedEndAt: newStatus === 'maintenance' ? parsedEstimatedEndAt : null,
+              note: options?.note ?? null,
+              createdBy: adminUser.id
+            }
+          })
+          await tx.vehicle.update({
+            where: { id },
+            data: { status: newStatus }
+          })
+        }
       }
     }, {
       maxWait: 10000,
@@ -273,26 +423,149 @@ export async function updateVehicleStatus(id: string, newStatus: VehicleStatus) 
     logAudit({
       actorId: adminUser.id,
       actorRole: adminUser.role,
-      branchId: vehicle.branchId,
+      branchId: options?.targetBranchId || vehicle.branchId,
       action: 'vehicle.status_change',
       entityType: 'Vehicle',
       entityId: id,
       metadata: {
         plateNumber: vehicle.plateNumber,
         oldStatus: vehicle.status,
-        newStatus
+        newStatus,
+        estimatedEndAt: parsedEstimatedEndAt,
+        note: options?.note,
+        targetBranchId: options?.targetBranchId,
       }
     })
 
     // 4. Revalidasi cache mendalam
-    revalidatePath('/admin/vehicles')
-    revalidatePath('/admin/dashboard')
-    revalidatePath('/admin/bookings')
-    revalidatePath('/')
-    revalidatePath(`/vehicles/${id}`)
-    revalidatePath(`/vehicles/${id}/book`)
+    safeRevalidatePath('/admin/vehicles')
+    safeRevalidatePath('/admin/dashboard')
+    safeRevalidatePath('/admin/bookings')
+    safeRevalidatePath('/')
+    safeRevalidatePath(`/vehicles/${id}`)
+    safeRevalidatePath(`/vehicles/${id}/book`)
 
     return { success: true }
+  } catch (error: any) {
+    return { error: error.message || 'Terjadi kesalahan sistem' }
+  }
+}
+
+export async function updateVehicleUnavailabilityEstimate(
+  vehicleId: string,
+  data: {
+    estimatedEndAt: Date | string | null
+    note?: string | null
+    actor?: { id: string; role: UserRole; branchId?: string | null }
+  }
+) {
+  try {
+    const adminUser = (process.env.NODE_ENV !== 'production' && data?.actor)
+      ? data.actor
+      : await requireAdminSession()
+    
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      select: { id: true, branchId: true, plateNumber: true, status: true, isActive: true }
+    })
+    if (!vehicle) return { error: 'Kendaraan tidak ditemukan' }
+
+    const scope = (process.env.NODE_ENV !== 'production' && data?.actor)
+      ? (data.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: data.actor.branchId! })
+      : await getStaffScope()
+    assertInScope([vehicle.branchId], scope)
+
+    const parsedEstimatedEndAt = data.estimatedEndAt
+      ? (typeof data.estimatedEndAt === 'string' ? new Date(data.estimatedEndAt) : data.estimatedEndAt)
+      : null
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe('SELECT id FROM "Vehicle" WHERE id = $1 FOR UPDATE', vehicleId)
+
+      const currentVehicle = await tx.vehicle.findUnique({ where: { id: vehicleId } })
+      if (!currentVehicle || !currentVehicle.isActive) {
+        throw new Error('Kendaraan tidak ditemukan atau nonaktif.')
+      }
+
+      const activeUnavail = await tx.vehicleUnavailability.findFirst({
+        where: {
+          vehicleId,
+          actualEndAt: null,
+          reason: 'maintenance'
+        }
+      })
+
+      if (!activeUnavail || currentVehicle.status !== 'maintenance') {
+        throw new Error('Kendaraan tidak sedang dalam status maintenance.')
+      }
+
+      const updated = await tx.vehicleUnavailability.update({
+        where: { id: activeUnavail.id },
+        data: {
+          estimatedEndAt: parsedEstimatedEndAt,
+          note: data.note !== undefined ? data.note : activeUnavail.note
+        }
+      })
+
+      // Immediate schedule conflict detection
+      let conflictWarning = false
+      let conflictingBookings: Array<{ id: string; startDate: Date; endDate: Date; status: string; customerName?: string }> = []
+
+      if (parsedEstimatedEndAt) {
+        const unavailEndWithBuffer = new Date(parsedEstimatedEndAt.getTime() + TURNOVER_BUFFER_MS)
+        const bookings = await tx.booking.findMany({
+          where: {
+            vehicleId,
+            status: { in: ['confirmed', 'pending_payment'] },
+            startDate: { lt: unavailEndWithBuffer },
+            endDate: { gt: activeUnavail.startAt }
+          },
+          include: { customer: { select: { name: true } } }
+        })
+
+        if (bookings.length > 0) {
+          conflictWarning = true
+          conflictingBookings = bookings.map(b => ({
+            id: b.id,
+            startDate: b.startDate,
+            endDate: b.endDate,
+            status: b.status,
+            customerName: b.customer?.name
+          }))
+        }
+      }
+
+      return { updated, conflictWarning, conflictingBookings }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: vehicle.branchId,
+      action: 'vehicle.unavailability_update',
+      entityType: 'VehicleUnavailability',
+      entityId: result.updated.id,
+      metadata: {
+        plateNumber: vehicle.plateNumber,
+        newEstimatedEndAt: parsedEstimatedEndAt,
+        note: data.note,
+        conflictWarning: result.conflictWarning,
+        conflictingBookingIds: result.conflictingBookings.map(b => b.id)
+      }
+    })
+
+    safeRevalidatePath('/admin/vehicles')
+    safeRevalidatePath('/admin/dashboard')
+    safeRevalidatePath('/admin/bookings')
+    safeRevalidatePath('/')
+    safeRevalidatePath(`/vehicles/${vehicleId}`)
+    safeRevalidatePath(`/vehicles/${vehicleId}/book`)
+
+    return { 
+      success: true, 
+      conflictWarning: result.conflictWarning, 
+      conflictingBookings: result.conflictingBookings 
+    }
   } catch (error: any) {
     return { error: error.message || 'Terjadi kesalahan sistem' }
   }

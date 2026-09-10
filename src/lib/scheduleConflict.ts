@@ -2,10 +2,11 @@ import { prisma } from '@/utils/prisma'
 import { TURNOVER_BUFFER_MS } from './constants'
 import { StaffScope } from './auth/scope'
 import { BookingStatus, Prisma } from '@prisma/client'
+import { checkIntervalOverlap } from './booking'
 
 export interface ScheduleConflictResult {
   hasConflict: boolean
-  type?: 'ongoing_risk' | 'upcoming_threat'
+  type?: 'ongoing_risk' | 'upcoming_threat' | 'maintenance_risk'
   message?: string
   conflictedBooking?: {
     id: string
@@ -22,6 +23,7 @@ export interface ScheduleConflictResult {
  *    - Cek apakah waktu sekarang sudah dalam jendela peringatan (now >= endDate - 3 jam).
  *    - Cek apakah ada pesanan berikutnya untuk unit yang sama dalam jendela turnover buffer (endDate + 3 jam).
  * 2. Jika pesanan berikutnya (`confirmed` atau `pending_payment`):
+ *    - Cek apakah unit armada sedang dalam status perbaikan (maintenance) atau mutasi (moved) yang bertabrakan.
  *    - Cek apakah unit masih dipakai oleh pesanan `ongoing` yang mendekati/melebihi jadwal selesai sewa.
  */
 export async function detectScheduleConflict(bookingId: string): Promise<ScheduleConflictResult> {
@@ -87,7 +89,38 @@ export async function detectScheduleConflict(bookingId: string): Promise<Schedul
     booking.status === BookingStatus.confirmed ||
     booking.status === BookingStatus.pending_payment
   ) {
-    // Cari pesanan ongoing sebelumnya pada unit yang sama
+    // 1. Cek apakah unit sedang dalam perbaikan (maintenance) atau dipindahkan (moved)
+    const activeUnavail = await prisma.vehicleUnavailability.findFirst({
+      where: {
+        vehicleId: booking.vehicleId,
+        actualEndAt: null,
+      },
+    })
+
+    if (activeUnavail) {
+      if (activeUnavail.reason === 'moved' || !activeUnavail.estimatedEndAt) {
+        return {
+          hasConflict: true,
+          type: 'maintenance_risk',
+          message: activeUnavail.reason === 'moved'
+            ? 'Unit sedang dalam mutasi/pemindahan cabang dan tidak tersedia untuk jadwal sewa ini.'
+            : 'Unit sedang dalam masa perawatan (maintenance) tanpa estimasi selesai yang pasti.',
+        }
+      }
+
+      const unavailEndWithBuffer = new Date(activeUnavail.estimatedEndAt.getTime() + TURNOVER_BUFFER_MS)
+      const bookingEndWithBuffer = new Date(booking.endDate.getTime() + TURNOVER_BUFFER_MS)
+
+      if (checkIntervalOverlap(booking.startDate, bookingEndWithBuffer, activeUnavail.startAt, unavailEndWithBuffer)) {
+        return {
+          hasConflict: true,
+          type: 'maintenance_risk',
+          message: `Unit dalam perawatan bengkel (estimasi s/d ${new Date(activeUnavail.estimatedEndAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}) yang bertabrakan dengan jadwal pesanan ini.`,
+        }
+      }
+    }
+
+    // 2. Cari pesanan ongoing sebelumnya pada unit yang sama
     const minOngoingEndDate = new Date(booking.startDate.getTime() - TURNOVER_BUFFER_MS)
     const ongoing = await prisma.booking.findFirst({
       where: {
@@ -129,13 +162,15 @@ export async function detectScheduleConflict(bookingId: string): Promise<Schedul
 
 /**
  * Mencari seluruh ID booking yang saat ini berisiko bentrok jadwal
- * (baik booking ongoing maupun booking berikutnya yang terancam).
+ * (baik booking ongoing maupun booking berikutnya yang terancam, serta yang bertabrakan dengan maintenance).
  * Digunakan untuk menyaring ke dalam tab antrian kerja 'action_required'.
  */
 export async function findConflictRiskBookingIds(scope?: StaffScope): Promise<string[]> {
   const now = new Date()
   const warningThreshold = new Date(now.getTime() + TURNOVER_BUFFER_MS)
+  const conflictIds = new Set<string>()
 
+  // 1. Cek booking ongoing yang mendekati batas turnover buffer
   const ongoingWhere: Prisma.BookingWhereInput = {
     status: BookingStatus.ongoing,
     endDate: { lte: warningThreshold },
@@ -146,10 +181,6 @@ export async function findConflictRiskBookingIds(scope?: StaffScope): Promise<st
     where: ongoingWhere,
     select: { id: true, vehicleId: true, endDate: true, startDate: true },
   })
-
-  if (ongoingBookings.length === 0) return []
-
-  const conflictIds = new Set<string>()
 
   for (const ob of ongoingBookings) {
     const upcoming = await prisma.booking.findFirst({
@@ -168,6 +199,50 @@ export async function findConflictRiskBookingIds(scope?: StaffScope): Promise<st
     if (upcoming) {
       conflictIds.add(ob.id)
       conflictIds.add(upcoming.id)
+    }
+  }
+
+  // 2. Cek booking aktif (confirmed, pending_payment) yang berbenturan dengan VehicleUnavailability aktif
+  const activeUnavails = await prisma.vehicleUnavailability.findMany({
+    where: {
+      actualEndAt: null,
+      ...(scope?.scope === 'branch' ? { vehicle: { branchId: scope.branchId } } : {}),
+    },
+    select: {
+      vehicleId: true,
+      reason: true,
+      startAt: true,
+      estimatedEndAt: true,
+    }
+  })
+
+  for (const unavail of activeUnavails) {
+    if (unavail.reason === 'moved' || !unavail.estimatedEndAt) {
+      // Indefinite maintenance atau moved: semua pesanan aktif di masa depan bertabrakan
+      const conflicting = await prisma.booking.findMany({
+        where: {
+          vehicleId: unavail.vehicleId,
+          status: { in: [BookingStatus.confirmed, BookingStatus.pending_payment] },
+          endDate: { gte: now },
+          ...(scope?.scope === 'branch' ? { pickupBranchId: scope.branchId } : {}),
+        },
+        select: { id: true },
+      })
+      conflicting.forEach(b => conflictIds.add(b.id))
+    } else {
+      // Windowed maintenance
+      const unavailEndWithBuffer = new Date(unavail.estimatedEndAt.getTime() + TURNOVER_BUFFER_MS)
+      const conflicting = await prisma.booking.findMany({
+        where: {
+          vehicleId: unavail.vehicleId,
+          status: { in: [BookingStatus.confirmed, BookingStatus.pending_payment] },
+          startDate: { lt: unavailEndWithBuffer },
+          endDate: { gt: unavail.startAt },
+          ...(scope?.scope === 'branch' ? { pickupBranchId: scope.branchId } : {}),
+        },
+        select: { id: true },
+      })
+      conflicting.forEach(b => conflictIds.add(b.id))
     }
   }
 
