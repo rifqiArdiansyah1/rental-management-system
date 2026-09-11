@@ -58,6 +58,12 @@ export default async function AdminVehiclesPage({
     include: {
       category: true,
       branch: true,
+      relocatedTo: {
+        include: { branch: true }
+      },
+      previousVehicle: {
+        include: { branch: true }
+      },
       unavailabilities: {
         where: { actualEndAt: null },
         take: 1
@@ -112,13 +118,24 @@ export default async function AdminVehiclesPage({
                   <div>
                     <div className="font-bold text-zinc-900 text-base">{vehicle.name || vehicle.plateNumber}</div>
                     <div className="text-xs font-mono text-zinc-500 uppercase">{vehicle.plateNumber}</div>
+                    {vehicle.previousVehicle && (
+                      <div className="text-[10px] text-purple-700 font-medium">
+                        ↳ Mutasi dari {vehicle.previousVehicle.branch?.name}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {!vehicle.isActive ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-800">
-                      NONAKTIF
-                    </span>
+                    vehicle.status === 'moved' ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800" title={vehicle.relocatedTo ? `Dimutasi ke ${vehicle.relocatedTo.branch?.name}` : undefined}>
+                        {vehicle.relocatedTo ? `MUTASI ➔ ${vehicle.relocatedTo.branch?.name}` : 'MUTASI'}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-800">
+                        NONAKTIF
+                      </span>
+                    )
                   ) : vehicle.status === 'maintenance' ? (
                     (() => {
                       const unavail = vehicle.unavailabilities?.[0]
@@ -217,6 +234,11 @@ export default async function AdminVehiclesPage({
                         </div>
                         <div>
                           <div className="font-bold text-zinc-900">{vehicle.name || vehicle.plateNumber}</div>
+                          {vehicle.previousVehicle && (
+                            <div className="text-[11px] text-purple-700 font-medium">
+                              ↳ Mutasi dari {vehicle.previousVehicle.branch?.name}
+                            </div>
+                          )}
                           <div className="text-xs text-zinc-400">
                             {vehicle.photos?.length || 0} Foto
                           </div>
@@ -239,9 +261,15 @@ export default async function AdminVehiclesPage({
                     )}
                     <td className="px-6 py-4">
                       {!vehicle.isActive ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          NONAKTIF
-                        </span>
+                        vehicle.status === 'moved' ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800" title={vehicle.relocatedTo ? `Dimutasi ke ${vehicle.relocatedTo.branch?.name}` : undefined}>
+                            {vehicle.relocatedTo ? `MUTASI ➔ ${vehicle.relocatedTo.branch?.name}` : 'MUTASI (NONAKTIF)'}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            NONAKTIF
+                          </span>
+                        )
                       ) : vehicle.status === 'maintenance' ? (
                         (() => {
                           const unavail = vehicle.unavailabilities?.[0]

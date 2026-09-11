@@ -89,7 +89,7 @@ export async function detectScheduleConflict(bookingId: string): Promise<Schedul
     booking.status === BookingStatus.confirmed ||
     booking.status === BookingStatus.pending_payment
   ) {
-    // 1. Cek apakah unit sedang dalam perbaikan (maintenance) atau dipindahkan (moved)
+    // 1. Cek apakah unit sedang dalam perbaikan (maintenance)
     const activeUnavail = await prisma.vehicleUnavailability.findFirst({
       where: {
         vehicleId: booking.vehicleId,
@@ -98,13 +98,11 @@ export async function detectScheduleConflict(bookingId: string): Promise<Schedul
     })
 
     if (activeUnavail) {
-      if (activeUnavail.reason === 'moved' || !activeUnavail.estimatedEndAt) {
+      if (!activeUnavail.estimatedEndAt) {
         return {
           hasConflict: true,
           type: 'maintenance_risk',
-          message: activeUnavail.reason === 'moved'
-            ? 'Unit sedang dalam mutasi/pemindahan cabang dan tidak tersedia untuk jadwal sewa ini.'
-            : 'Unit sedang dalam masa perawatan (maintenance) tanpa estimasi selesai yang pasti.',
+          message: 'Unit sedang dalam masa perawatan (maintenance) tanpa estimasi selesai yang pasti.',
         }
       }
 
@@ -217,8 +215,8 @@ export async function findConflictRiskBookingIds(scope?: StaffScope): Promise<st
   })
 
   for (const unavail of activeUnavails) {
-    if (unavail.reason === 'moved' || !unavail.estimatedEndAt) {
-      // Indefinite maintenance atau moved: semua pesanan aktif di masa depan bertabrakan
+    if (!unavail.estimatedEndAt) {
+      // Indefinite maintenance: semua pesanan aktif di masa depan bertabrakan
       const conflicting = await prisma.booking.findMany({
         where: {
           vehicleId: unavail.vehicleId,

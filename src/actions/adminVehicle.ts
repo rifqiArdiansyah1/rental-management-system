@@ -17,6 +17,16 @@ function safeRevalidatePath(path: string) {
   }
 }
 
+function isPlateUniqueViolation(error: any): boolean {
+  return Boolean(
+    error?.code === 'P2002' ||
+    error?.code === '23505' ||
+    error?.message?.includes('Vehicle_plateNumber_active_unique') ||
+    error?.message?.includes('Vehicle_plateNumber_key') ||
+    (typeof error?.message === 'string' && error.message.toLowerCase().includes('unique constraint'))
+  )
+}
+
 export async function createVehicle(data: {
   name: string
   plateNumber: string
@@ -26,9 +36,12 @@ export async function createVehicle(data: {
   photos?: string[]
   fuelType?: FuelType
   fuelEfficiencyKmL?: number | null
+  actor?: { id: string; role: UserRole; branchId?: string | null }
 }) {
   try {
-    const adminUser = await requireAdminSession()
+    const adminUser = (process.env.NODE_ENV !== 'production' && data.actor)
+      ? data.actor
+      : await requireAdminSession()
     if (adminUser.role === 'staff_cabang') {
       return { error: 'Akses ditolak: Hanya Admin Pusat atau Admin Cabang yang berwenang menambah kendaraan.' }
     }
@@ -47,10 +60,20 @@ export async function createVehicle(data: {
       return { error: 'Efisiensi BBM harus berupa angka positif (km/liter).' }
     }
 
-    const scope = await getStaffScope()
+    const scope = (process.env.NODE_ENV !== 'production' && data.actor)
+      ? (data.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: data.actor.branchId! })
+      : await getStaffScope()
     assertInScope([data.branchId], scope)
 
     const normalizedPlate = data.plateNumber.replace(/\s+/g, '').toUpperCase()
+
+    // Pre-check active plate number to prevent duplicates
+    const activeExisting = await prisma.vehicle.findFirst({
+      where: { plateNumber: normalizedPlate, isActive: true }
+    })
+    if (activeExisting) {
+      return { error: 'Plat nomor sudah terdaftar pada armada aktif lain.' }
+    }
 
     const vehicle = await prisma.vehicle.create({
       data: {
@@ -91,8 +114,8 @@ export async function createVehicle(data: {
 
     return { success: true, vehicle: JSON.parse(JSON.stringify(vehicle)) }
   } catch (error: any) {
-    if (error.code === 'P2002') {
-      return { error: 'Plat nomor sudah terdaftar' }
+    if (isPlateUniqueViolation(error)) {
+      return { error: 'Plat nomor sudah terdaftar pada armada aktif lain.' }
     }
     console.error('Failed to create vehicle:', error)
     return { error: 'Terjadi kesalahan sistem' }
@@ -149,6 +172,13 @@ export async function updateVehicle(id: string, data: {
 
     const normalizedPlate = data.plateNumber.replace(/\s+/g, '').toUpperCase()
 
+    const activeExisting = await prisma.vehicle.findFirst({
+      where: { plateNumber: normalizedPlate, isActive: true, id: { not: id } }
+    })
+    if (activeExisting) {
+      return { error: 'Plat nomor sudah terdaftar pada armada aktif lain.' }
+    }
+
     // Note: status is strictly omitted from data update to prevent status bypass
     await prisma.vehicle.update({
       where: { id },
@@ -201,7 +231,7 @@ export async function updateVehicle(id: string, data: {
 
     return { success: true }
   } catch (error: any) {
-    if (error.code === 'P2002') return { error: 'Plat nomor sudah terdaftar' }
+    if (isPlateUniqueViolation(error)) return { error: 'Plat nomor sudah terdaftar pada armada aktif lain.' }
     return { error: 'Terjadi kesalahan sistem' }
   }
 }
@@ -223,9 +253,12 @@ export async function updateVehicleStatus(
       ? options.actor
       : await requireAdminSession()
     
-    // 1. Larangan mutlak transisi manual ke status 'rented'
+    // 1. Larangan mutlak transisi manual ke status 'rented' dan 'moved'
     if (newStatus === 'rented') {
       return { error: 'Status "Disewa (Rented)" dikelola otomatis oleh sistem saat Mulai Sewa di Manajemen Pesanan.' }
+    }
+    if (newStatus === 'moved') {
+      return { error: 'Status "Dipindahkan (Moved)" hanya dapat dilakukan melalui fitur Relokasi Armada antar cabang.' }
     }
 
     // 2. Check scope first
@@ -273,22 +306,6 @@ export async function updateVehicleStatus(
       }
 
       const now = new Date()
-
-      // Guard Unbounded untuk 'moved':
-      // Unit yang dimutasi tidak boleh memiliki pesanan aktif di masa depan sama sekali
-      if (newStatus === 'moved') {
-        const futureActiveBookings = await tx.booking.count({
-          where: {
-            vehicleId: id,
-            status: { in: ['pending_payment', 'confirmed', 'ongoing'] },
-            endDate: { gte: now }
-          }
-        })
-
-        if (futureActiveBookings > 0) {
-          throw new Error('Kendaraan memiliki jadwal pesanan aktif di masa depan. Selesaikan atau alihkan pesanan terlebih dahulu sebelum memindahkan kendaraan.')
-        }
-      }
 
       // Guard Windowed untuk 'maintenance':
       if (newStatus === 'maintenance') {
@@ -360,14 +377,14 @@ export async function updateVehicleStatus(
               note: options?.note !== undefined ? options.note : activeUnavail.note
             }
           })
-        } else if (newStatus === 'maintenance' || newStatus === 'moved') {
-          // Jika status sudah maintenance/moved tapi tidak ada baris aktif (anomali)
+        } else if (newStatus === 'maintenance') {
+          // Jika status sudah maintenance tapi tidak ada baris aktif (anomali)
           await tx.vehicleUnavailability.create({
             data: {
               vehicleId: id,
-              reason: newStatus as any,
+              reason: 'maintenance',
               startAt: now,
-              estimatedEndAt: newStatus === 'maintenance' ? parsedEstimatedEndAt : null,
+              estimatedEndAt: parsedEstimatedEndAt,
               note: options?.note ?? null,
               createdBy: adminUser.id
             }
@@ -385,26 +402,17 @@ export async function updateVehicleStatus(
 
         if (newStatus === 'available') {
           const updateData: Prisma.VehicleUpdateInput = { status: newStatus }
-          if (options?.targetBranchId) {
-            const targetBranch = await tx.branch.findUnique({
-              where: { id: options.targetBranchId }
-            })
-            if (!targetBranch || !targetBranch.isActive) {
-              throw new Error('Cabang tujuan tidak valid atau tidak aktif.')
-            }
-            updateData.branch = { connect: { id: options.targetBranchId } }
-          }
           await tx.vehicle.update({
             where: { id },
             data: updateData
           })
-        } else if (newStatus === 'maintenance' || newStatus === 'moved') {
+        } else if (newStatus === 'maintenance') {
           await tx.vehicleUnavailability.create({
             data: {
               vehicleId: id,
-              reason: newStatus as any,
+              reason: 'maintenance',
               startAt: now,
-              estimatedEndAt: newStatus === 'maintenance' ? parsedEstimatedEndAt : null,
+              estimatedEndAt: parsedEstimatedEndAt,
               note: options?.note ?? null,
               createdBy: adminUser.id
             }
@@ -596,6 +604,13 @@ export async function softDeleteVehicle(id: string, isActive: boolean) {
         if (activeBookings > 0) {
           throw new Error('Tidak dapat menonaktifkan kendaraan yang memiliki pesanan aktif.')
         }
+      } else {
+        const activeExisting = await tx.vehicle.findFirst({
+          where: { plateNumber: vehicle.plateNumber, isActive: true, id: { not: id } }
+        })
+        if (activeExisting) {
+          throw new Error('Tidak dapat mengaktifkan armada: Plat nomor ini sudah aktif pada armada di cabang lain. Lakukan mutasi kembali jika ingin memindahkan unit.')
+        }
       }
 
       const updated = await tx.vehicle.update({
@@ -629,6 +644,214 @@ export async function softDeleteVehicle(id: string, isActive: boolean) {
 
     return { success: true }
   } catch (error: any) {
+    if (isPlateUniqueViolation(error)) {
+      return { error: 'Plat nomor sudah terdaftar pada armada aktif lain.' }
+    }
     return { error: error.message || 'Terjadi kesalahan sistem' }
+  }
+}
+
+export async function relocateVehicle(
+  sourceVehicleId: string,
+  targetBranchId: string,
+  options?: {
+    transitUntil?: Date | string | null
+    note?: string | null
+    actor?: { id: string; role: UserRole; branchId?: string | null }
+  }
+): Promise<{ success?: boolean; newVehicleId?: string; error?: string }> {
+  try {
+    const adminUser = (process.env.NODE_ENV !== 'production' && options?.actor)
+      ? options.actor
+      : await requireAdminSession()
+
+    if (adminUser.role !== 'admin_pusat') {
+      return { error: 'Akses ditolak: Hanya Admin Pusat yang berwenang memindahkan armada antar cabang.' }
+    }
+
+    const targetBranch = await prisma.branch.findUnique({
+      where: { id: targetBranchId }
+    })
+    if (!targetBranch || !targetBranch.isActive) {
+      return { error: 'Cabang tujuan tidak valid atau tidak aktif.' }
+    }
+
+    const parsedTransitUntil = options?.transitUntil
+      ? (typeof options.transitUntil === 'string' ? new Date(options.transitUntil) : options.transitUntil)
+      : null
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Lock source vehicle
+      await tx.$queryRawUnsafe('SELECT id FROM "Vehicle" WHERE id = $1 FOR UPDATE', sourceVehicleId)
+
+      const sourceVehicle = await tx.vehicle.findUnique({
+        where: { id: sourceVehicleId },
+        include: {
+          branch: { select: { id: true, name: true } },
+          unavailabilities: {
+            where: { actualEndAt: null }
+          }
+        }
+      })
+
+      if (!sourceVehicle) {
+        throw new Error('Kendaraan asal tidak ditemukan.')
+      }
+      if (!sourceVehicle.isActive) {
+        throw new Error('Kendaraan nonaktif tidak dapat dimutasi.')
+      }
+      if (sourceVehicle.status === 'rented') {
+        throw new Error('Kendaraan sedang dalam masa sewa aktif (ongoing). Selesaikan sewa terlebih dahulu sebelum mutasi.')
+      }
+      if (sourceVehicle.branchId === targetBranchId) {
+        throw new Error('Cabang tujuan harus berbeda dengan cabang armada saat ini.')
+      }
+
+      const now = new Date()
+
+      // 2. Strict guard against active or future bookings
+      const activeBookings = await tx.booking.count({
+        where: {
+          vehicleId: sourceVehicleId,
+          status: { in: ['pending_payment', 'confirmed', 'ongoing'] },
+          endDate: { gte: now }
+        }
+      })
+
+      if (activeBookings > 0) {
+        throw new Error('Kendaraan memiliki jadwal pesanan aktif di masa depan. Selesaikan atau alihkan pesanan terlebih dahulu sebelum memindahkan kendaraan.')
+      }
+
+      // 3. Handle open unavailability on source vehicle with audit preservation
+      const activeUnavail = sourceVehicle.unavailabilities[0]
+      if (activeUnavail) {
+        const preservedNote = (activeUnavail.note ? activeUnavail.note + ' | ' : '') + `Ditutup otomatis karena mutasi ke Cabang ${targetBranch.name}.`
+        await tx.vehicleUnavailability.update({
+          where: { id: activeUnavail.id },
+          data: {
+            actualEndAt: now,
+            note: preservedNote
+          }
+        })
+      }
+
+      // 4. Decommission source vehicle (isActive = false, status = moved)
+      await tx.vehicle.update({
+        where: { id: sourceVehicleId },
+        data: {
+          isActive: false,
+          status: 'moved'
+        }
+      })
+
+      // 5. Commission new vehicle at target branch (Linked Record)
+      const newVehicle = await tx.vehicle.create({
+        data: {
+          name: sourceVehicle.name,
+          plateNumber: sourceVehicle.plateNumber,
+          categoryId: sourceVehicle.categoryId,
+          branchId: targetBranchId,
+          dailyRate: sourceVehicle.dailyRate,
+          photos: sourceVehicle.photos,
+          fuelType: sourceVehicle.fuelType,
+          fuelEfficiencyKmL: sourceVehicle.fuelEfficiencyKmL,
+          status: 'available',
+          isActive: true,
+          previousVehicleId: sourceVehicle.id
+        }
+      })
+
+      // 6. Handle transit / maintenance continuity
+      let createdUnavail: any = null
+      if (parsedTransitUntil && parsedTransitUntil > now) {
+        const transitNote = options?.note
+          ? options.note
+          : (activeUnavail ? `Transit mutasi dari Cabang ${sourceVehicle.branch.name}. Lanjutan perbaikan: ${activeUnavail.note || 'Pemeriksaan unit'}` : `Transit pengiriman armada dari Cabang ${sourceVehicle.branch.name}`)
+
+        createdUnavail = await tx.vehicleUnavailability.create({
+          data: {
+            vehicleId: newVehicle.id,
+            reason: 'maintenance',
+            startAt: now,
+            estimatedEndAt: parsedTransitUntil,
+            note: transitNote,
+            createdBy: adminUser.id
+          }
+        })
+
+        await tx.vehicle.update({
+          where: { id: newVehicle.id },
+          data: { status: 'maintenance' }
+        })
+      } else if (sourceVehicle.status === 'maintenance' && activeUnavail) {
+        const contNote = `Lanjutan perbaikan dari Cabang ${sourceVehicle.branch.name}: ${activeUnavail.note || '-'}`
+        createdUnavail = await tx.vehicleUnavailability.create({
+          data: {
+            vehicleId: newVehicle.id,
+            reason: 'maintenance',
+            startAt: now,
+            estimatedEndAt: (activeUnavail.estimatedEndAt && activeUnavail.estimatedEndAt > now) ? activeUnavail.estimatedEndAt : null,
+            note: contNote,
+            createdBy: adminUser.id
+          }
+        })
+
+        await tx.vehicle.update({
+          where: { id: newVehicle.id },
+          data: { status: 'maintenance' }
+        })
+      }
+
+      return { sourceVehicle, newVehicle, activeUnavail, createdUnavail }
+    }, {
+      maxWait: 10000,
+      timeout: 20000
+    })
+
+    // 7. Structured Audit Log
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: targetBranchId,
+      action: 'vehicle.relocated',
+      entityType: 'Vehicle',
+      entityId: result.newVehicle.id,
+      metadata: {
+        sourceVehicleId,
+        newVehicleId: result.newVehicle.id,
+        fromBranchId: result.sourceVehicle.branchId,
+        fromBranchName: result.sourceVehicle.branch.name,
+        toBranchId: targetBranchId,
+        toBranchName: targetBranch.name,
+        plateNumber: result.sourceVehicle.plateNumber,
+        closedUnavailability: result.activeUnavail ? {
+          id: result.activeUnavail.id,
+          reason: result.activeUnavail.reason,
+          originalNote: result.activeUnavail.note,
+          closedAt: new Date().toISOString()
+        } : null,
+        createdUnavailability: result.createdUnavail ? {
+          id: result.createdUnavail.id,
+          estimatedEndAt: result.createdUnavail.estimatedEndAt?.toISOString() || null,
+          note: result.createdUnavail.note
+        } : null,
+        transitUntil: parsedTransitUntil ? parsedTransitUntil.toISOString() : null,
+        note: options?.note || null
+      }
+    })
+
+    safeRevalidatePath('/admin/vehicles')
+    safeRevalidatePath('/admin/dashboard')
+    safeRevalidatePath('/admin/bookings')
+    safeRevalidatePath('/')
+    safeRevalidatePath(`/vehicles/${result.newVehicle.id}`)
+    safeRevalidatePath(`/vehicles/${sourceVehicleId}`)
+
+    return { success: true, newVehicleId: result.newVehicle.id }
+  } catch (error: any) {
+    if (isPlateUniqueViolation(error)) {
+      return { error: 'Plat nomor sudah terdaftar pada armada aktif lain.' }
+    }
+    return { error: error.message || 'Terjadi kesalahan sistem saat memindahkan armada.' }
   }
 }

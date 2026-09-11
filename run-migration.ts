@@ -85,6 +85,48 @@ async function main() {
       WHERE "actualEndAt" IS NULL;
     `);
 
+    console.log('Ensuring Vehicle relocation chain and partial unique index exist...');
+    await pool.query(`
+      ALTER TABLE "Vehicle" DROP CONSTRAINT IF EXISTS "Vehicle_plateNumber_key";
+      DROP INDEX IF EXISTS "Vehicle_plateNumber_key";
+
+      ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "previousVehicleId" TEXT;
+      CREATE UNIQUE INDEX IF NOT EXISTS "Vehicle_previousVehicleId_key" ON "Vehicle"("previousVehicleId");
+
+      DO $$ BEGIN
+        ALTER TABLE "Vehicle" 
+        ADD CONSTRAINT "Vehicle_previousVehicleId_fkey" 
+        FOREIGN KEY ("previousVehicleId") REFERENCES "Vehicle"("id") 
+        ON DELETE RESTRICT ON UPDATE CASCADE;
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "Vehicle_plateNumber_active_unique" 
+      ON "Vehicle" ("plateNumber") 
+      WHERE "isActive" = true;
+
+      CREATE INDEX IF NOT EXISTS "Vehicle_plateNumber_idx" ON "Vehicle"("plateNumber");
+
+      UPDATE "VehicleUnavailability" 
+      SET 
+        "note" = CASE 
+          WHEN "note" IS NULL OR "note" = '' THEN '[Catatan migrasi: dulunya alasan moved]'
+          ELSE "note" || ' [Catatan migrasi: dulunya alasan moved]'
+        END,
+        "reason" = 'maintenance' 
+      WHERE "reason"::text = 'moved';
+
+      DO $$ BEGIN
+        CREATE TYPE "VehicleUnavailabilityReason_new" AS ENUM ('maintenance');
+        ALTER TABLE "VehicleUnavailability" ALTER COLUMN "reason" TYPE "VehicleUnavailabilityReason_new" USING ("reason"::text::"VehicleUnavailabilityReason_new");
+        DROP TYPE IF EXISTS "VehicleUnavailabilityReason";
+        ALTER TYPE "VehicleUnavailabilityReason_new" RENAME TO "VehicleUnavailabilityReason";
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
     console.log('Done!');
   } catch (e) {
     console.error('Error executing SQL:', e);

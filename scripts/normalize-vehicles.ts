@@ -131,10 +131,10 @@ async function main() {
 
     // 2. Update Vehicles
     for (const v of vehicleUpdates) {
-      const existing = await tx.vehicle.findUnique({ where: { plateNumber: v.plate } })
+      const existing = await tx.vehicle.findFirst({ where: { plateNumber: v.plate, isActive: true } })
       if (existing) {
         await tx.vehicle.update({
-          where: { plateNumber: v.plate },
+          where: { id: existing.id },
           data: {
             name: v.targetName,
             categoryId: v.targetCatId,

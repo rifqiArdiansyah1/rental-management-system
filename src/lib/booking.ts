@@ -46,8 +46,8 @@ export async function checkVehicleAvailability(
 
   // Active unavailability checks
   if (activeUnavail) {
-    // If unit is moved or has indefinite maintenance (no estimated end), completely unavailable
-    if (activeUnavail.reason === 'moved' || !activeUnavail.estimatedEndAt) {
+    // If unit has indefinite maintenance (no estimated end), completely unavailable
+    if (!activeUnavail.estimatedEndAt) {
       return false
     }
 

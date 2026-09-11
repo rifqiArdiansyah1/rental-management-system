@@ -3,7 +3,7 @@ import { PrismaClient, VehicleStatus, BookingStatus, UserRole } from '@prisma/cl
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import { checkVehicleAvailability, createDraftBookingCore } from '@/lib/booking'
-import { updateVehicleStatus, updateVehicleUnavailabilityEstimate } from '@/actions/adminVehicle'
+import { updateVehicleStatus, updateVehicleUnavailabilityEstimate, relocateVehicle } from '@/actions/adminVehicle'
 import { findConflictRiskBookingIds, detectScheduleConflict } from '@/lib/scheduleConflict'
 import { TURNOVER_BUFFER_MS } from '@/lib/constants'
 
@@ -23,6 +23,10 @@ async function cleanupTestData() {
   })
   await prisma.booking.deleteMany({
     where: { vehicle: { plateNumber: { in: [testPlate1, testPlate2] } } }
+  })
+  await prisma.vehicle.updateMany({
+    where: { plateNumber: { in: [testPlate1, testPlate2] } },
+    data: { previousVehicleId: null }
   })
   await prisma.vehicle.deleteMany({
     where: { plateNumber: { in: [testPlate1, testPlate2] } }
@@ -204,7 +208,7 @@ test.describe('Vehicle Maintenance & Unavailability Scheduling (Opsi A)', () => 
 
   test('3. Guard Unbounded "moved": Unit tidak dapat dimutasi jika ada pesanan terjadwal di masa depan', async () => {
     // vehicle1 currently has a pending_payment booking created in test 1
-    const res = await updateVehicleStatus(vehicle1Id, 'moved', {
+    const res = await relocateVehicle(vehicle1Id, branch2Id, {
       note: 'Mencoba memindahkan unit yang punya jadwal sewa',
       actor: adminActor
     })
@@ -216,42 +220,39 @@ test.describe('Vehicle Maintenance & Unavailability Scheduling (Opsi A)', () => 
     expect(v?.status).toBe('maintenance')
   })
 
-  test('4. Relokasi Cabang: Transisi "moved" -> "available" memperbarui branchId secara atomik', async () => {
+  test('4. Relokasi Cabang: Relokasi armada antar-cabang via relocateVehicle menghasilkan Linked Record', async () => {
     // vehicle2 has no bookings
-    const moveRes = await updateVehicleStatus(vehicle2Id, 'moved', {
+    const moveRes = await relocateVehicle(vehicle2Id, branch2Id, {
       note: 'Mutasi unit ke cabang 2',
       actor: adminActor
     })
     expect(moveRes.success).toBe(true)
+    expect(moveRes.newVehicleId).toBeDefined()
 
-    let v2 = await prisma.vehicle.findUnique({
-      where: { id: vehicle2Id },
-      include: { unavailabilities: { where: { actualEndAt: null } } }
+    // Old vehicle is decommissioned (status: moved, isActive: false)
+    const oldV = await prisma.vehicle.findUnique({
+      where: { id: vehicle2Id }
     })
-    expect(v2?.status).toBe('moved')
-    expect(v2?.unavailabilities.length).toBe(1)
-    expect(v2?.unavailabilities[0].reason).toBe('moved')
+    expect(oldV?.status).toBe('moved')
+    expect(oldV?.isActive).toBe(false)
 
-    // Moved vehicle is strictly unavailable for booking
+    // Decommissioned moved vehicle is strictly unavailable for booking
     const tomorrow = new Date(Date.now() + 48 * 60 * 60 * 1000)
     const nextDay = new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000)
     const availInMoved = await checkVehicleAvailability(vehicle2Id, tomorrow, nextDay)
     expect(availInMoved).toBe(false)
 
-    // Arrive at Branch 2 -> Set to available with targetBranchId = branch2Id
-    const availRes = await updateVehicleStatus(vehicle2Id, 'available', {
-      targetBranchId: branch2Id,
-      actor: adminActor
+    // New vehicle is active at branch2
+    const newV = await prisma.vehicle.findUnique({
+      where: { id: moveRes.newVehicleId! }
     })
-    expect(availRes.success).toBe(true)
+    expect(newV?.status).toBe('available')
+    expect(newV?.branchId).toBe(branch2Id)
+    expect(newV?.isActive).toBe(true)
+    expect(newV?.previousVehicleId).toBe(vehicle2Id)
 
-    v2 = await prisma.vehicle.findUnique({
-      where: { id: vehicle2Id },
-      include: { unavailabilities: { where: { actualEndAt: null } } }
-    })
-    expect(v2?.status).toBe('available')
-    expect(v2?.branchId).toBe(branch2Id) // Branch relocated!
-    expect(v2?.unavailabilities.length).toBe(0) // Active unavailability closed!
+    // Update vehicle2Id so subsequent tests (test 5) use the new active vehicle at branch2
+    vehicle2Id = moveRes.newVehicleId!
   })
 
   test('5. Deteksi Konflik Seketika Saat Perpanjangan: Booking tertabrak perpanjangan masuk ke conflict risk', async () => {

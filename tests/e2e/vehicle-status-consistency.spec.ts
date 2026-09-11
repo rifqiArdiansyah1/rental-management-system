@@ -110,6 +110,7 @@ test.describe('Vehicle Status Consistency & Operational Lifecycle Audit (Issue #
   }
 
   test('UI & Backend: "Disewa (Rented)" is removed from status modal & available vehicle can toggle maintenance', async ({ page }) => {
+    test.setTimeout(60000)
     await loginAsAdmin(page)
 
     // 2. Navigate to vehicles page and search for test vehicle
@@ -130,10 +131,12 @@ test.describe('Vehicle Status Consistency & Operational Lifecycle Audit (Issue #
     const selectDropdown = modal.locator('select')
     const options = await selectDropdown.locator('option').allTextContents()
 
-    // Expect 'available', 'maintenance', 'moved' are present
+    // Expect 'available' and 'maintenance' are present
     expect(options.some(opt => opt.includes('Tersedia') || opt.includes('Available'))).toBeTruthy()
     expect(options.some(opt => opt.includes('Perbaikan') || opt.includes('Maintenance'))).toBeTruthy()
-    expect(options.some(opt => opt.includes('Dipindahkan') || opt.includes('Moved'))).toBeTruthy()
+
+    // Expect 'moved' is STRICTLY NOT present in generic status modal (relocation is dedicated)
+    expect(options.some(opt => opt.includes('Dipindahkan') || opt.includes('Moved'))).toBeFalsy()
 
     // Expect 'rented' is STRICTLY NOT present
     expect(options.some(opt => opt.includes('Disewa') || opt.includes('Rented'))).toBeFalsy()

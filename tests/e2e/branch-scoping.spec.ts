@@ -44,11 +44,17 @@ test.describe('Branch Scoping & RBAC Granular', () => {
     });
 
     // 3. Setup Vehicles for Branch B
-    await prisma.vehicle.upsert({
-      where: { plateNumber: 'B ETA' },
-      update: { branchId: branchBId },
-      create: { plateNumber: 'B ETA', branchId: branchBId, categoryId: cat.id, dailyRate: 100000 }
-    });
+    const existingVehicle = await prisma.vehicle.findFirst({ where: { plateNumber: 'B ETA', isActive: true } });
+    if (existingVehicle) {
+      await prisma.vehicle.update({
+        where: { id: existingVehicle.id },
+        data: { branchId: branchBId }
+      });
+    } else {
+      await prisma.vehicle.create({
+        data: { plateNumber: 'B ETA', branchId: branchBId, categoryId: cat.id, dailyRate: 100000 }
+      });
+    }
 
     // 4. Setup Staff Users via Supabase Admin
     const supabaseAdmin = createClient(
@@ -128,7 +134,7 @@ test.describe('Branch Scoping & RBAC Granular', () => {
     });
     
     // We just create a dummy booking directly via Prisma
-    const vehicle = await prisma.vehicle.findUnique({ where: { plateNumber: 'B ETA' } });
+    const vehicle = await prisma.vehicle.findFirst({ where: { plateNumber: 'B ETA', isActive: true } });
     if (vehicle) {
       const existingBooking = await prisma.booking.findFirst({ where: { vehicleId: vehicle.id } });
       if (!existingBooking) {

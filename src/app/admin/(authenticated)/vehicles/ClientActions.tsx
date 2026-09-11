@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle, updateVehicleUnavailabilityEstimate } from '@/actions/adminVehicle'
+import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle, updateVehicleUnavailabilityEstimate, relocateVehicle } from '@/actions/adminVehicle'
 import { uploadVehiclePhoto } from '@/actions/vehiclePhoto'
 import { VehicleStatus, FuelType } from '@prisma/client'
 import { MIN_VEHICLE_DAILY_RATE, FUEL_TYPE_LABELS } from '@/lib/constants'
@@ -482,7 +482,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
   const [menuOpen, setMenuOpen] = useState(false)
   const [openUpward, setOpenUpward] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
-  const [modalType, setModalType] = useState<'edit' | 'status' | 'delete' | 'estimate' | null>(null)
+  const [modalType, setModalType] = useState<'edit' | 'status' | 'delete' | 'estimate' | 'relocate' | null>(null)
   
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -492,7 +492,12 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
   const [status, setStatus] = useState<VehicleStatus>(vehicle.status)
   const [statusEstimatedEndAt, setStatusEstimatedEndAt] = useState<string>('')
   const [statusNote, setStatusNote] = useState<string>('')
-  const [statusTargetBranchId, setStatusTargetBranchId] = useState<string>(vehicle.branchId)
+
+  // Relocate Modal states
+  const otherBranches = branches.filter(b => b.id !== vehicle.branchId)
+  const [relocateTargetBranchId, setRelocateTargetBranchId] = useState<string>(otherBranches[0]?.id || '')
+  const [relocateTransitUntil, setRelocateTransitUntil] = useState<string>('')
+  const [relocateNote, setRelocateNote] = useState<string>('')
 
   // Estimate Modal states
   const [estimateEndAt, setEstimateEndAt] = useState<string>('')
@@ -548,9 +553,18 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
       setStatusEstimatedEndAt('')
     }
     setStatusNote(unavail?.note || '')
-    setStatusTargetBranchId(vehicle.branchId)
     setError(null)
     setModalType('status')
+  }
+
+  const handleOpenRelocateModal = () => {
+    setMenuOpen(false)
+    const targetBranches = branches.filter(b => b.id !== vehicle.branchId)
+    setRelocateTargetBranchId(targetBranches[0]?.id || '')
+    setRelocateTransitUntil('')
+    setRelocateNote('')
+    setError(null)
+    setModalType('relocate')
   }
 
   const handleOpenEstimateModal = () => {
@@ -575,11 +589,30 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
       setError(null)
       const res = await updateVehicleStatus(vehicle.id, status, {
         estimatedEndAt: status === 'maintenance' && statusEstimatedEndAt ? new Date(`${statusEstimatedEndAt}+07:00`) : null,
-        note: statusNote.trim() || null,
-        targetBranchId: (status === 'available' && vehicle.status === 'moved' && statusTargetBranchId) ? statusTargetBranchId : undefined
+        note: statusNote.trim() || null
       })
       if (res.error) setError(res.error)
       else {
+        setModalType(null)
+        router.refresh()
+      }
+    })
+  }
+
+  const handleRelocate = () => {
+    if (!relocateTargetBranchId) {
+      setError('Pilih cabang tujuan mutasi.')
+      return
+    }
+    startTransition(async () => {
+      setError(null)
+      const res = await relocateVehicle(vehicle.id, relocateTargetBranchId, {
+        transitUntil: relocateTransitUntil ? new Date(`${relocateTransitUntil}+07:00`) : null,
+        note: relocateNote.trim() || null
+      })
+      if (res.error) {
+        setError(res.error)
+      } else {
         setModalType(null)
         router.refresh()
       }
@@ -685,6 +718,18 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
               </button>
             )}
 
+            {userRole === 'admin_pusat' && vehicle.isActive && vehicle.status !== 'rented' && (
+              <button 
+                onClick={handleOpenRelocateModal}
+                className="w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 flex items-center justify-between"
+              >
+                <span>Mutasi Cabang</span>
+                <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-medium">
+                  Pusat
+                </span>
+              </button>
+            )}
+
             {vehicle.status === 'maintenance' && vehicle.isActive && (
               <button 
                 onClick={handleOpenEstimateModal}
@@ -734,10 +779,9 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                 >
                   <option value="available">Tersedia (Available)</option>
                   <option value="maintenance">Perbaikan (Maintenance)</option>
-                  <option value="moved">Dipindahkan (Moved)</option>
                 </select>
                 <p className="text-[11px] text-zinc-400 mt-1">
-                  Status &quot;Disewa&quot; dikelola otomatis oleh sistem saat Mulai Sewa di Manajemen Pesanan.
+                  Status &quot;Disewa&quot; dikelola otomatis oleh sistem saat Mulai Sewa di Manajemen Pesanan. Pemindahan cabang dapat dilakukan melalui menu &quot;Mutasi Cabang&quot;.
                 </p>
               </div>
 
@@ -768,49 +812,6 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                   </div>
                 </div>
               )}
-
-              {/* Conditional Inputs: Moved */}
-              {status === 'moved' && (
-                <div className="space-y-3 pt-3 border-t border-zinc-100">
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                    <p className="font-semibold mb-1">Perhatian Mutasi Unit:</p>
-                    <p>Unit yang berstatus &quot;Moved&quot; diblokir penuh dari seluruh katalog pemesanan cabang sampai tiba di tujuan. Transisi akan ditolak jika armada memiliki pesanan aktif di masa depan.</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-700 mb-1">Catatan / Tujuan Mutasi</label>
-                    <textarea
-                      rows={2}
-                      placeholder="Misal: Mutasi unit ke Cabang Bandung untuk rotasi armada"
-                      value={statusNote}
-                      onChange={e => setStatusNote(e.target.value)}
-                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Conditional Inputs: Moved -> Available (Branch Relocation) */}
-              {status === 'available' && vehicle.status === 'moved' && (
-                <div className="space-y-3 pt-3 border-t border-zinc-100">
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
-                    Armada tiba dari proses mutasi. Pilih cabang penempatan operasional baru untuk unit ini:
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-700 mb-1">Cabang Penempatan Baru *</label>
-                    <select
-                      value={statusTargetBranchId}
-                      onChange={e => setStatusTargetBranchId(e.target.value)}
-                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {branches.map(b => (
-                        <option key={b.id} value={b.id}>
-                          {b.name} {b.id === vehicle.branchId ? '(Cabang Asal)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
             </div>
 
             {error && <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded-md">{error}</div>}
@@ -829,6 +830,87 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                 className="px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-md disabled:opacity-50"
               >
                 {isPending ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Relocate Vehicle (Mutasi Antar Cabang) */}
+      {modalType === 'relocate' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-xl max-w-md w-full shadow-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xl">🚚</span>
+              <h3 className="text-lg font-bold text-zinc-900">Mutasi Armada Antar Cabang</h3>
+            </div>
+            <p className="text-xs text-zinc-500 mb-4">
+              Armada: <strong>{vehicle.name || vehicle.plateNumber}</strong> ({vehicle.plateNumber}) • Cabang Asal: <strong>{branches.find(b => b.id === vehicle.branchId)?.name || 'Cabang Asal'}</strong>
+            </p>
+
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-900 mb-4">
+              <p className="font-semibold mb-1">Pola Mutasi Terhubung (Linked Record):</p>
+              <p>Unit di cabang saat ini akan dinonaktifkan sebagai arsip riwayat, dan unit baru dengan spesifikasi serta nomor plat yang sama akan dibuka di cabang tujuan secara terhubung.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Pilih Cabang Tujuan *</label>
+                <select 
+                  value={relocateTargetBranchId}
+                  onChange={e => setRelocateTargetBranchId(e.target.value)}
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  {branches.filter(b => b.id !== vehicle.branchId).map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                {branches.filter(b => b.id !== vehicle.branchId).length === 0 && (
+                  <p className="text-xs text-red-500 mt-1">Tidak ada cabang tujuan lain yang aktif.</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Estimasi Tiba (Transit Window, Opsional)</label>
+                <input
+                  type="datetime-local"
+                  value={relocateTransitUntil}
+                  onChange={e => setRelocateTransitUntil(e.target.value)}
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  Kosongkan jika armada langsung siap sewa di tujuan. Jika diisi tanggal masa depan, unit baru di cabang tujuan otomatis berstatus &quot;Maintenance&quot; selama masa pengiriman/transit sampai waktu tiba.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Catatan Mutasi</label>
+                <textarea
+                  rows={2}
+                  placeholder="Misal: Rotasi armada untuk kebutuhan event / permintaan tinggi di cabang tujuan"
+                  value={relocateNote}
+                  onChange={e => setRelocateNote(e.target.value)}
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            {error && <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded-md">{error}</div>}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button 
+                onClick={() => setModalType(null)}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 rounded-md"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleRelocate}
+                disabled={isPending || !relocateTargetBranchId}
+                className="px-4 py-2 text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 rounded-md disabled:opacity-50"
+              >
+                {isPending ? 'Memproses Mutasi...' : 'Eksekusi Mutasi'}
               </button>
             </div>
           </div>

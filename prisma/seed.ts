@@ -71,52 +71,57 @@ async function main() {
   console.log(`✅ Categories ensured`)
 
   // 3. Mobil (Vehicle)
-  await prisma.vehicle.upsert({
-    where: { plateNumber: 'B 1 BMW' },
-    update: {
-      name: 'BMW 730Li M Sport',
-      photos: [catSedan.imageUrl || ''],
-    },
-    create: {
-      name: 'BMW 730Li M Sport',
-      plateNumber: 'B 1 BMW',
-      branchId: branchPusat.id,
-      categoryId: catSedan.id,
-      dailyRate: 4500000,
-      photos: [catSedan.imageUrl || ''],
-    },
+  async function ensureVehicle(data: {
+    name: string
+    plateNumber: string
+    branchId: string
+    categoryId: string
+    dailyRate: number
+    photos: string[]
+  }) {
+    const existing = await prisma.vehicle.findFirst({
+      where: { plateNumber: data.plateNumber, isActive: true }
+    })
+    if (existing) {
+      await prisma.vehicle.update({
+        where: { id: existing.id },
+        data: {
+          name: data.name,
+          photos: data.photos,
+        }
+      })
+    } else {
+      await prisma.vehicle.create({
+        data
+      })
+    }
+  }
+
+  await ensureVehicle({
+    name: 'BMW 730Li M Sport',
+    plateNumber: 'B 1 BMW',
+    branchId: branchPusat.id,
+    categoryId: catSedan.id,
+    dailyRate: 4500000,
+    photos: [catSedan.imageUrl || ''],
   })
 
-  await prisma.vehicle.upsert({
-    where: { plateNumber: 'B 2 RR' },
-    update: {
-      name: 'Range Rover Autobiography',
-      photos: [catSuv.imageUrl || ''],
-    },
-    create: {
-      name: 'Range Rover Autobiography',
-      plateNumber: 'B 2 RR',
-      branchId: branchPusat.id,
-      categoryId: catSuv.id,
-      dailyRate: 6000000,
-      photos: [catSuv.imageUrl || ''],
-    },
+  await ensureVehicle({
+    name: 'Range Rover Autobiography',
+    plateNumber: 'B 2 RR',
+    branchId: branchPusat.id,
+    categoryId: catSuv.id,
+    dailyRate: 6000000,
+    photos: [catSuv.imageUrl || ''],
   })
 
-  await prisma.vehicle.upsert({
-    where: { plateNumber: 'B 911 PC' },
-    update: {
-      name: 'Porsche 911 Carrera S',
-      photos: [catSports.imageUrl || ''],
-    },
-    create: {
-      name: 'Porsche 911 Carrera S',
-      plateNumber: 'B 911 PC',
-      branchId: branchPusat.id,
-      categoryId: catSports.id,
-      dailyRate: 8500000,
-      photos: [catSports.imageUrl || ''],
-    },
+  await ensureVehicle({
+    name: 'Porsche 911 Carrera S',
+    plateNumber: 'B 911 PC',
+    branchId: branchPusat.id,
+    categoryId: catSports.id,
+    dailyRate: 8500000,
+    photos: [catSports.imageUrl || ''],
   })
   console.log(`✅ Vehicles ensured`)
 
