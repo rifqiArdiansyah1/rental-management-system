@@ -780,9 +780,17 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                   <option value="available">Tersedia (Available)</option>
                   <option value="maintenance">Perbaikan (Maintenance)</option>
                 </select>
-                <p className="text-[11px] text-zinc-400 mt-1">
-                  Status &quot;Disewa&quot; dikelola otomatis oleh sistem saat Mulai Sewa di Manajemen Pesanan. Pemindahan cabang dapat dilakukan melalui menu &quot;Mutasi Cabang&quot;.
+                <p className="text-[11px] text-zinc-500 mt-1.5">
+                  {status === 'available'
+                    ? 'Armada dalam kondisi prima, siap operasional, dan dapat dipesan oleh pelanggan.'
+                    : 'Armada masuk masa perawatan atau perbaikan bengkel dan dijeda dari pemesanan sewa.'}
                 </p>
+                <div className="mt-2.5 pt-2 border-t border-zinc-100 text-[11px] text-zinc-400 space-y-0.5">
+                  <p>• Status &quot;Disewa&quot; dikelola otomatis oleh sistem saat Mulai Sewa di Manajemen Pesanan.</p>
+                  {userRole === 'admin_pusat' && (
+                    <p>• Pemindahan cabang dapat dilakukan melalui menu &quot;Mutasi Cabang&quot;.</p>
+                  )}
+                </div>
               </div>
 
               {/* Conditional Inputs: Maintenance */}
