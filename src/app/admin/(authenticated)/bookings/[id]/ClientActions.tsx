@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useRef } from 'react'
 import { verifyDocument, assignDriver, adminCancelBooking, markPaymentRefunded, startRental, endRental } from '@/actions/admin'
 import { useRouter } from 'next/navigation'
 import { generateSignedDocumentUrl } from '@/actions/document'
-import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw, Play, AlertCircle, Clock, AlertTriangle, Gauge } from 'lucide-react'
+import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw, Play, AlertCircle, Clock, AlertTriangle, Gauge, X } from 'lucide-react'
 import { calculateLateFee } from '@/lib/lateFee'
 import { formatWibDateTime } from '@/lib/bookingFilters'
 
@@ -388,22 +388,33 @@ export function EndRentalButton({
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
 
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white p-6 rounded-xl max-w-lg w-full shadow-2xl my-8 text-left">
-            <div className="flex items-center justify-between border-b pb-3 mb-4">
+        <div className="fixed inset-0 bg-black/50 z-50 p-4 overflow-y-auto flex justify-center items-center">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl my-auto text-left flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 shrink-0 bg-white">
               <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-blue-600" /> Konfirmasi Selesai Sewa (Pengembalian Armada)
               </h3>
-              <span className="text-xs font-mono bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded">
-                #{bookingId.slice(0, 8).toUpperCase()}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded">
+                  #{bookingId.slice(0, 8).toUpperCase()}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="text-zinc-400 hover:text-zinc-600 p-1 rounded-md transition-colors cursor-pointer"
+                  aria-label="Tutup"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            {vehicleName && (
-              <p className="text-sm font-semibold text-zinc-800 mb-3">
-                Unit Armada: {vehicleName}
-              </p>
-            )}
+            <div className="p-6 overflow-y-auto flex-1">
+              {vehicleName && (
+                <p className="text-sm font-semibold text-zinc-800 mb-3">
+                  Unit Armada: {vehicleName}
+                </p>
+              )}
 
             {/* Box Waktu Jadwal vs Aktual */}
             <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3.5 text-xs space-y-1.5 mb-4">
@@ -651,32 +662,33 @@ export function EndRentalButton({
             )}
 
             {error && (
-              <div className="mb-4 p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+              <div className="mt-4 p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-700">
                 {error}
               </div>
             )}
+          </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-zinc-200">
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                disabled={isPending}
-                className="px-4 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmEnd}
-                disabled={isPending}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-              >
-                {isPending ? 'Memproses...' : 'Ya, Selesaikan Sewa'}
-              </button>
-            </div>
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-zinc-200 shrink-0 bg-zinc-50 rounded-b-2xl">
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              disabled={isPending}
+              className="px-4 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmEnd}
+              disabled={isPending}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+            >
+              {isPending ? 'Memproses...' : 'Ya, Selesaikan Sewa'}
+            </button>
           </div>
         </div>
-      )}
+      </div>
+    )}
     </div>
   )
 }
