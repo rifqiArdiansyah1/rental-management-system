@@ -31,6 +31,24 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
       </head>
       <body className="min-h-full flex flex-col">
+        <noscript>
+          <style dangerouslySetInnerHTML={{
+            __html: `
+              .animate-hero-kicker,
+              .animate-hero-title,
+              .animate-hero-desc,
+              .animate-hero-cta,
+              .animate-hero-badges,
+              .animate-page-header,
+              .animate-page-desc,
+              .animate-ambient-glow {
+                animation: none !important;
+                opacity: 1 !important;
+                transform: none !important;
+              }
+            `
+          }} />
+        </noscript>
         {children}
         <AuthNotifier />
       </body>

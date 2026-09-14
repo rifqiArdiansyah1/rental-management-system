@@ -113,6 +113,144 @@
     box-shadow: 0 15px 25px -5px rgba(233, 193, 118, 0.25);
     transform: translateY(-2px);
   }
+
+  /* Shimmer button light-sweep (GPU-accelerated via transform) */
+  .shimmer-btn {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.25),
+      transparent
+    );
+    transform: translateX(-150%);
+    pointer-events: none;
+  }
+
+  .shimmer-btn:hover::after {
+    animation: shimmerSweep 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* GPU-accelerated Pure CSS Hero Entrance Animations */
+  .animate-hero-kicker {
+    animation: heroFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    will-change: transform, opacity;
+  }
+
+  .animate-hero-title {
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+    will-change: transform, opacity;
+  }
+
+  .animate-hero-desc {
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+    will-change: transform, opacity;
+  }
+
+  .animate-hero-cta {
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
+    will-change: transform, opacity;
+  }
+
+  .animate-hero-badges {
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.38s both;
+    will-change: transform, opacity;
+  }
+
+  /* Subpage Header Pure CSS Animations (LCP safe, GPU-composited) */
+  .animate-page-header {
+    animation: heroFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+    will-change: transform, opacity;
+  }
+
+  .animate-page-desc {
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+    will-change: transform, opacity;
+  }
+
+  /* Ambient Glow Animation (Opacity & scale on dedicated layer, zero repaints) */
+  .animate-ambient-glow {
+    animation: ambientGlow 8s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  /* Pause looping animations when hero is out of viewport to conserve mobile battery */
+  [data-in-view="false"] .animate-ambient-glow {
+    animation-play-state: paused !important;
+  }
+}
+
+@keyframes heroFadeUp {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes ambientGlow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translate3d(0, -8px, 0) scale(1.06);
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-150%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+/* Accessibility: WCAG AA prefers-reduced-motion fallback */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-ambient-glow {
+    animation: none !important;
+  }
+  .shimmer-btn::after {
+    display: none !important;
+  }
+}
+
+/* Progressive enhancement: when JavaScript is disabled, guarantee instant visibility */
+@media (scripting: none) {
+  .animate-hero-kicker,
+  .animate-hero-title,
+  .animate-hero-desc,
+  .animate-hero-cta,
+  .animate-hero-badges,
+  .animate-page-header,
+  .animate-page-desc,
+  .animate-ambient-glow {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 /* Custom scrollbar */

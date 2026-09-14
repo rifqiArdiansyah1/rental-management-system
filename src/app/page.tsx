@@ -5,6 +5,8 @@ import { getVehicles, getBranches, getCategories } from '@/actions/vehicle'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import { createClient } from '@/utils/supabase/server'
+import ScrollReveal from '@/components/ui/ScrollReveal'
+import HeroAmbientController from '@/components/ui/HeroAmbientController'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +36,7 @@ export default async function Home({
       {/* Main Content Canvas */}
       <main className="flex-grow flex flex-col">
         {/* Hero Section */}
-        <section className="relative w-full h-[614px] min-h-[500px] flex items-center justify-start overflow-hidden">
+        <HeroAmbientController id="hero-section" className="relative w-full min-h-[560px] md:h-[640px] flex items-center justify-start overflow-hidden">
           {/* Background Image with Permanent High-Contrast Multi-Stop Gradients (WCAG AA Compliant) */}
           <div className="absolute inset-0 z-0 hero-bg">
             <div
@@ -45,57 +47,90 @@ export default async function Home({
             <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30"></div>
           </div>
 
-          {/* Hero Content */}
-          <div className="relative z-10 w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
+          {/* Ambient Glow Beam (GPU Composited, Zero Repaint, Paused when offscreen) */}
+          <div 
+            aria-hidden="true" 
+            className="pointer-events-none absolute -top-20 -left-20 w-[420px] h-[420px] rounded-full bg-gradient-to-br from-secondary/15 via-primary-container/20 to-transparent blur-3xl animate-ambient-glow" 
+          />
+
+          {/* Hero Content (Pure CSS Entrance, 100% LCP Safe, Zero JS Gating) */}
+          <div className="relative z-10 w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto py-12">
             <div className="max-w-2xl">
-              <span className="font-label-caps text-xs text-secondary mb-4 block tracking-widest uppercase font-semibold">
+              <span className="font-label-caps text-xs text-secondary mb-4 block tracking-widest uppercase font-semibold animate-hero-kicker">
                 Koleksi Armada Eksklusif
               </span>
-              <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-6 drop-shadow-md">
+              <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-6 drop-shadow-md animate-hero-title">
                 Kenyamanan & Kemewahan Perjalanan Terbaik
               </h1>
-              <p className="font-body-lg text-base md:text-lg text-on-surface-variant mb-10 max-w-lg leading-relaxed">
+              <p className="font-body-lg text-base md:text-lg text-on-surface-variant mb-8 max-w-lg leading-relaxed animate-hero-desc">
                 Solusi mobilitas premium dengan standar inspeksi ketat, reservasi online instan, serta perlindungan privasi dokumen untuk perjalanan bisnis maupun personal Anda.
               </p>
-              <a
-                href="#vehicles"
-                className="btn-primary bg-secondary text-on-secondary font-button text-sm font-semibold px-8 py-4 rounded-DEFAULT inline-flex items-center gap-2 cursor-pointer hover:bg-secondary-fixed transition-colors"
-              >
-                Jelajahi Armada <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-              </a>
+              
+              <div className="flex flex-wrap items-center gap-4 mb-8 animate-hero-cta">
+                <a
+                  href="#vehicles"
+                  className="btn-primary shimmer-btn group bg-secondary text-on-secondary font-button text-sm font-semibold px-8 py-4 rounded-DEFAULT inline-flex items-center gap-2 cursor-pointer hover:bg-secondary-fixed transition-all"
+                >
+                  Jelajahi Armada 
+                  <span className="material-symbols-outlined text-[18px] transition-transform duration-300 group-hover:translate-x-1.5">
+                    arrow_forward
+                  </span>
+                </a>
+              </div>
+
+              {/* Factual Trust Badges (Ground Truth Operational Claims) */}
+              <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-surface-variant/30 animate-hero-badges">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high/80 border border-outline-variant/30 text-xs text-on-surface-variant font-label-caps">
+                  <span className="material-symbols-outlined text-[15px] text-secondary">verified</span>
+                  <span>Jeda Pengecekan 3 Jam</span>
+                </div>
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high/80 border border-outline-variant/30 text-xs text-on-surface-variant font-label-caps">
+                  <span className="material-symbols-outlined text-[15px] text-secondary">bolt</span>
+                  <span>Konfirmasi Instan</span>
+                </div>
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high/80 border border-outline-variant/30 text-xs text-on-surface-variant font-label-caps">
+                  <span className="material-symbols-outlined text-[15px] text-secondary">shield</span>
+                  <span>Privasi Terlindungi UU PDP</span>
+                </div>
+              </div>
             </div>
           </div>
-        </section>
+        </HeroAmbientController>
 
         {/* FilterBar Section */}
         <FilterBar branches={branches} categories={categories} />
 
         {/* Vehicle Grid Section */}
         <section id="vehicles" className="w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto py-20 scroll-mt-20">
-          <div className="flex justify-between items-end mb-12 border-b border-surface-variant pb-4">
-            <div>
-              <h2 className="font-headline-lg text-headline-lg text-on-surface">Pilihan Armada</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-2">Armada terawat yang siap digunakan untuk perjalanan Anda.</p>
+          <ScrollReveal>
+            <div className="flex justify-between items-end mb-12 border-b border-surface-variant pb-4">
+              <div>
+                <h2 className="font-headline-lg text-headline-lg text-on-surface">Pilihan Armada</h2>
+                <p className="font-body-md text-body-md text-on-surface-variant mt-2">Armada terawat yang siap digunakan untuk perjalanan Anda.</p>
+              </div>
             </div>
-          </div>
+          </ScrollReveal>
 
-          {/* Bento-style Grid */}
+          {/* Bento-style Grid with Staggered ScrollReveal */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {vehicles.map((vehicle: any, index: number) => (
-              <VehicleCard
-                key={vehicle.id}
-                vehicle={vehicle}
-                isPopular={index === 1}
-              />
+              <ScrollReveal key={vehicle.id} delay={Math.min(index * 75, 450)}>
+                <VehicleCard
+                  vehicle={vehicle}
+                  isPopular={index === 1}
+                />
+              </ScrollReveal>
             ))}
           </div>
 
           {vehicles.length === 0 && (
-            <div className="text-center py-20 border border-outline-variant/20 rounded-xl bg-surface-container-low">
-              <span className="material-symbols-outlined text-[48px] text-surface-variant mb-4 block">no_crash</span>
-              <h3 className="text-headline-md text-on-surface mb-2">Kendaraan Tidak Ditemukan</h3>
-              <p className="text-on-surface-variant">Coba sesuaikan filter cabang atau kategori untuk melihat hasil lainnya.</p>
-            </div>
+            <ScrollReveal>
+              <div className="text-center py-20 border border-outline-variant/20 rounded-xl bg-surface-container-low">
+                <span className="material-symbols-outlined text-[48px] text-surface-variant mb-4 block">no_crash</span>
+                <h3 className="text-headline-md text-on-surface mb-2">Kendaraan Tidak Ditemukan</h3>
+                <p className="text-on-surface-variant">Coba sesuaikan filter cabang atau kategori untuk melihat hasil lainnya.</p>
+              </div>
+            </ScrollReveal>
           )}
         </section>
 
@@ -103,49 +138,57 @@ export default async function Home({
         <section className="w-full bg-surface-container-lowest border-y border-surface-variant/40 py-20 mt-auto">
           <div className="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
             {/* Section Header Hook */}
-            <div className="max-w-2xl mx-auto text-center mb-14">
-              <span className="font-label-caps text-xs text-secondary tracking-widest uppercase font-semibold block mb-3">
-                Alasan Memilih Kami
-              </span>
-              <h2 className="font-display-lg text-2xl md:text-3xl lg:text-4xl text-on-surface font-bold tracking-tight mb-4">
-                Standar Tertinggi untuk Kenyamanan & Keamanan Anda
-              </h2>
-              <p className="font-body-md text-sm md:text-base text-on-surface-variant leading-relaxed">
-                Kami menetapkan tolok ukur baru dalam layanan transportasi premium: armada terawat dengan inspeksi ketat, kemudahan reservasi online, serta perlindungan privasi tanpa kompromi.
-              </p>
-            </div>
+            <ScrollReveal>
+              <div className="max-w-2xl mx-auto text-center mb-14">
+                <span className="font-label-caps text-xs text-secondary tracking-widest uppercase font-semibold block mb-3">
+                  Alasan Memilih Kami
+                </span>
+                <h2 className="font-display-lg text-2xl md:text-3xl lg:text-4xl text-on-surface font-bold tracking-tight mb-4">
+                  Standar Tertinggi untuk Kenyamanan & Keamanan Anda
+                </h2>
+                <p className="font-body-md text-sm md:text-base text-on-surface-variant leading-relaxed">
+                  Kami menetapkan tolok ukur baru dalam layanan transportasi premium: armada terawat dengan inspeksi ketat, kemudahan reservasi online, serta perlindungan privasi tanpa kompromi.
+                </p>
+              </div>
+            </ScrollReveal>
 
             {/* 3 Pillars Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 text-center">
-              <div className="flex flex-col items-center px-4">
-                <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
-                  <span className="material-symbols-outlined text-[28px]">diamond</span>
+              <ScrollReveal delay={0}>
+                <div className="flex flex-col items-center px-4 group">
+                  <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-secondary/20">
+                    <span className="material-symbols-outlined text-[28px]">diamond</span>
+                  </div>
+                  <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Armada Terawat & Bersih</h4>
+                  <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                    Setiap unit melalui inspeksi berkala serta jeda pembersihan dan pengecekan menyeluruh 3 jam sebelum diserahkan.
+                  </p>
                 </div>
-                <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Armada Terawat & Bersih</h4>
-                <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
-                  Setiap unit melalui inspeksi berkala serta jeda pembersihan dan pengecekan menyeluruh 3 jam sebelum diserahkan.
-                </p>
-              </div>
+              </ScrollReveal>
 
-              <div className="flex flex-col items-center px-4">
-                <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
-                  <span className="material-symbols-outlined text-[28px]">schedule</span>
+              <ScrollReveal delay={150}>
+                <div className="flex flex-col items-center px-4 group">
+                  <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-secondary/20">
+                    <span className="material-symbols-outlined text-[28px]">schedule</span>
+                  </div>
+                  <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Reservasi Online 24/7</h4>
+                  <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                    Pemesanan online aktif 24 jam dengan layanan pelanggan responsif selama jam operasional cabang (08:00–21:00 WIB).
+                  </p>
                 </div>
-                <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Reservasi Online 24/7</h4>
-                <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
-                  Pemesanan online aktif 24 jam dengan layanan pelanggan responsif selama jam operasional cabang (08:00–21:00 WIB).
-                </p>
-              </div>
+              </ScrollReveal>
 
-              <div className="flex flex-col items-center px-4">
-                <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4">
-                  <span className="material-symbols-outlined text-[28px]">lock</span>
+              <ScrollReveal delay={300}>
+                <div className="flex flex-col items-center px-4 group">
+                  <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-secondary/20">
+                    <span className="material-symbols-outlined text-[28px]">lock</span>
+                  </div>
+                  <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Privasi Terlindungi Ketat</h4>
+                  <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                    Dokumen identitas (KTP/SIM) dan riwayat sewa Anda diamankan sesuai standar UU PDP dengan kontrol akses berjenjang.
+                  </p>
                 </div>
-                <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Privasi Terlindungi Ketat</h4>
-                <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
-                  Dokumen identitas (KTP/SIM) dan riwayat sewa Anda diamankan sesuai standar UU PDP dengan kontrol akses berjenjang.
-                </p>
-              </div>
+              </ScrollReveal>
             </div>
           </div>
         </section>

@@ -6,6 +6,7 @@ import FuelCostEstimator from '@/components/vehicle/FuelCostEstimator'
 import { FUEL_TYPE_LABELS } from '@/lib/constants'
 import { FuelType } from '@prisma/client'
 import Navbar from '@/components/Navbar'
+import ScrollReveal from '@/components/ui/ScrollReveal'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,7 +82,7 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
           <div className="relative z-10 w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto pb-12">
             <div className="flex flex-col md:flex-row justify-between items-end gap-gutter">
               <div className="flex flex-col">
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3 mb-2 animate-hero-kicker">
                   <span className="font-label-caps text-label-caps text-secondary tracking-widest uppercase bg-secondary/10 px-2.5 py-1 rounded border border-secondary/20">
                     {category.name}
                   </span>
@@ -89,14 +90,14 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                     {vehicle.plateNumber}
                   </span>
                 </div>
-                <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-2">
+                <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-2 animate-hero-title">
                   {vehicleName}
                 </h1>
-                <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
+                <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl animate-hero-desc">
                   {category.description || 'The pinnacle of automotive engineering, offering unmatched comfort, cutting-edge technology, and a commanding presence on the road. Perfect for executive travel and special occasions.'}
                 </p>
               </div>
-              <div className="flex flex-col items-start md:items-end mt-6 md:mt-0">
+              <div className="flex flex-col items-start md:items-end mt-6 md:mt-0 animate-hero-cta">
                 <span className="font-label-caps text-label-caps text-on-surface-variant mb-1 uppercase">Daily Rate</span>
                 <div className="flex items-baseline gap-2">
                   <span className="font-headline-lg text-headline-lg text-secondary">
@@ -117,142 +118,155 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
             <div className="lg:col-span-8 flex flex-col gap-16">
               
               {/* Specifications Bento Grid */}
-              <div>
-                <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Vehicle Specifications</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
-                    <span className="material-symbols-outlined text-secondary opacity-80">settings</span>
-                    <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Transmission</span>
-                    <span className="font-body-lg text-body-lg text-on-surface">{category.transmission}</span>
-                  </div>
-                  <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
-                    <span className="material-symbols-outlined text-secondary opacity-80">local_gas_station</span>
-                    <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Fuel Type</span>
-                    <span className="font-body-lg text-body-lg text-on-surface">
-                      {FUEL_TYPE_LABELS[vehicle.fuelType as FuelType] || vehicle.fuelType}
-                    </span>
-                    {vehicle.fuelEfficiencyKmL && (
-                      <span className="text-xs text-on-surface-variant">
-                        ~{Number(vehicle.fuelEfficiencyKmL)} km/Liter
+              <ScrollReveal>
+                <div>
+                  <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Vehicle Specifications</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow border border-outline-variant/30 hover:border-secondary/50 transition-all duration-300 hover:-translate-y-1 group">
+                      <span className="material-symbols-outlined text-secondary opacity-80 transition-transform duration-300 group-hover:scale-110">settings</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Transmission</span>
+                      <span className="font-body-lg text-body-lg text-on-surface">{category.transmission}</span>
+                    </div>
+                    <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow border border-outline-variant/30 hover:border-secondary/50 transition-all duration-300 hover:-translate-y-1 group">
+                      <span className="material-symbols-outlined text-secondary opacity-80 transition-transform duration-300 group-hover:scale-110">local_gas_station</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Fuel Type</span>
+                      <span className="font-body-lg text-body-lg text-on-surface">
+                        {FUEL_TYPE_LABELS[vehicle.fuelType as FuelType] || vehicle.fuelType}
                       </span>
-                    )}
-                  </div>
-                  <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
-                    <span className="material-symbols-outlined text-secondary opacity-80">group</span>
-                    <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Capacity</span>
-                    <span className="font-body-lg text-body-lg text-on-surface">{category.capacity} Pass.</span>
-                  </div>
-                  <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow">
-                    <span className="material-symbols-outlined text-secondary opacity-80">directions_car</span>
-                    <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Branch Location</span>
-                    <span className="font-body-lg text-body-lg text-on-surface">{vehicle.branch.name}</span>
+                      {vehicle.fuelEfficiencyKmL && (
+                        <span className="text-xs text-on-surface-variant">
+                          ~{Number(vehicle.fuelEfficiencyKmL)} km/Liter
+                        </span>
+                      )}
+                    </div>
+                    <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow border border-outline-variant/30 hover:border-secondary/50 transition-all duration-300 hover:-translate-y-1 group">
+                      <span className="material-symbols-outlined text-secondary opacity-80 transition-transform duration-300 group-hover:scale-110">group</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Capacity</span>
+                      <span className="font-body-lg text-body-lg text-on-surface">{category.capacity} Pass.</span>
+                    </div>
+                    <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow border border-outline-variant/30 hover:border-secondary/50 transition-all duration-300 hover:-translate-y-1 group">
+                      <span className="material-symbols-outlined text-secondary opacity-80 transition-transform duration-300 group-hover:scale-110">directions_car</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Branch Location</span>
+                      <span className="font-body-lg text-body-lg text-on-surface">{vehicle.branch.name}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </ScrollReveal>
 
               {/* Pre-Trip Fuel Estimator (Opsi A) */}
-              <FuelCostEstimator
-                fuelType={vehicle.fuelType as FuelType}
-                fuelEfficiencyKmL={vehicle.fuelEfficiencyKmL ? Number(vehicle.fuelEfficiencyKmL) : null}
-                pricePerLiter={fuelPricePerLiter}
-              />
+              <ScrollReveal delay={100}>
+                <FuelCostEstimator
+                  fuelType={vehicle.fuelType as FuelType}
+                  fuelEfficiencyKmL={vehicle.fuelEfficiencyKmL ? Number(vehicle.fuelEfficiencyKmL) : null}
+                  pricePerLiter={fuelPricePerLiter}
+                />
+              </ScrollReveal>
 
               {/* Photo Gallery (if multiple photos) */}
               {photos.length > 1 && (
-                <div>
-                  <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Fleet Gallery</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {photos.map((photo, index) => (
-                      <div key={index} className="rounded-xl overflow-hidden aspect-video bg-surface-container border border-surface-variant shadow-md">
-                        <img src={photo} alt={`${vehicleName} view ${index + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
-                      </div>
-                    ))}
+                <ScrollReveal delay={150}>
+                  <div>
+                    <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Fleet Gallery</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {photos.map((photo, index) => (
+                        <div key={index} className="group rounded-xl overflow-hidden aspect-video bg-surface-container border border-surface-variant hover:border-secondary/50 shadow-md transition-all duration-300 hover:-translate-y-1">
+                          <img src={photo} alt={`${vehicleName} view ${index + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                </ScrollReveal>
               )}
 
               {/* Features */}
-              <div>
-                <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Premium Features</h2>
-                {features.length > 0 ? (
-                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {features.map((feat, idx) => (
-                      <li key={idx} className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center border border-white/5">
-                          <span className="material-symbols-outlined text-secondary">{getFeatureIcon(feat)}</span>
-                        </div>
-                        <span className="font-body-md text-body-md text-on-surface">{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-on-surface-variant">No specific premium features listed.</p>
-                )}
-              </div>
+              <ScrollReveal delay={200}>
+                <div>
+                  <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Premium Features</h2>
+                  {features.length > 0 ? (
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {features.map((feat, idx) => (
+                        <li key={idx} className="flex items-center gap-4 group">
+                          <div className="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center border border-white/5 transition-all duration-300 group-hover:scale-110 group-hover:bg-secondary/20">
+                            <span className="material-symbols-outlined text-secondary">{getFeatureIcon(feat)}</span>
+                          </div>
+                          <span className="font-body-md text-body-md text-on-surface">{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-on-surface-variant">No specific premium features listed.</p>
+                  )}
+                </div>
+              </ScrollReveal>
             </div>
 
             {/* Right Column: Booking Widget */}
             <div className="lg:col-span-4">
-              <div className="bg-surface-container rounded-lg p-8 sticky top-28 border border-white/5 ambient-glow flex flex-col gap-6">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-headline-md text-headline-md text-on-surface">Reservation</h3>
-                </div>
-                
-                {/* Progress line */}
-                <div className="w-full h-[1px] bg-surface-variant relative mb-4">
-                  <div className="absolute left-0 top-0 h-full w-1/3 bg-secondary"></div>
-                </div>
-                
-                <div className="flex flex-col gap-4">
-                  <div className="bg-surface-container-lowest p-4 rounded border border-surface-variant/50">
-                    <span className="font-label-caps text-label-caps text-on-surface-variant block uppercase mb-1">Selected Vehicle</span>
-                    <span className="font-headline-md text-on-surface text-lg font-bold block">{vehicleName}</span>
-                    <span className="text-xs text-secondary">{category.name} • {vehicle.plateNumber}</span>
+              <ScrollReveal delay={100}>
+                <div className="bg-surface-container rounded-lg p-8 sticky top-28 border border-white/5 ambient-glow flex flex-col gap-6">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-headline-md text-headline-md text-on-surface">Reservation</h3>
                   </div>
+                  
+                  {/* Clean Divider (Removed misleading partial progress line) */}
+                  <div className="w-full h-[1px] bg-surface-variant/40 mb-4" />
+                  
+                  <div className="flex flex-col gap-4">
+                    <div className="bg-surface-container-lowest p-4 rounded border border-surface-variant/50">
+                      <span className="font-label-caps text-label-caps text-on-surface-variant block uppercase mb-1">Selected Vehicle</span>
+                      <span className="font-headline-md text-on-surface text-lg font-bold block">{vehicleName}</span>
+                      <span className="text-xs text-secondary">{category.name} • {vehicle.plateNumber}</span>
+                    </div>
 
-                  {vehicle.status === 'maintenance' && (
-                    <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1.5 font-semibold text-amber-300">
-                        <span className="material-symbols-outlined text-[16px]">build</span>
-                        <span>Status: Dalam Perawatan Bengkel</span>
-                      </div>
-                      {vehicle.unavailabilities?.[0]?.estimatedEndAt ? (
-                        new Date() > new Date(vehicle.unavailabilities[0].estimatedEndAt) ? (
-                          <p className="text-amber-300/80 leading-relaxed">
-                            Jadwal perbaikan sedang diperbarui oleh tim teknis. Pemesanan dibuka untuk jadwal setelah servis selesai.
-                          </p>
+                    {vehicle.status === 'maintenance' && (
+                      <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex flex-col gap-1.5">
+                        <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                          <span className="material-symbols-outlined text-[16px]">build</span>
+                          <span>Status: Dalam Perawatan Bengkel</span>
+                        </div>
+                        {vehicle.unavailabilities?.[0]?.estimatedEndAt ? (
+                          new Date() > new Date(vehicle.unavailabilities[0].estimatedEndAt) ? (
+                            <p className="text-amber-300/80 leading-relaxed">
+                              Jadwal perbaikan sedang diperbarui oleh tim teknis. Pemesanan dibuka untuk jadwal setelah servis selesai.
+                            </p>
+                          ) : (
+                            <p className="text-amber-300/80 leading-relaxed">
+                              Estimasi selesai servis: <strong>{new Date(vehicle.unavailabilities[0].estimatedEndAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB</strong>. Anda dapat memesan armada ini untuk tanggal setelah masa perawatan (+3 jam buffer).
+                            </p>
+                          )
                         ) : (
                           <p className="text-amber-300/80 leading-relaxed">
-                            Estimasi selesai servis: <strong>{new Date(vehicle.unavailabilities[0].estimatedEndAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB</strong>. Anda dapat memesan armada ini untuk tanggal setelah masa perawatan (+3 jam buffer).
+                            Perawatan intensif sedang berlangsung. Pemesanan masa depan dibuka segera setelah estimasi selesai ditetapkan.
                           </p>
-                        )
-                      ) : (
-                        <p className="text-amber-300/80 leading-relaxed">
-                          Perawatan intensif sedang berlangsung. Pemesanan masa depan dibuka segera setelah estimasi selesai ditetapkan.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex justify-between items-center py-4 border-t border-surface-variant mt-2">
-                  <span className="font-body-lg text-body-lg text-on-surface-variant">Daily Rate</span>
-                  <span className="font-headline-md text-headline-md text-on-surface">
-                    {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(vehicle.dailyRate))}
-                  </span>
-                </div>
-                
-                {vehicle.status === 'maintenance' && !vehicle.unavailabilities?.[0]?.estimatedEndAt ? (
-                  <div className="block w-full text-center bg-surface-container-high text-on-surface-variant font-button text-button py-4 rounded border border-outline-variant/40 cursor-not-allowed">
-                    Sedang Perawatan (Belum Dapat Dipesan)
+                        )}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <Link href={`/vehicles/${vehicle.id}/book`} className="block w-full text-center bg-secondary text-on-secondary font-button text-button py-4 rounded hover:bg-secondary-fixed transition-all duration-300 transform hover:-translate-y-1 shadow-[0_10px_20px_-10px_rgba(233,193,118,0.3)]">
-                    Rent This Car
-                  </Link>
-                )}
-                <p className="font-label-caps text-label-caps text-on-surface-variant text-center lowercase tracking-normal">Requires security deposit and insurance verification.</p>
-              </div>
+                  
+                  <div className="flex justify-between items-center py-4 border-t border-surface-variant mt-2">
+                    <span className="font-body-lg text-body-lg text-on-surface-variant">Daily Rate</span>
+                    <span className="font-headline-md text-headline-md text-on-surface">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(vehicle.dailyRate))}
+                    </span>
+                  </div>
+                  
+                  {vehicle.status === 'maintenance' && !vehicle.unavailabilities?.[0]?.estimatedEndAt ? (
+                    <div className="block w-full text-center bg-surface-container-high text-on-surface-variant font-button text-button py-4 rounded border border-outline-variant/40 cursor-not-allowed">
+                      Sedang Perawatan (Belum Dapat Dipesan)
+                    </div>
+                  ) : (
+                    <Link href={`/vehicles/${vehicle.id}/book`} className="shimmer-btn group block w-full text-center bg-secondary text-on-secondary font-button text-button py-4 rounded hover:bg-secondary-fixed transition-all duration-300 transform hover:-translate-y-0.5 shadow-[0_10px_20px_-10px_rgba(233,193,118,0.3)]">
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        Rent This Car
+                        <span className="material-symbols-outlined text-[18px] transition-transform duration-300 group-hover:translate-x-1">
+                          arrow_forward
+                        </span>
+                      </span>
+                    </Link>
+                  )}
+                  <p className="font-label-caps text-label-caps text-on-surface-variant text-center lowercase tracking-normal">Requires security deposit and insurance verification.</p>
+                </div>
+              </ScrollReveal>
             </div>
 
           </div>

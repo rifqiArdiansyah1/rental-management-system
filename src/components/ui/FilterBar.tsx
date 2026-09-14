@@ -38,7 +38,7 @@ export default function FilterBar({ branches, categories }: FilterBarProps) {
 
   return (
     <section className="relative z-20 w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto -mt-8">
-      <div className="bg-surface-container-high border border-outline-variant/30 rounded-lg p-6 shadow-2xl backdrop-blur-xl flex flex-col md:flex-row items-end gap-6">
+      <div className="bg-surface-container-high border border-outline-variant/30 rounded-lg p-6 shadow-2xl backdrop-blur-xl flex flex-col md:flex-row items-end gap-6 transition-all duration-300 hover:border-secondary/30">
         <div className="w-full md:w-1/3 flex flex-col gap-2">
           <label className="font-label-caps text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
             Pilihan Cabang
@@ -47,7 +47,7 @@ export default function FilterBar({ branches, categories }: FilterBarProps) {
             <select 
               value={branchId}
               onChange={(e) => setBranchId(e.target.value)}
-              className="w-full min-h-[44px] h-[46px] bg-surface border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none text-sm"
+              className="w-full min-h-[44px] h-[46px] bg-surface border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none text-sm transition-colors duration-200"
             >
               <option value="all">Semua Cabang</option>
               {branches.map((b) => (
@@ -67,7 +67,7 @@ export default function FilterBar({ branches, categories }: FilterBarProps) {
             <select 
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full min-h-[44px] h-[46px] bg-surface border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none text-sm"
+              className="w-full min-h-[44px] h-[46px] bg-surface border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary appearance-none text-sm transition-colors duration-200"
             >
               <option value="all">Semua Kategori</option>
               {categories.map((c) => (
@@ -82,9 +82,9 @@ export default function FilterBar({ branches, categories }: FilterBarProps) {
         <div className="w-full md:w-auto md:ml-auto">
           <button 
             onClick={applyFilters}
-            className="w-full md:w-auto min-h-[44px] h-[46px] bg-surface-container-lowest border border-secondary text-secondary font-button text-sm font-semibold px-8 py-3 rounded-DEFAULT hover:bg-secondary/10 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="group w-full md:w-auto min-h-[44px] h-[46px] bg-surface-container-lowest border border-secondary text-secondary font-button text-sm font-semibold px-8 py-3 rounded-DEFAULT hover:bg-secondary/15 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px]">search</span>
+            <span className="material-symbols-outlined text-[18px] transition-transform duration-300 group-hover:scale-110">search</span>
             Terapkan Filter
           </button>
         </div>

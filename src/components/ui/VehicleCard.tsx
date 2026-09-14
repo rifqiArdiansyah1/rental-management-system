@@ -76,20 +76,20 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
       aria-label={`Lihat detail ${vehicleName}`}
       className="block h-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary/50 rounded-xl"
     >
-      <article className={`card-hover-effect rounded-xl overflow-hidden flex flex-col group relative h-full ${
+      <article className={`card-hover-effect rounded-xl overflow-hidden flex flex-col group relative h-full transition-all duration-300 ease-out hover:-translate-y-1.5 ${
         isPopular 
-          ? 'bg-surface-container-high border border-secondary/40 shadow-lg shadow-secondary/5' 
-          : 'bg-surface-container-high border border-outline-variant/20'
+          ? 'bg-surface-container-high border border-secondary/40 shadow-lg shadow-secondary/5 hover:border-secondary/70' 
+          : 'bg-surface-container-high border border-outline-variant/20 hover:border-secondary/40'
       }`}>
         {isPopular && (
-          <div className="absolute top-0 right-0 bg-secondary text-background font-label-caps text-xs px-3.5 py-1 rounded-bl-lg z-10 font-bold tracking-widest uppercase">
+          <div className="absolute top-0 right-0 bg-secondary text-background font-label-caps text-xs px-3.5 py-1 rounded-bl-lg z-10 font-bold tracking-widest uppercase shadow-sm">
             UNGGULAN
           </div>
         )}
         
         <div className="relative h-64 overflow-hidden bg-surface-container-lowest">
           <img 
-            className={`w-full h-full object-cover card-image transition-all duration-500 ${!isPopular ? 'mix-blend-luminosity group-hover:mix-blend-normal' : ''}`} 
+            className={`w-full h-full object-cover card-image transition-all duration-500 ease-out ${!isPopular ? 'mix-blend-luminosity group-hover:mix-blend-normal' : ''}`} 
             src={imageUrl} 
             alt={vehicleName}
           />
@@ -104,7 +104,7 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
               {availabilityBadge}
             </div>
           )}
-          <h3 className="font-headline-md text-headline-md text-on-surface mb-2 font-semibold line-clamp-1">{vehicleName}</h3>
+          <h3 className="font-headline-md text-headline-md text-on-surface mb-2 font-semibold line-clamp-1 transition-colors group-hover:text-secondary">{vehicleName}</h3>
           <p className="font-body-md text-sm text-on-surface-variant mb-6 flex-grow line-clamp-2 leading-relaxed">
             {featureSummary}
           </p>
@@ -140,8 +140,8 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
               aria-hidden="true"
               className={
                 isPopular 
-                  ? "bg-secondary text-background p-2.5 rounded-full transition-transform group-hover:scale-110 flex items-center justify-center shadow-md"
-                  : "bg-surface-container-lowest border border-secondary text-secondary group-hover:bg-secondary group-hover:text-background p-2.5 rounded-full transition-colors flex items-center justify-center"
+                  ? "bg-secondary text-background p-2.5 rounded-full transition-all duration-300 group-hover:scale-110 group-hover:translate-x-1 flex items-center justify-center shadow-md"
+                  : "bg-surface-container-lowest border border-secondary text-secondary group-hover:bg-secondary group-hover:text-background p-2.5 rounded-full transition-all duration-300 group-hover:scale-105 group-hover:translate-x-1 flex items-center justify-center"
               }
             >
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
