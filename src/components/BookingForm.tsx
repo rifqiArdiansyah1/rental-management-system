@@ -6,6 +6,7 @@ import { createDraftBookingAction, BookingFormPayload } from '@/actions/booking'
 import { calculateEstimatedPrice } from '@/lib/pricing'
 import { RentalType } from '@prisma/client'
 import { TURNOVER_BUFFER_MS, isWithinOperatingHoursWIB } from '@/lib/constants'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 type Branch = {
   id: string
@@ -26,6 +27,8 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const { t, locale, formatCurrency, formatDate } = useLanguage()
+  const isEn = locale === 'en'
   
   const assignedBranch = vehicleBranch || branches.find(b => b.id === defaultBranchId) || branches[0]
 
@@ -53,7 +56,11 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
     if (!isFormValid) return
 
     if (branchId !== defaultBranchId) {
-      setErrorMsg(`Armada ini hanya tersedia di ${assignedBranch?.name || 'cabang asalnya'}. Pemesanan tidak dapat dilakukan di cabang lain.`)
+      setErrorMsg(
+        isEn
+          ? `This vehicle is only available at ${assignedBranch?.name || 'its home branch'}. Reservations cannot be made from other branches.`
+          : `Armada ini hanya tersedia di ${assignedBranch?.name || 'cabang asalnya'}. Pemesanan tidak dapat dilakukan di cabang lain.`
+      )
       return
     }
 
@@ -75,17 +82,11 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
       const result = await createDraftBookingAction(payload)
       
       if (result.success && result.bookingId) {
-        // Redirect to success or payment page. For now, we redirect to a placeholder or home.
-        // Once Issue 7 is done, this will redirect to /booking/[id]/payment
         router.push(`/booking/${result.bookingId}`)
       } else {
-        setErrorMsg(result.error || 'Terjadi kesalahan tidak terduga.')
+        setErrorMsg(result.error || (isEn ? 'An unexpected error occurred.' : 'Terjadi kesalahan tidak terduga.'))
       }
     })
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
   }
 
   const getLocalMinDateTime = () => {
@@ -105,10 +106,12 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
 
   return (
     <div className="flex flex-col gap-6 w-full h-full">
-      <h2 className="font-headline-md text-on-surface mb-2">Booking Details</h2>
+      <h2 className="font-headline-md text-on-surface mb-2">
+        {t.booking.pageTitle}
+      </h2>
       
       {errorMsg && (
-        <div className="p-4 bg-error-container/20 border border-error text-error rounded-lg text-body-md">
+        <div className="p-4 bg-error-container/20 border border-error text-error rounded-lg text-body-md" data-testid="booking-error-msg">
           {errorMsg}
         </div>
       )}
@@ -117,7 +120,15 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
         <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg text-xs flex items-start gap-2">
           <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">build</span>
           <span>
-            Armada ini sedang dalam masa perawatan hingga <strong>{new Date(maintenanceEndAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB</strong>. Waktu penjemputan otomatis dibatasi mulai minimal 3 jam setelah masa perawatan berakhir.
+            {isEn ? (
+              <>
+                This vehicle is currently undergoing scheduled workshop maintenance until <strong>{formatDate(maintenanceEndAt, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} WIB</strong>. Earliest pickup is restricted to 3 hours after maintenance ends.
+              </>
+            ) : (
+              <>
+                Armada ini sedang dalam masa perawatan hingga <strong>{formatDate(maintenanceEndAt, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} WIB</strong>. Waktu penjemputan otomatis dibatasi mulai minimal 3 jam setelah masa perawatan berakhir.
+              </>
+            )}
           </span>
         </div>
       )}
@@ -128,7 +139,9 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
         <div className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
-              <label className="font-label-caps text-on-surface-variant uppercase">Pick-up Time</label>
+              <label className="font-label-caps text-on-surface-variant uppercase">
+                {t.booking.startDateLabel}
+              </label>
               <input 
                 type="datetime-local" 
                 required
@@ -139,7 +152,9 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label className="font-label-caps text-on-surface-variant uppercase">Return Time</label>
+              <label className="font-label-caps text-on-surface-variant uppercase">
+                {t.booking.endDateLabel}
+              </label>
               <input 
                 type="datetime-local" 
                 required
@@ -154,14 +169,24 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
           {/* Operating hours guidance note */}
           <div className="flex items-center gap-2 text-xs text-on-surface-variant bg-surface-container p-2.5 rounded-md border border-outline-variant/40">
             <span className="material-symbols-outlined text-[16px] text-secondary">schedule</span>
-            <span>Jam layanan operasional cabang: <strong>08:00 – 21:00 WIB</strong> (minimal 3 jam dari waktu pemesanan).</span>
+            <span>
+              {isEn ? (
+                <>Branch operating hours: <strong>08:00 – 21:00 WIB</strong> (minimum 3 hours advance booking).</>
+              ) : (
+                <>Jam layanan operasional cabang: <strong>08:00 – 21:00 WIB</strong> (minimal 3 jam dari waktu pemesanan).</>
+              )}
+            </span>
           </div>
 
           {/* Warning if selected time is outside operating hours */}
           {!isOperatingHoursValid && (
             <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg text-xs flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px] flex-shrink-0">warning</span>
-              <span>Waktu penjemputan dan pengembalian harus berada dalam rentang jam operasional cabang (08:00 – 21:00 WIB).</span>
+              <span>
+                {isEn
+                  ? 'Vehicle pickup and return times must be within branch operating hours (08:00 – 21:00 WIB).'
+                  : 'Waktu penjemputan dan pengembalian harus berada dalam rentang jam operasional cabang (08:00 – 21:00 WIB).'}
+              </span>
             </div>
           )}
         </div>
@@ -169,10 +194,12 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
         {/* Branch Location (Locked to Vehicle's Stationed Branch) */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <label className="font-label-caps text-on-surface-variant uppercase">Branch Location</label>
+            <label className="font-label-caps text-on-surface-variant uppercase">
+              {t.booking.branchLabel}
+            </label>
             <span className="text-[11px] text-secondary/90 bg-secondary/10 px-2 py-0.5 rounded border border-secondary/20 flex items-center gap-1 font-medium">
               <span className="material-symbols-outlined text-[13px]">location_on</span>
-              Lokasi Armada
+              {isEn ? 'Fleet Base' : 'Lokasi Armada'}
             </span>
           </div>
 
@@ -182,7 +209,11 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
               onChange={(e) => {
                 const selectedId = e.target.value
                 if (selectedId !== defaultBranchId) {
-                  setErrorMsg(`Armada ini hanya tersedia di ${assignedBranch?.name || 'cabang asalnya'}. Tidak dapat dipesan dari cabang lain.`)
+                  setErrorMsg(
+                    isEn
+                      ? `This vehicle is only stationed at ${assignedBranch?.name || 'its home branch'}. It cannot be booked from other branches.`
+                      : `Armada ini hanya tersedia di ${assignedBranch?.name || 'cabang asalnya'}. Tidak dapat dipesan dari cabang lain.`
+                  )
                   return
                 }
                 setBranchId(selectedId)
@@ -198,7 +229,7 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
                     value={b.id} 
                     disabled={!isCurrentBranch}
                   >
-                    {b.name} - {b.address} {isCurrentBranch ? '✓ (Lokasi Armada)' : '— (Armada Tidak Tersedia)'}
+                    {b.name} - {b.address} {isCurrentBranch ? (isEn ? '✓ (Fleet Station)' : '✓ (Lokasi Armada)') : (isEn ? '— (Unavailable Here)' : '— (Armada Tidak Tersedia)')}
                   </option>
                 )
               })}
@@ -212,28 +243,34 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
           <div className="flex items-start gap-2 text-xs text-on-surface-variant bg-surface-container p-2.5 rounded-md border border-outline-variant/40">
             <span className="material-symbols-outlined text-[16px] text-secondary flex-shrink-0 mt-0.5">info</span>
             <span>
-              Armada ini berbasis di <strong>{assignedBranch?.name || 'cabang ini'}</strong>. Pengambilan dan pengembalian wajib dilakukan di cabang yang bersangkutan.
+              {isEn ? (
+                <>This vehicle is stationed at <strong>{assignedBranch?.name || 'this branch'}</strong>. Pickup and return must occur at this branch location.</>
+              ) : (
+                <>Armada ini berbasis di <strong>{assignedBranch?.name || 'cabang ini'}</strong>. Pengambilan dan pengembalian wajib dilakukan di cabang yang bersangkutan.</>
+              )}
             </span>
           </div>
         </div>
 
         {/* Rental Type Toggle */}
         <div className="flex flex-col gap-2">
-          <label className="font-label-caps text-on-surface-variant uppercase">Service Type</label>
+          <label className="font-label-caps text-on-surface-variant uppercase">
+            {t.booking.stepService}
+          </label>
           <div className="flex bg-surface-container rounded-lg p-1 border border-outline-variant">
             <button
               type="button"
               onClick={() => setRentalType('self_drive')}
               className={`flex-1 py-2 text-center rounded-md font-button transition-all ${rentalType === 'self_drive' ? 'bg-secondary text-on-secondary shadow-md' : 'text-on-surface-variant hover:text-on-surface'}`}
             >
-              Self-Drive
+              {t.booking.selfDrive}
             </button>
             <button
               type="button"
               onClick={() => setRentalType('with_driver')}
               className={`flex-1 py-2 text-center rounded-md font-button transition-all ${rentalType === 'with_driver' ? 'bg-secondary text-on-secondary shadow-md' : 'text-on-surface-variant hover:text-on-surface'}`}
             >
-              With Driver
+              {t.booking.withDriver}
             </button>
           </div>
         </div>
@@ -241,19 +278,21 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
         {/* Dynamic Price Breakdown */}
         {pricing && (
           <div className="mt-4 p-6 bg-surface-container-high rounded-xl border border-outline-variant flex flex-col gap-4">
-            <h3 className="font-label-caps text-on-surface-variant uppercase tracking-widest border-b border-surface-variant pb-2">Price Breakdown</h3>
+            <h3 className="font-label-caps text-on-surface-variant uppercase tracking-widest border-b border-surface-variant pb-2">
+              {t.booking.stepSummary}
+            </h3>
             <div className="flex justify-between items-center text-body-md text-on-surface">
-              <span>Vehicle ({formatCurrency(dailyRate)} x {pricing.days} days)</span>
+              <span>{isEn ? 'Vehicle' : 'Kendaraan'} ({formatCurrency(dailyRate)} x {pricing.days} {isEn ? 'days' : 'hari'})</span>
               <span>{formatCurrency(pricing.vehicleTotal)}</span>
             </div>
             {pricing.driverTotal > 0 && (
               <div className="flex justify-between items-center text-body-md text-on-surface">
-                <span>Driver Fee (x {pricing.days} days)</span>
+                <span>{t.booking.driverFee} (x {pricing.days} {isEn ? 'days' : 'hari'})</span>
                 <span>{formatCurrency(pricing.driverTotal)}</span>
               </div>
             )}
             <div className="flex justify-between items-center mt-2 pt-4 border-t border-surface-variant">
-              <span className="font-headline-md text-on-surface">Total Price</span>
+              <span className="font-headline-md text-on-surface">{t.booking.grandTotal}</span>
               <span className="font-headline-md text-secondary">{formatCurrency(pricing.grandTotal)}</span>
             </div>
           </div>
@@ -268,10 +307,10 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
           {isPending ? (
             <>
               <span className="material-symbols-outlined animate-spin text-xl">progress_activity</span>
-              <span>Processing...</span>
+              <span>{t.booking.submittingBtn}</span>
             </>
           ) : (
-            'Confirm Booking'
+            t.booking.submitBtn
           )}
         </button>
       </form>

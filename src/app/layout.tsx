@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 };
 
 import AuthNotifier from "@/components/AuthNotifier";
+import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 
 export default function RootLayout({
   children,
@@ -24,32 +25,16 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="id"
       className="h-full antialiased dark"
     >
       <head>
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
       </head>
       <body className="min-h-full flex flex-col">
-        <noscript>
-          <style dangerouslySetInnerHTML={{
-            __html: `
-              .animate-hero-kicker,
-              .animate-hero-title,
-              .animate-hero-desc,
-              .animate-hero-cta,
-              .animate-hero-badges,
-              .animate-page-header,
-              .animate-page-desc,
-              .animate-ambient-glow {
-                animation: none !important;
-                opacity: 1 !important;
-                transform: none !important;
-              }
-            `
-          }} />
-        </noscript>
-        {children}
+        <LanguageProvider>
+          {children}
+        </LanguageProvider>
         <AuthNotifier />
       </body>
     </html>

@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { logout } from '@/actions/auth'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import LanguageSwitcher from '@/components/ui/LanguageSwitcher'
 
 interface MobileNavProps {
   user: {
@@ -15,6 +17,7 @@ interface MobileNavProps {
 
 export function MobileNav({ user }: MobileNavProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const { t } = useLanguage()
 
   const displayName = user?.name || user?.email?.split('@')[0] || 'User'
   const isAdmin = user?.role && ['admin_pusat', 'admin_cabang', 'staff_cabang'].includes(user.role)
@@ -43,7 +46,7 @@ export function MobileNav({ user }: MobileNavProps) {
                 onClick={() => setIsOpen(false)}
                 className="text-on-surface hover:text-secondary transition-colors block py-1"
               >
-                Home
+                {t.nav.home}
               </Link>
             </li>
             <li>
@@ -52,7 +55,7 @@ export function MobileNav({ user }: MobileNavProps) {
                 onClick={() => setIsOpen(false)}
                 className="text-on-surface hover:text-secondary transition-colors block py-1"
               >
-                Armada
+                {t.nav.fleet}
               </Link>
             </li>
             <li>
@@ -61,7 +64,7 @@ export function MobileNav({ user }: MobileNavProps) {
                 onClick={() => setIsOpen(false)}
                 className="text-on-surface hover:text-secondary transition-colors block py-1"
               >
-                Cabang
+                {t.nav.locations}
               </Link>
             </li>
             <li>
@@ -70,7 +73,7 @@ export function MobileNav({ user }: MobileNavProps) {
                 onClick={() => setIsOpen(false)}
                 className="text-on-surface hover:text-secondary transition-colors block py-1"
               >
-                Tentang
+                {t.nav.about}
               </Link>
             </li>
             <li>
@@ -79,10 +82,15 @@ export function MobileNav({ user }: MobileNavProps) {
                 onClick={() => setIsOpen(false)}
                 className="text-on-surface hover:text-secondary transition-colors block py-1"
               >
-                Kontak
+                {t.nav.contact}
               </Link>
             </li>
           </ul>
+
+          <div className="flex items-center justify-between border-t border-surface-variant/30 pt-4">
+            <span className="text-xs text-gray-400 uppercase tracking-wider">{t.nav.language}:</span>
+            <LanguageSwitcher />
+          </div>
 
           <div className="border-t border-surface-variant/30 pt-4">
             {user ? (
@@ -103,7 +111,7 @@ export function MobileNav({ user }: MobileNavProps) {
                     onClick={() => setIsOpen(false)}
                     className="w-full text-center bg-surface-container-high border border-outline-variant/40 text-secondary font-button text-xs tracking-wider uppercase font-semibold py-2.5 rounded-DEFAULT hover:border-secondary/60 transition-colors"
                   >
-                    Dashboard Saya
+                    {t.nav.myDashboard}
                   </Link>
 
                   {isAdmin && (
@@ -112,7 +120,7 @@ export function MobileNav({ user }: MobileNavProps) {
                       onClick={() => setIsOpen(false)}
                       className="w-full text-center bg-surface-container border border-outline-variant/40 text-amber-400 font-button text-xs tracking-wider uppercase font-semibold py-2.5 rounded-DEFAULT hover:border-amber-400/60 transition-colors"
                     >
-                      Portal Manajemen Admin
+                      {t.nav.staffPortal}
                     </Link>
                   )}
 
@@ -123,7 +131,7 @@ export function MobileNav({ user }: MobileNavProps) {
                     }}
                     className="w-full text-center text-error/90 hover:text-error hover:bg-error/10 font-button text-xs tracking-wider uppercase font-semibold py-2 rounded-DEFAULT transition-colors cursor-pointer"
                   >
-                    Keluar (Logout)
+                    {t.nav.signOut}
                   </button>
                 </div>
               </div>
@@ -133,7 +141,7 @@ export function MobileNav({ user }: MobileNavProps) {
                 onClick={() => setIsOpen(false)}
                 className="w-full text-center block font-button text-xs tracking-wide uppercase font-semibold text-secondary border border-secondary/60 px-5 py-2.5 rounded-DEFAULT hover:bg-secondary hover:text-background transition-colors"
               >
-                Masuk
+                {t.nav.signIn}
               </Link>
             )}
           </div>

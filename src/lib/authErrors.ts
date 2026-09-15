@@ -1,11 +1,18 @@
 import { MIN_PASSWORD_LENGTH } from '@/lib/constants'
+import { Locale } from '@/lib/i18n/types'
 
 /**
- * Memetakan kode dan pesan error dari Supabase Auth ke Bahasa Indonesia yang informatif dan ramah pengguna.
+ * Memetakan kode dan pesan error dari Supabase Auth ke Bahasa Indonesia atau English yang informatif.
  * Memeriksa `error.code` dan `error.status` terlebih dahulu sebelum melakukan fallback pencocokan substring pesan.
  */
-export function getAuthErrorMessage(error: any): string {
-  if (!error) return 'Terjadi kendala. Silakan coba beberapa saat lagi.'
+export function getAuthErrorMessage(error: any, locale: Locale = 'id'): string {
+  const isEn = locale === 'en'
+
+  if (!error) {
+    return isEn
+      ? 'An issue occurred. Please try again shortly.'
+      : 'Terjadi kendala. Silakan coba beberapa saat lagi.'
+  }
 
   const code = String(error.code || '').toLowerCase()
   const msg = String(error.message || '').toLowerCase()
@@ -17,7 +24,9 @@ export function getAuthErrorMessage(error: any): string {
     msg.includes('invalid login credentials') ||
     msg.includes('invalid credentials')
   ) {
-    return 'Email atau kata sandi yang Anda masukkan salah. Silakan periksa kembali.'
+    return isEn
+      ? 'Invalid email or password. Please verify your credentials and try again.'
+      : 'Email atau kata sandi yang Anda masukkan salah. Silakan periksa kembali.'
   }
 
   // 2. Email belum dikonfirmasi/diverifikasi
@@ -25,7 +34,9 @@ export function getAuthErrorMessage(error: any): string {
     code === 'email_not_confirmed' ||
     msg.includes('email not confirmed')
   ) {
-    return 'Email Anda belum diverifikasi. Silakan periksa kotak masuk atau spam email Anda untuk tautan verifikasi akun.'
+    return isEn
+      ? 'Your email address has not been verified. Please check your inbox or spam folder for the verification link.'
+      : 'Email Anda belum diverifikasi. Silakan periksa kotak masuk atau spam email Anda untuk tautan verifikasi akun.'
   }
 
   // 3. Batas laju permintaan (Rate Limit / Too Many Requests)
@@ -38,7 +49,9 @@ export function getAuthErrorMessage(error: any): string {
     msg.includes('security purposes, you can only request this once') ||
     msg.includes('only request this once every')
   ) {
-    return 'Terlalu banyak permintaan dalam waktu singkat. Demi alasan keamanan, silakan tunggu 60 detik sebelum mencoba kembali.'
+    return isEn
+      ? 'Too many requests. For security reasons, please wait 60 seconds before trying again.'
+      : 'Terlalu banyak permintaan dalam waktu singkat. Demi alasan keamanan, silakan tunggu 60 detik sebelum mencoba kembali.'
   }
 
   // 4. Kata sandi lemah / tidak memenuhi panjang minimum
@@ -47,7 +60,9 @@ export function getAuthErrorMessage(error: any): string {
     msg.includes('password should be at least') ||
     msg.includes('weak password')
   ) {
-    return `Kata sandi minimal harus terdiri dari ${MIN_PASSWORD_LENGTH} karakter.`
+    return isEn
+      ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`
+      : `Kata sandi minimal harus terdiri dari ${MIN_PASSWORD_LENGTH} karakter.`
   }
 
   // 5. Akun sudah terdaftar (pada saat registrasi)
@@ -56,7 +71,9 @@ export function getAuthErrorMessage(error: any): string {
     msg.includes('user already registered') ||
     msg.includes('already exists')
   ) {
-    return 'Email sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda.'
+    return isEn
+      ? 'This email is already registered. Please sign in or use a different email address.'
+      : 'Email sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda.'
   }
 
   // 6. Token reset atau OTP kedaluwarsa / invalid
@@ -65,9 +82,13 @@ export function getAuthErrorMessage(error: any): string {
     msg.includes('token has expired') ||
     msg.includes('invalid token')
   ) {
-    return 'Tautan pemulihan kata sandi tidak valid atau telah kedaluwarsa. Silakan minta tautan baru.'
+    return isEn
+      ? 'The password reset link is invalid or has expired. Please request a new link.'
+      : 'Tautan pemulihan kata sandi tidak valid atau telah kedaluwarsa. Silakan minta tautan baru.'
   }
 
   // Fallback umum
-  return 'Terjadi kendala saat memproses autentikasi. Silakan coba beberapa saat lagi.'
+  return isEn
+    ? 'An issue occurred during authentication. Please try again shortly.'
+    : 'Terjadi kendala saat memproses autentikasi. Silakan coba beberapa saat lagi.'
 }

@@ -195,14 +195,17 @@ export async function syncPaymentStatus(bookingId: string) {
 
       try {
         const { sendBookingConfirmedEmail } = await import('@/utils/email')
+        const { formatCurrency, formatDate } = await import('@/lib/i18n/formatters')
+        const bookingLocale = (booking.locale as any) || 'id'
         await sendBookingConfirmedEmail({
           toEmail: booking.customer.email,
           customerName: booking.customer.name,
           bookingId: booking.id,
           vehicleName: booking.vehicle.name || booking.vehicle.category.name,
-          startDate: booking.startDate.toLocaleDateString('id-ID'),
-          endDate: booking.endDate.toLocaleDateString('id-ID'),
-          totalPrice: `Rp ${Number(booking.totalPrice).toLocaleString('id-ID')}`
+          startDate: formatDate(booking.startDate, bookingLocale),
+          endDate: formatDate(booking.endDate, bookingLocale),
+          totalPrice: formatCurrency(booking.totalPrice, bookingLocale),
+          locale: bookingLocale,
         })
       } catch (e: any) {
         console.error('[EMAIL ERROR] Failed to send confirmation email on sync:', e.message)

@@ -17,8 +17,15 @@ export async function signup(formData: FormData) {
     phone: formData.get('phone') as string,
   }
 
+  const { getLocale } = await import('@/lib/i18n/server')
+  const locale = await getLocale()
+  const isEn = locale === 'en'
+
   if (!data.password || data.password.length < MIN_PASSWORD_LENGTH) {
-    redirect(`/register?message=${encodeURIComponent(`Kata sandi minimal harus terdiri dari ${MIN_PASSWORD_LENGTH} karakter.`)}`)
+    const msg = isEn
+      ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`
+      : `Kata sandi minimal harus terdiri dari ${MIN_PASSWORD_LENGTH} karakter.`
+    redirect(`/register?message=${encodeURIComponent(msg)}`)
   }
 
   const existingName = await prisma.customer.findFirst({
@@ -31,7 +38,10 @@ export async function signup(formData: FormData) {
   })
 
   if (existingName) {
-    redirect('/register?message=Nama tersebut sudah digunakan. Agar tidak tertukar, mohon tambahkan nama belakang atau variasi lain pada nama Anda.')
+    const msg = isEn
+      ? 'This name is already in use. Please add a surname or additional identifier.'
+      : 'Nama tersebut sudah digunakan. Agar tidak tertukar, mohon tambahkan nama belakang atau variasi lain pada nama Anda.'
+    redirect(`/register?message=${encodeURIComponent(msg)}`)
   }
 
   const existingCustomer = await prisma.customer.findUnique({
@@ -39,7 +49,10 @@ export async function signup(formData: FormData) {
   })
 
   if (existingCustomer) {
-    redirect('/register?message=Email sudah terdaftar. Silakan gunakan email lain atau masuk.')
+    const msg = isEn
+      ? 'This email is already registered. Please sign in or use another email.'
+      : 'Email sudah terdaftar. Silakan gunakan email lain atau masuk.'
+    redirect(`/register?message=${encodeURIComponent(msg)}`)
   }
 
   const { data: authData, error } = await supabase.auth.signUp({
@@ -53,7 +66,7 @@ export async function signup(formData: FormData) {
   })
 
   if (error) {
-    redirect(`/register?message=${encodeURIComponent(getAuthErrorMessage(error))}`)
+    redirect(`/register?message=${encodeURIComponent(getAuthErrorMessage(error, locale))}`)
   }
 
   // Create row in Prisma Customer table

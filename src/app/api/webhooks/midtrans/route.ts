@@ -114,14 +114,17 @@ export async function POST(req: Request) {
         if (fullBooking) {
           try {
             const { sendBookingConfirmedEmail } = await import('@/utils/email')
+            const { formatCurrency, formatDate } = await import('@/lib/i18n/formatters')
+            const bookingLocale = (fullBooking.locale as any) || 'id'
             await sendBookingConfirmedEmail({
               toEmail: fullBooking.customer.email,
               customerName: fullBooking.customer.name,
               bookingId: fullBooking.id,
               vehicleName: fullBooking.vehicle.category.name,
-              startDate: fullBooking.startDate.toLocaleDateString('id-ID'),
-              endDate: fullBooking.endDate.toLocaleDateString('id-ID'),
-              totalPrice: `Rp ${Number(fullBooking.totalPrice).toLocaleString('id-ID')}`
+              startDate: formatDate(fullBooking.startDate, bookingLocale),
+              endDate: formatDate(fullBooking.endDate, bookingLocale),
+              totalPrice: formatCurrency(fullBooking.totalPrice, bookingLocale),
+              locale: bookingLocale,
             })
           } catch (emailError: any) {
             console.error('[EMAIL ERROR] Failed to send booking confirmation:', emailError.message)

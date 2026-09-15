@@ -11,8 +11,12 @@ export async function login(formData: FormData) {
   const password = formData.get('password') as string
   const redirectTo = (formData.get('redirectTo') as string) || '/'
 
+  const { getLocale } = await import('@/lib/i18n/server')
+  const locale = await getLocale()
+
   if (!email || !password) {
-    redirect('/login?message=' + encodeURIComponent('Silakan masukkan email dan kata sandi Anda.'))
+    const msg = locale === 'en' ? 'Please enter your email and password.' : 'Silakan masukkan email dan kata sandi Anda.'
+    redirect('/login?message=' + encodeURIComponent(msg))
   }
 
   const supabase = await createClient()
@@ -24,7 +28,7 @@ export async function login(formData: FormData) {
 
   if (error) {
     console.error('Login error:', error.message)
-    const localizedMessage = getAuthErrorMessage(error)
+    const localizedMessage = getAuthErrorMessage(error, locale)
     redirect(`/login?message=${encodeURIComponent(localizedMessage)}`)
   }
 

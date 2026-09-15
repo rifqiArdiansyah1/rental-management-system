@@ -143,39 +143,59 @@
 
   /* GPU-accelerated Pure CSS Hero Entrance Animations */
   .animate-hero-kicker {
-    animation: heroFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: heroFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     will-change: transform, opacity;
   }
 
   .animate-hero-title {
-    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.08s forwards;
     will-change: transform, opacity;
   }
 
   .animate-hero-desc {
-    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.18s forwards;
     will-change: transform, opacity;
   }
 
   .animate-hero-cta {
-    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.28s forwards;
     will-change: transform, opacity;
   }
 
   .animate-hero-badges {
-    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.38s both;
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.38s forwards;
     will-change: transform, opacity;
   }
 
   /* Subpage Header Pure CSS Animations (LCP safe, GPU-composited) */
   .animate-page-header {
-    animation: heroFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: heroFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     will-change: transform, opacity;
   }
 
   .animate-page-desc {
-    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+    animation: heroFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
     will-change: transform, opacity;
+  }
+
+  /* Auth Card Pure CSS Entrance (LCP safe, GPU-composited) */
+  .animate-auth-card {
+    animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity;
+  }
+
+  /* Form Alert Notification Slide-down Entrance */
+  .animate-alert-slide {
+    animation: alertSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity;
+  }
+
+  /* Suppress shimmer pseudo-element when button is disabled or loading */
+  .shimmer-btn:disabled::after,
+  .shimmer-btn[disabled]::after,
+  .shimmer-btn:has([aria-busy="true"])::after {
+    display: none !important;
+    animation: none !important;
   }
 
   /* Ambient Glow Animation (Opacity & scale on dedicated layer, zero repaints) */
@@ -194,6 +214,28 @@
   0% {
     opacity: 0;
     transform: translate3d(0, 18px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes cardEntrance {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes alertSlideDown {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
   }
   100% {
     opacity: 1;
@@ -246,6 +288,8 @@
   .animate-hero-badges,
   .animate-page-header,
   .animate-page-desc,
+  .animate-auth-card,
+  .animate-alert-slide,
   .animate-ambient-glow {
     animation: none !important;
     opacity: 1 !important;

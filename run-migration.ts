@@ -54,6 +54,14 @@ async function main() {
     console.log('Ensuring Booking odometer & Vehicle fuel columns exist...');
     await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "odometerStart" INTEGER;`);
     await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "odometerEnd" INTEGER;`);
+
+    console.log('Ensuring Booking locale column exists...');
+    await pool.query(`DO $$ BEGIN
+      CREATE TYPE "Locale" AS ENUM ('id', 'en');
+    EXCEPTION
+      WHEN duplicate_object THEN null;
+    END $$;`);
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "locale" "Locale" NOT NULL DEFAULT 'id';`);
     await pool.query(`DO $$ BEGIN
       CREATE TYPE "FuelType" AS ENUM ('pertalite', 'pertamax', 'pertamax_turbo', 'solar', 'dexlite');
     EXCEPTION

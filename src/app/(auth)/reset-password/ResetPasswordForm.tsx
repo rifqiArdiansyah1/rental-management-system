@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react'
+import { Lock, Eye, EyeOff, AlertCircle, Loader2, ShieldCheck } from 'lucide-react'
 import { updatePassword } from './actions'
 import { MIN_PASSWORD_LENGTH } from '@/lib/constants'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface ResetPasswordFormProps {
   initialMessage?: string
@@ -13,6 +14,7 @@ export default function ResetPasswordForm({ initialMessage }: ResetPasswordFormP
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const { t } = useLanguage()
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -31,7 +33,7 @@ export default function ResetPasswordForm({ initialMessage }: ResetPasswordFormP
         <div
           role="alert"
           data-testid="auth-alert"
-          className="mb-6 p-3.5 rounded-lg text-sm flex items-start gap-3 border bg-error-container/20 border-error/40 text-error transition-all"
+          className="animate-alert-slide mb-6 p-3.5 rounded-lg text-sm flex items-start gap-3 border bg-error-container/20 border-error/40 text-error transition-all"
         >
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
           <p className="leading-relaxed flex-1">{initialMessage}</p>
@@ -45,10 +47,10 @@ export default function ResetPasswordForm({ initialMessage }: ResetPasswordFormP
             htmlFor="password"
             className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-2"
           >
-            Kata Sandi Baru (Min. {MIN_PASSWORD_LENGTH} Karakter)
+            {t.auth.newPasswordMinLabel}
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline transition-all duration-300 group-focus-within:text-secondary group-focus-within:scale-110">
               <Lock className="w-4 h-4" />
             </div>
             <input
@@ -59,14 +61,15 @@ export default function ResetPasswordForm({ initialMessage }: ResetPasswordFormP
               minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               disabled={isPending}
-              placeholder={`Minimal ${MIN_PASSWORD_LENGTH} karakter`}
-              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-3 pl-10 pr-11 text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              placeholder={t.auth.passwordMinPlaceholder}
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 focus:bg-surface-container/90 px-4 py-3 pl-10 pr-11 text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-outline hover:text-on-surface transition-colors cursor-pointer"
+              aria-label={showPassword ? t.auth.hidePassword : t.auth.showPassword}
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-outline hover:text-secondary hover:scale-110 active:scale-95 transition-all duration-200 cursor-pointer"
+              tabIndex={0}
             >
               {showPassword ? (
                 <EyeOff className="w-4 h-4" />
@@ -83,10 +86,10 @@ export default function ResetPasswordForm({ initialMessage }: ResetPasswordFormP
             htmlFor="confirmPassword"
             className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-2"
           >
-            Konfirmasi Kata Sandi Baru
+            {t.auth.confirmPasswordLabel}
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline transition-all duration-300 group-focus-within:text-secondary group-focus-within:scale-110">
               <Lock className="w-4 h-4" />
             </div>
             <input
@@ -97,14 +100,14 @@ export default function ResetPasswordForm({ initialMessage }: ResetPasswordFormP
               minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               disabled={isPending}
-              placeholder="Ulangi kata sandi baru"
-              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-3 pl-10 pr-11 text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              placeholder={t.auth.confirmPasswordPlaceholder}
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 focus:bg-surface-container/90 px-4 py-3 pl-10 pr-11 text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              aria-label={showConfirmPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-outline hover:text-on-surface transition-colors cursor-pointer"
+              aria-label={showConfirmPassword ? t.auth.hidePassword : t.auth.showPassword}
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-outline hover:text-secondary hover:scale-110 active:scale-95 transition-all duration-200 cursor-pointer"
             >
               {showConfirmPassword ? (
                 <EyeOff className="w-4 h-4" />
@@ -120,15 +123,18 @@ export default function ResetPasswordForm({ initialMessage }: ResetPasswordFormP
           <button
             type="submit"
             disabled={isPending}
-            className="w-full bg-secondary text-on-secondary font-bold text-sm tracking-wide rounded-lg py-3 px-4 hover:bg-secondary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-secondary/15 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+            className="shimmer-btn group w-full bg-secondary text-on-secondary font-bold text-sm tracking-wide rounded-lg py-3 px-4 hover:bg-secondary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-secondary/15 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
           >
             {isPending ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-on-secondary" />
-                <span>Menyimpan Kata Sandi...</span>
+                <span>{t.auth.savingPassword}</span>
               </>
             ) : (
-              <span>Simpan Kata Sandi Baru</span>
+              <>
+                <span>{t.auth.resetSubmitBtn}</span>
+                <ShieldCheck className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+              </>
             )}
           </button>
         </div>

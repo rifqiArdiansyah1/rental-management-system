@@ -75,6 +75,11 @@ enum FuelType {
   dexlite
 }
 
+enum Locale {
+  id
+  en
+}
+
 // -------------------------------------------------------------
 // MODELS
 // -------------------------------------------------------------
@@ -253,6 +258,9 @@ model Booking {
   // Bidang pencatatan odometer (opsional / informasional Opsi A)
   odometerStart  Int?
   odometerEnd    Int?
+
+  // Bahasa preferensi saat pemesanan dibuat (untuk korespondensi email & dokumen)
+  locale         Locale    @default(id)
 
   customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)

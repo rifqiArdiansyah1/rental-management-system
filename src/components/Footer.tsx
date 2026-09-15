@@ -1,6 +1,12 @@
-﻿import Link from 'next/link'
+import Link from 'next/link'
+import LanguageSwitcher from '@/components/ui/LanguageSwitcher'
+import { getLocale, getDictionary } from '@/lib/i18n/server'
 
-export default function Footer() {
+export default async function Footer() {
+  const locale = await getLocale()
+  const dict = await getDictionary(locale)
+  const isEn = locale === 'en'
+
   return (
     <footer className="bg-surface-container-lowest w-full pt-16 pb-10 border-t border-surface-variant/40">
       <div className="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
@@ -15,14 +21,14 @@ export default function Footer() {
               Prestige Motion
             </Link>
             <p className="font-body-md text-sm text-on-surface-variant leading-relaxed max-w-sm">
-              Layanan rental kendaraan premium & armada mewah dengan standar kebersihan tertinggi, privasi terlindungi, dan jaringan cabang terpercaya.
+              {dict.footer.tagline}
             </p>
           </div>
 
           {/* Column 1: Layanan & Informasi */}
           <div className="col-span-1">
             <h4 className="font-label-caps text-xs tracking-widest text-secondary uppercase mb-4 font-semibold">
-              Layanan & Profil
+              {dict.footer.navigationTitle}
             </h4>
             <ul className="flex flex-col gap-3 font-body-md text-sm">
               <li>
@@ -30,7 +36,7 @@ export default function Footer() {
                   href="/#vehicles" 
                   className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
                 >
-                  Katalog Kendaraan
+                  {dict.nav.fleet}
                 </Link>
               </li>
               <li>
@@ -38,7 +44,7 @@ export default function Footer() {
                   href="/locations" 
                   className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
                 >
-                  Lokasi Cabang
+                  {dict.nav.locations}
                 </Link>
               </li>
               <li>
@@ -46,7 +52,7 @@ export default function Footer() {
                   href="/about" 
                   className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
                 >
-                  Tentang Kami
+                  {dict.nav.about}
                 </Link>
               </li>
               <li>
@@ -54,7 +60,7 @@ export default function Footer() {
                   href="/contact" 
                   className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
                 >
-                  Bantuan & Reservasi
+                  {dict.nav.contact}
                 </Link>
               </li>
             </ul>
@@ -63,7 +69,7 @@ export default function Footer() {
           {/* Column 2: Legal & Kebijakan */}
           <div className="col-span-1">
             <h4 className="font-label-caps text-xs tracking-widest text-secondary uppercase mb-4 font-semibold">
-              Legal & Privasi
+              {dict.footer.legalTitle}
             </h4>
             <ul className="flex flex-col gap-3 font-body-md text-sm">
               <li>
@@ -71,7 +77,7 @@ export default function Footer() {
                   href="/privacy" 
                   className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
                 >
-                  Kebijakan Privasi (UU PDP)
+                  {dict.footer.privacyPolicy}
                 </Link>
               </li>
               <li>
@@ -79,15 +85,15 @@ export default function Footer() {
                   href="/terms" 
                   className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
                 >
-                  Syarat & Ketentuan Sewa
+                  {dict.footer.termsOfService}
                 </Link>
               </li>
               <li>
                 <Link 
-                  href="/contact#emergency" 
+                  href="/contact" 
                   className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
                 >
-                  Eskalasi Darurat Perjalanan
+                  {isEn ? 'Emergency Support & Assistance' : 'Eskalasi Darurat Perjalanan'}
                 </Link>
               </li>
             </ul>
@@ -96,50 +102,44 @@ export default function Footer() {
           {/* Column 3: Jam Operasional & Kontak */}
           <div className="col-span-1">
             <h4 className="font-label-caps text-xs tracking-widest text-secondary uppercase mb-4 font-semibold">
-              Operasional Cabang
+              {isEn ? 'Branch Operations' : 'Operasional Cabang'}
             </h4>
             <div className="space-y-3 font-body-md text-sm text-on-surface-variant">
               <div>
-                <p className="text-white font-medium">Jam Layanan CS & Serah Terima:</p>
-                <p className="text-zinc-400">08:00 – 21:00 WIB (Setiap Hari)</p>
+                <p className="text-white font-medium">{isEn ? 'Customer Service & Handover:' : 'Jam Layanan CS & Serah Terima:'}</p>
+                <p className="text-zinc-400">{dict.footer.operatingHours}</p>
               </div>
               <div>
-                <p className="text-white font-medium">Sistem Pemesanan Online:</p>
-                <p className="text-emerald-400 font-medium">Aktif 24 Jam Non-Stop</p>
+                <p className="text-white font-medium">{isEn ? 'Digital Reservation System:' : 'Sistem Pemesanan Online:'}</p>
+                <p className="text-emerald-400 font-medium">{isEn ? 'Active 24 Hours Daily' : 'Aktif 24 Jam Non-Stop'}</p>
               </div>
               <div className="pt-1">
                 <Link 
                   href="/locations" 
                   className="text-xs text-secondary hover:underline inline-flex items-center gap-1"
                 >
-                  Lihat Daftar Alamat Cabang →
+                  {isEn ? 'View Branch Addresses →' : 'Lihat Daftar Alamat Cabang →'}
                 </Link>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Bottom Copyright & Disclaimer */}
+        {/* Bottom Copyright & Language Switcher */}
         <div className="mt-12 pt-8 border-t border-surface-variant/40 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-zinc-500">
           <p>
-            © 2026 Prestige Motion. Seluruh hak cipta dilindungi undang-undang.
+            © {new Date().getFullYear()} Prestige Motion. {dict.footer.allRightsReserved}
           </p>
-          <div className="flex flex-wrap gap-6">
-            <Link href="/about" className="hover:text-zinc-300 transition-colors">
-              Tentang Kami
-            </Link>
-            <Link href="/privacy" className="hover:text-zinc-300 transition-colors">
-              Privasi
-            </Link>
-            <Link href="/terms" className="hover:text-zinc-300 transition-colors">
-              Ketentuan
-            </Link>
-            <Link href="/locations" className="hover:text-zinc-300 transition-colors">
-              Cabang
-            </Link>
-            <Link href="/contact" className="hover:text-zinc-300 transition-colors">
-              Kontak
-            </Link>
+          <div className="flex items-center gap-6">
+            <LanguageSwitcher variant="footer" />
+            <div className="flex flex-wrap gap-4">
+              <Link href="/privacy" className="hover:text-zinc-300 transition-colors">
+                {dict.footer.privacyPolicy}
+              </Link>
+              <Link href="/terms" className="hover:text-zinc-300 transition-colors">
+                {dict.footer.termsOfService}
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import Footer from '@/components/Footer'
 import { createClient } from '@/utils/supabase/server'
 import ScrollReveal from '@/components/ui/ScrollReveal'
 import HeroAmbientController from '@/components/ui/HeroAmbientController'
+import { getLocale, getDictionary } from '@/lib/i18n/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,14 +20,20 @@ export default async function Home({
   const branchId = typeof resolvedSearchParams.branch === 'string' ? resolvedSearchParams.branch : undefined
   const categoryId = typeof resolvedSearchParams.category === 'string' ? resolvedSearchParams.category : undefined
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [supabase, locale] = await Promise.all([
+    createClient(),
+    getLocale(),
+  ])
 
-  const [vehicles, branches, categories] = await Promise.all([
+  const [authResponse, dict, vehicles, branches, categories] = await Promise.all([
+    supabase.auth.getUser(),
+    getDictionary(locale),
     getVehicles({ branchId, categoryId }),
     getBranches(),
     getCategories()
   ])
+
+  const isEn = locale === 'en'
 
   return (
     <div className="flex-grow flex flex-col min-h-screen">
@@ -37,7 +44,7 @@ export default async function Home({
       <main className="flex-grow flex flex-col">
         {/* Hero Section */}
         <HeroAmbientController id="hero-section" className="relative w-full min-h-[560px] md:h-[640px] flex items-center justify-start overflow-hidden">
-          {/* Background Image with Permanent High-Contrast Multi-Stop Gradients (WCAG AA Compliant) */}
+          {/* Background Image with Permanent High-Contrast Multi-Stop Gradients */}
           <div className="absolute inset-0 z-0 hero-bg">
             <div
               className="w-full h-full bg-cover bg-center opacity-60 mix-blend-overlay"
@@ -47,23 +54,23 @@ export default async function Home({
             <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30"></div>
           </div>
 
-          {/* Ambient Glow Beam (GPU Composited, Zero Repaint, Paused when offscreen) */}
+          {/* Ambient Glow Beam (GPU Composited, Zero Repaint) */}
           <div 
             aria-hidden="true" 
             className="pointer-events-none absolute -top-20 -left-20 w-[420px] h-[420px] rounded-full bg-gradient-to-br from-secondary/15 via-primary-container/20 to-transparent blur-3xl animate-ambient-glow" 
           />
 
-          {/* Hero Content (Pure CSS Entrance, 100% LCP Safe, Zero JS Gating) */}
+          {/* Hero Content */}
           <div className="relative z-10 w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto py-12">
             <div className="max-w-2xl">
               <span className="font-label-caps text-xs text-secondary mb-4 block tracking-widest uppercase font-semibold animate-hero-kicker">
-                Koleksi Armada Eksklusif
+                {dict.home.hero.kicker}
               </span>
               <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-6 drop-shadow-md animate-hero-title">
-                Kenyamanan & Kemewahan Perjalanan Terbaik
+                {dict.home.hero.title}
               </h1>
               <p className="font-body-lg text-base md:text-lg text-on-surface-variant mb-8 max-w-lg leading-relaxed animate-hero-desc">
-                Solusi mobilitas premium dengan standar inspeksi ketat, reservasi online instan, serta perlindungan privasi dokumen untuk perjalanan bisnis maupun personal Anda.
+                {dict.home.hero.subtitle}
               </p>
               
               <div className="flex flex-wrap items-center gap-4 mb-8 animate-hero-cta">
@@ -71,26 +78,26 @@ export default async function Home({
                   href="#vehicles"
                   className="btn-primary shimmer-btn group bg-secondary text-on-secondary font-button text-sm font-semibold px-8 py-4 rounded-DEFAULT inline-flex items-center gap-2 cursor-pointer hover:bg-secondary-fixed transition-all"
                 >
-                  Jelajahi Armada 
+                  {dict.home.hero.ctaFleet}
                   <span className="material-symbols-outlined text-[18px] transition-transform duration-300 group-hover:translate-x-1.5">
                     arrow_forward
                   </span>
                 </a>
               </div>
 
-              {/* Factual Trust Badges (Ground Truth Operational Claims) */}
+              {/* Factual Trust Badges */}
               <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-surface-variant/30 animate-hero-badges">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high/80 border border-outline-variant/30 text-xs text-on-surface-variant font-label-caps">
                   <span className="material-symbols-outlined text-[15px] text-secondary">verified</span>
-                  <span>Jeda Pengecekan 3 Jam</span>
+                  <span>{dict.home.trust.inspection}</span>
                 </div>
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high/80 border border-outline-variant/30 text-xs text-on-surface-variant font-label-caps">
                   <span className="material-symbols-outlined text-[15px] text-secondary">bolt</span>
-                  <span>Konfirmasi Instan</span>
+                  <span>{dict.home.trust.instantConfirm}</span>
                 </div>
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high/80 border border-outline-variant/30 text-xs text-on-surface-variant font-label-caps">
                   <span className="material-symbols-outlined text-[15px] text-secondary">shield</span>
-                  <span>Privasi Terlindungi UU PDP</span>
+                  <span>{dict.home.trust.privacyLaw}</span>
                 </div>
               </div>
             </div>
@@ -105,8 +112,12 @@ export default async function Home({
           <ScrollReveal>
             <div className="flex justify-between items-end mb-12 border-b border-surface-variant pb-4">
               <div>
-                <h2 className="font-headline-lg text-headline-lg text-on-surface">Pilihan Armada</h2>
-                <p className="font-body-md text-body-md text-on-surface-variant mt-2">Armada terawat yang siap digunakan untuk perjalanan Anda.</p>
+                <h2 className="font-headline-lg text-headline-lg text-on-surface">
+                  {isEn ? 'Executive Fleet Collection' : 'Pilihan Armada'}
+                </h2>
+                <p className="font-body-md text-body-md text-on-surface-variant mt-2">
+                  {isEn ? 'Meticulously maintained fleet ready for your bespoke itinerary.' : 'Armada terawat yang siap digunakan untuk perjalanan Anda.'}
+                </p>
               </div>
             </div>
           </ScrollReveal>
@@ -118,6 +129,7 @@ export default async function Home({
                 <VehicleCard
                   vehicle={vehicle}
                   isPopular={index === 1}
+                  locale={locale}
                 />
               </ScrollReveal>
             ))}
@@ -127,8 +139,8 @@ export default async function Home({
             <ScrollReveal>
               <div className="text-center py-20 border border-outline-variant/20 rounded-xl bg-surface-container-low">
                 <span className="material-symbols-outlined text-[48px] text-surface-variant mb-4 block">no_crash</span>
-                <h3 className="text-headline-md text-on-surface mb-2">Kendaraan Tidak Ditemukan</h3>
-                <p className="text-on-surface-variant">Coba sesuaikan filter cabang atau kategori untuk melihat hasil lainnya.</p>
+                <h3 className="text-headline-md text-on-surface mb-2">{dict.home.filter.noResultsTitle}</h3>
+                <p className="text-on-surface-variant">{dict.home.filter.noResultsDesc}</p>
               </div>
             </ScrollReveal>
           )}
@@ -141,13 +153,13 @@ export default async function Home({
             <ScrollReveal>
               <div className="max-w-2xl mx-auto text-center mb-14">
                 <span className="font-label-caps text-xs text-secondary tracking-widest uppercase font-semibold block mb-3">
-                  Alasan Memilih Kami
+                  {isEn ? 'Why Choose Us' : 'Alasan Memilih Kami'}
                 </span>
                 <h2 className="font-display-lg text-2xl md:text-3xl lg:text-4xl text-on-surface font-bold tracking-tight mb-4">
-                  Standar Tertinggi untuk Kenyamanan & Keamanan Anda
+                  {dict.home.pillars.title}
                 </h2>
                 <p className="font-body-md text-sm md:text-base text-on-surface-variant leading-relaxed">
-                  Kami menetapkan tolok ukur baru dalam layanan transportasi premium: armada terawat dengan inspeksi ketat, kemudahan reservasi online, serta perlindungan privasi tanpa kompromi.
+                  {dict.home.pillars.subtitle}
                 </p>
               </div>
             </ScrollReveal>
@@ -159,9 +171,11 @@ export default async function Home({
                   <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-secondary/20">
                     <span className="material-symbols-outlined text-[28px]">diamond</span>
                   </div>
-                  <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Armada Terawat & Bersih</h4>
+                  <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">
+                    {dict.home.pillars.fleetTitle}
+                  </h4>
                   <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
-                    Setiap unit melalui inspeksi berkala serta jeda pembersihan dan pengecekan menyeluruh 3 jam sebelum diserahkan.
+                    {dict.home.pillars.fleetDesc}
                   </p>
                 </div>
               </ScrollReveal>
@@ -171,9 +185,11 @@ export default async function Home({
                   <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-secondary/20">
                     <span className="material-symbols-outlined text-[28px]">schedule</span>
                   </div>
-                  <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Reservasi Online 24/7</h4>
+                  <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">
+                    {dict.home.pillars.driverTitle}
+                  </h4>
                   <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
-                    Pemesanan online aktif 24 jam dengan layanan pelanggan responsif selama jam operasional cabang (08:00–21:00 WIB).
+                    {dict.home.pillars.driverDesc}
                   </p>
                 </div>
               </ScrollReveal>
@@ -183,9 +199,11 @@ export default async function Home({
                   <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center text-secondary mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-secondary/20">
                     <span className="material-symbols-outlined text-[28px]">lock</span>
                   </div>
-                  <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">Privasi Terlindungi Ketat</h4>
+                  <h4 className="font-headline-md text-lg text-on-surface mb-2 font-semibold">
+                    {dict.home.pillars.digitalTitle}
+                  </h4>
                   <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
-                    Dokumen identitas (KTP/SIM) dan riwayat sewa Anda diamankan sesuai standar UU PDP dengan kontrol akses berjenjang.
+                    {dict.home.pillars.digitalDesc}
                   </p>
                 </div>
               </ScrollReveal>

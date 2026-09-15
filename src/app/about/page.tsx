@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { prisma } from '@/utils/prisma'
 import { 
   Building2, 
-  ShieldCheck, 
   Clock, 
   Sparkles, 
   CircleDollarSign, 
@@ -15,6 +14,7 @@ import {
   ArrowRight 
 } from 'lucide-react'
 import ScrollReveal from '@/components/ui/ScrollReveal'
+import { getLocale, getDictionary } from '@/lib/i18n/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,41 +24,45 @@ export const metadata = {
 }
 
 export default async function AboutPage() {
-  // Query active branches dynamically from database
-  const activeBranches = await prisma.branch.findMany({
-    where: { isActive: true },
-    include: {
-      _count: {
-        select: {
-          vehicles: {
-            where: { isActive: true }
+  const [locale, activeBranches] = await Promise.all([
+    getLocale(),
+    prisma.branch.findMany({
+      where: { isActive: true },
+      include: {
+        _count: {
+          select: {
+            vehicles: {
+              where: { isActive: true }
+            }
           }
         }
-      }
-    },
-    orderBy: { city: 'asc' }
-  })
+      },
+      orderBy: { city: 'asc' }
+    })
+  ])
 
-  // Extract unique active cities
-  const activeCities = Array.from(new Set(activeBranches.map(b => b.city)))
+  const dict = await getDictionary(locale)
+  const isEn = locale === 'en'
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-on-surface">
       <Navbar />
 
       <main className="flex-grow py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full">
-        {/* Header Breadcrumb & Title (Pure CSS Entrance, LCP safe) */}
+        {/* Header Breadcrumb & Title */}
         <div className="max-w-4xl mx-auto mb-16 text-center md:text-left">
           <div className="flex items-center justify-center md:justify-start gap-2 text-xs font-label-caps uppercase tracking-wider text-secondary mb-3 animate-hero-kicker">
-            <Link href="/" className="hover:underline">Home</Link>
+            <Link href="/" className="hover:underline">{dict.nav.home}</Link>
             <span>/</span>
-            <span className="text-zinc-400">Tentang Kami</span>
+            <span className="text-zinc-400">{dict.nav.about}</span>
           </div>
           <h1 className="font-display-lg text-3xl md:text-5xl text-on-surface font-bold tracking-tight mb-4 animate-page-header">
-            Mendefinisikan Ulang Mobilitas Premium
+            {isEn ? 'Redefining Executive Mobility' : 'Mendefinisikan Ulang Mobilitas Premium'}
           </h1>
           <p className="font-body-md text-on-surface-variant text-base md:text-lg leading-relaxed max-w-3xl animate-page-desc">
-            Prestige Motion menghadirkan layanan rental kendaraan kelas atas berbasis teknologi modern, dengan komitmen pada kenyamanan perjalanan, kebersihan armada, transparansi tarif, dan kepatuhan hukum yang solid.
+            {isEn
+              ? 'Prestige Motion delivers executive mobility solutions powered by modern infrastructure, adhering to rigorous vehicle maintenance, rate transparency, and verified regulatory compliance.'
+              : 'Prestige Motion menghadirkan layanan rental kendaraan kelas atas berbasis teknologi modern, dengan komitmen pada kenyamanan perjalanan, kebersihan armada, transparansi tarif, dan kepatuhan hukum yang solid.'}
           </p>
         </div>
 
@@ -67,46 +71,48 @@ export default async function AboutPage() {
           <section className="max-w-5xl mx-auto mb-16 bg-surface-container-lowest border border-surface-variant/50 rounded-2xl p-8 md:p-10 hover:border-secondary/30 transition-colors duration-300">
             <div className="flex items-center gap-3 text-secondary font-semibold text-lg md:text-xl mb-4">
               <Building2 className="w-6 h-6 text-secondary flex-shrink-0" />
-              <h2 className="text-on-surface">Profil & Identitas Badan Usaha</h2>
+              <h2 className="text-on-surface">
+                {isEn ? 'Corporate Profile & Legal Registration' : 'Profil & Identitas Badan Usaha'}
+              </h2>
             </div>
             <p className="font-body-md text-on-surface-variant text-sm md:text-base leading-relaxed mb-6">
-              Prestige Motion beroperasi secara resmi di bawah badan usaha berbadan hukum di Indonesia, memberikan kepastian hukum, perlindungan konsumen, dan standar asuransi perjalanan terpercaya bagi seluruh klien personal maupun korporat.
+              {dict.about.legalDesc}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-surface-variant/40">
               <div className="bg-surface-container-low/60 rounded-xl p-5 border border-surface-variant/30 hover:border-secondary/40 transition-all duration-300">
                 <p className="text-xs text-secondary font-label-caps uppercase tracking-wider font-semibold mb-1">
-                  Badan Usaha Resmi
+                  {isEn ? 'Incorporated Entity' : 'Badan Usaha Resmi'}
                 </p>
                 <p className="text-base text-white font-bold">
-                  CV Prestige Motion Nusantara
+                  {dict.about.legalEntityName}
                 </p>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Penyedia Jasa Transportasi & Rental Mobil
+                  {isEn ? 'Licensed Transportation & Executive Rental Services' : 'Penyedia Jasa Transportasi & Rental Mobil'}
                 </p>
               </div>
 
               <div className="bg-surface-container-low/60 rounded-xl p-5 border border-surface-variant/30 hover:border-secondary/40 transition-all duration-300">
                 <p className="text-xs text-secondary font-label-caps uppercase tracking-wider font-semibold mb-1">
-                  Kategori Layanan
+                  {isEn ? 'Service Scope' : 'Kategori Layanan'}
                 </p>
                 <p className="text-base text-white font-bold">
-                  Rental Premium & Sopir
+                  {isEn ? 'Premium Fleet & Chauffeur' : 'Rental Premium & Sopir'}
                 </p>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Lepas Kunci & Layanan Pengemudi Eksekutif
+                  {isEn ? 'Autonomous Driving & Executive Chauffeur Services' : 'Lepas Kunci & Layanan Pengemudi Eksekutif'}
                 </p>
               </div>
 
               <div className="bg-surface-container-low/60 rounded-xl p-5 border border-surface-variant/30 hover:border-secondary/40 transition-all duration-300">
                 <p className="text-xs text-secondary font-label-caps uppercase tracking-wider font-semibold mb-1">
-                  Kepatuhan Regulasi
+                  {isEn ? 'Regulatory Adherence' : 'Kepatuhan Regulasi'}
                 </p>
                 <p className="text-base text-white font-bold">
-                  Berlisensi & Terproteksi
+                  {isEn ? 'Licensed & Protected' : 'Berlisensi & Terproteksi'}
                 </p>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Kepatuhan Pajak & Perlindungan Konsumen UU PDP
+                  {isEn ? 'Tax Compliant & Data Protection Standard (UU PDP)' : 'Kepatuhan Pajak & Perlindungan Konsumen UU PDP'}
                 </p>
               </div>
             </div>
@@ -118,10 +124,12 @@ export default async function AboutPage() {
           <ScrollReveal>
             <div className="text-center md:text-left mb-8">
               <h2 className="font-headline-lg text-2xl md:text-3xl text-white font-bold mb-2">
-                Mengapa Memilih Prestige Motion?
+                {dict.about.fourPillarsTitle}
               </h2>
               <p className="font-body-md text-sm md:text-base text-on-surface-variant">
-                Standar operasional ketat yang didukung sistem teknologi andal di setiap tahapan penyewaan.
+                {isEn
+                  ? 'Strict operational benchmarks reinforced by robust digital systems at each stage of your rental.'
+                  : 'Standar operasional ketat yang didukung sistem teknologi andal di setiap tahapan penyewaan.'}
               </p>
             </div>
           </ScrollReveal>
@@ -134,9 +142,13 @@ export default async function AboutPage() {
                   <Clock className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white mb-1 transition-colors group-hover:text-secondary">Pemesanan Online 24/7</h3>
+                  <h3 className="text-base font-bold text-white mb-1 transition-colors group-hover:text-secondary">
+                    {isEn ? '24/7 Digital Reservations' : 'Pemesanan Online 24/7'}
+                  </h3>
                   <p className="text-xs md:text-sm text-zinc-400 leading-relaxed">
-                    Cek ketersediaan jadwal secara real-time dan lakukan booking kapan saja secara instan tanpa proses formulir manual yang memakan waktu.
+                    {isEn
+                      ? 'Check real-time fleet schedules and reserve instantly without time-consuming manual forms.'
+                      : 'Cek ketersediaan jadwal secara real-time dan lakukan booking kapan saja secara instan tanpa proses formulir manual yang memakan waktu.'}
                   </p>
                 </div>
               </div>
@@ -149,9 +161,11 @@ export default async function AboutPage() {
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white mb-1 transition-colors group-hover:text-secondary">Jeda Detailing & Inspeksi 3 Jam</h3>
+                  <h3 className="text-base font-bold text-white mb-1 transition-colors group-hover:text-secondary">
+                    {dict.about.pillar1Title}
+                  </h3>
                   <p className="text-xs md:text-sm text-zinc-400 leading-relaxed">
-                    Setiap armada mendapatkan jeda pembersihan menyeluruh, inspeksi teknis, dan sanitasi kabin sebelum diserahterimakan kepada Anda.
+                    {dict.about.pillar1Desc}
                   </p>
                 </div>
               </div>
@@ -164,9 +178,11 @@ export default async function AboutPage() {
                   <CircleDollarSign className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white mb-1 transition-colors group-hover:text-secondary">Tarif Pasti Tanpa Biaya Tersembunyi</h3>
+                  <h3 className="text-base font-bold text-white mb-1 transition-colors group-hover:text-secondary">
+                    {dict.about.pillar3Title}
+                  </h3>
                   <p className="text-xs md:text-sm text-zinc-400 leading-relaxed">
-                    Harga yang Anda lihat adalah harga final yang transparan dengan rincian biaya sewa dan opsi layanan yang jelas sejak awal.
+                    {dict.about.pillar3Desc}
                   </p>
                 </div>
               </div>
@@ -179,9 +195,11 @@ export default async function AboutPage() {
                   <Lock className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white mb-1 transition-colors group-hover:text-secondary">Perlindungan Data (UU PDP No. 27/2022)</h3>
+                  <h3 className="text-base font-bold text-white mb-1 transition-colors group-hover:text-secondary">
+                    {dict.about.pillar2Title}
+                  </h3>
                   <p className="text-xs md:text-sm text-zinc-400 leading-relaxed">
-                    Dokumen identitas (KTP/SIM) dienkripsi di media penyimpanan tertutup dan hanya diakses berbatas waktu via Signed URL dengan pencatatan audit log ketat.
+                    {dict.about.pillar2Desc}
                   </p>
                 </div>
               </div>
@@ -193,45 +211,49 @@ export default async function AboutPage() {
         <ScrollReveal>
           <section className="max-w-5xl mx-auto mb-16 bg-surface-container-low/40 border border-surface-variant/40 rounded-2xl p-8 md:p-10">
             <h2 className="font-headline-lg text-xl md:text-2xl text-white font-bold mb-6 text-center md:text-left">
-              Fleksibilitas Pilihan Layanan
+              {isEn ? 'Bespoke Mobility Options' : 'Fleksibilitas Pilihan Layanan'}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-surface-container-lowest border border-surface-variant/40 hover:border-secondary/50 rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 group">
                 <div className="flex items-center gap-3 mb-3">
                   <Car className="w-6 h-6 text-secondary transition-transform duration-300 group-hover:scale-110" />
-                  <h3 className="text-lg font-bold text-white transition-colors group-hover:text-secondary">Lepas Kunci (Self-Drive)</h3>
+                  <h3 className="text-lg font-bold text-white transition-colors group-hover:text-secondary">
+                    {dict.booking.selfDrive}
+                  </h3>
                 </div>
                 <p className="text-xs md:text-sm text-zinc-300 leading-relaxed mb-4">
-                  Pilihan tepat bagi Anda yang mengutamakan kebebasan berkendara mandiri dan privasi penuh selama perjalanan bisnis maupun liburan keluarga.
+                  {dict.booking.selfDriveDesc}
                 </p>
                 <Link 
                   href="/#vehicles" 
                   className="text-xs font-semibold text-secondary hover:text-white inline-flex items-center gap-1 group"
                 >
-                  Cari Mobil Lepas Kunci <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform duration-300" />
+                  {isEn ? 'Explore Self-Drive Fleet' : 'Cari Mobil Lepas Kunci'} <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform duration-300" />
                 </Link>
               </div>
 
               <div className="bg-surface-container-lowest border border-surface-variant/40 hover:border-secondary/50 rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 group">
                 <div className="flex items-center gap-3 mb-3">
                   <UserCheck className="w-6 h-6 text-secondary transition-transform duration-300 group-hover:scale-110" />
-                  <h3 className="text-lg font-bold text-white transition-colors group-hover:text-secondary">Dengan Sopir (With Driver)</h3>
+                  <h3 className="text-lg font-bold text-white transition-colors group-hover:text-secondary">
+                    {dict.booking.withDriver}
+                  </h3>
                 </div>
                 <p className="text-xs md:text-sm text-zinc-300 leading-relaxed mb-4">
-                  Layanan pengemudi profesional berlisensi dan berpengalaman yang siap mengantar perjalanan Anda dengan santun, tepat waktu, dan aman.
+                  {dict.booking.withDriverDesc}
                 </p>
                 <Link 
                   href="/#vehicles" 
                   className="text-xs font-semibold text-secondary hover:text-white inline-flex items-center gap-1 group"
                 >
-                  Cari Mobil dengan Sopir <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform duration-300" />
+                  {isEn ? 'Explore Chauffeur Fleet' : 'Cari Mobil dengan Sopir'} <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform duration-300" />
                 </Link>
               </div>
             </div>
           </section>
         </ScrollReveal>
 
-        {/* Section 4: Jaringan Cabang Aktif (Dynamic dari Database) */}
+        {/* Section 4: Jaringan Cabang Aktif */}
         <ScrollReveal>
           <section className="max-w-5xl mx-auto mb-16">
             <div className="bg-surface-container-lowest border border-surface-variant/40 rounded-2xl p-8 md:p-10">
@@ -239,17 +261,17 @@ export default async function AboutPage() {
                 <div>
                   <div className="flex items-center gap-2 text-secondary font-semibold text-base mb-1">
                     <MapPin className="w-5 h-5 text-secondary" />
-                    <span>Jangkauan Operasional Aktif</span>
+                    <span>{isEn ? 'Active Service Network' : 'Jangkauan Operasional Aktif'}</span>
                   </div>
                   <h2 className="font-headline-lg text-xl md:text-2xl text-white font-bold">
-                    Hadir di Kota-Kota Strategis
+                    {isEn ? 'Present in Prime Metropolitan Hubs' : 'Hadir di Kota-Kota Strategis'}
                   </h2>
                 </div>
                 <Link 
                   href="/locations" 
                   className="btn-secondary text-xs font-semibold text-secondary border border-secondary/50 px-4 py-2 rounded hover:bg-secondary hover:text-background transition-colors inline-flex items-center gap-1.5 group"
                 >
-                  Lihat Detail Semua Cabang <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+                  {isEn ? 'View All Locations' : 'Lihat Detail Semua Cabang'} <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
                 </Link>
               </div>
 
@@ -258,17 +280,21 @@ export default async function AboutPage() {
                   {activeBranches.map(branch => (
                     <div key={branch.id} className="bg-surface-container-low/50 border border-surface-variant/30 hover:border-secondary/40 rounded-lg p-4 transition-all duration-300 hover:-translate-y-0.5">
                       <p className="text-white font-semibold text-sm">{branch.name}</p>
-                      <p className="text-xs text-secondary font-medium mt-0.5">Kota {branch.city}</p>
+                      <p className="text-xs text-secondary font-medium mt-0.5">{isEn ? branch.city : `Kota ${branch.city}`}</p>
                       <p className="text-xs text-zinc-400 mt-2 flex items-center gap-1.5">
                         <span className={`w-2 h-2 rounded-full inline-block ${branch._count.vehicles > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`}></span>
-                        {branch._count.vehicles > 0 ? `${branch._count.vehicles} armada siap jalan` : 'Armada sedang bertugas'}
+                        {branch._count.vehicles > 0 
+                          ? `${branch._count.vehicles} ${isEn ? 'units ready' : 'armada siap jalan'}` 
+                          : isEn ? 'Currently on duty' : 'Armada sedang bertugas'}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
                 <p className="text-sm text-zinc-400">
-                  Jaringan cabang kami terus berkembang untuk menjangkau kebutuhan mobilitas Anda di berbagai kota.
+                  {isEn
+                    ? 'Our service network continuously expands to support your luxury executive mobility across Indonesia.'
+                    : 'Jaringan cabang kami terus berkembang untuk menjangkau kebutuhan mobilitas Anda di berbagai kota.'}
                 </p>
               )}
             </div>
@@ -279,23 +305,25 @@ export default async function AboutPage() {
         <ScrollReveal>
           <section className="max-w-5xl mx-auto text-center bg-gradient-to-r from-surface-container-low via-surface-container-lowest to-surface-container-low border border-surface-variant/50 rounded-2xl p-10 md:p-12">
             <h2 className="font-display-lg text-2xl md:text-4xl text-white font-bold mb-4">
-              Siap Menikmati Perjalanan Istimewa?
+              {isEn ? 'Ready for an Exceptional Journey?' : 'Siap Menikmati Perjalanan Istimewa?'}
             </h2>
             <p className="font-body-md text-on-surface-variant text-sm md:text-base max-w-xl mx-auto mb-8 leading-relaxed">
-              Temukan kendaraan idaman Anda sekarang dan nikmati pengalaman sewa mobil premium tanpa ribet.
+              {isEn
+                ? 'Select your preferred flagship vehicle now and experience effortless premium car rental.'
+                : 'Temukan kendaraan idaman Anda sekarang dan nikmati pengalaman sewa mobil premium tanpa ribet.'}
             </p>
             <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
               <Link 
                 href="/#vehicles" 
                 className="btn-primary shimmer-btn group bg-secondary text-on-secondary font-button text-sm font-semibold px-8 py-3.5 rounded-DEFAULT inline-flex items-center gap-2 hover:bg-secondary-fixed transition-all"
               >
-                Pilih Armada Sekarang <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+                {isEn ? 'Choose Fleet Now' : 'Pilih Armada Sekarang'} <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
               </Link>
               <Link 
                 href="/contact" 
                 className="font-button text-sm font-semibold text-zinc-300 border border-zinc-700 px-6 py-3.5 rounded-DEFAULT hover:border-zinc-400 hover:text-white transition-colors"
               >
-                Hubungi Konsierge
+                {dict.nav.contact}
               </Link>
             </div>
           </section>

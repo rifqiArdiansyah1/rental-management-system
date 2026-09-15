@@ -10,14 +10,36 @@ export default function AuthLayout({
     <div className="flex flex-col min-h-screen bg-background text-on-surface">
       <Navbar />
 
+      <noscript>
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            .loading-fallback {
+              display: none !important;
+            }
+            [hidden] {
+              display: block !important;
+            }
+            .animate-auth-card,
+            .animate-alert-slide,
+            .animate-hero-kicker,
+            .animate-page-header,
+            .animate-page-desc {
+              animation: none !important;
+              opacity: 1 !important;
+              transform: none !important;
+            }
+          `
+        }} />
+      </noscript>
+
       <main className="flex-grow flex items-center justify-center py-12 md:py-16 px-margin-mobile md:px-margin-desktop relative overflow-hidden">
-        {/* Subtle luxury ambient radial glows */}
+        {/* Subtle luxury ambient radial glows (GPU-accelerated transform/opacity only) */}
         <div 
-          className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-secondary/5 rounded-full blur-3xl pointer-events-none" 
+          className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-secondary/5 rounded-full blur-3xl pointer-events-none animate-ambient-glow" 
           aria-hidden="true"
         />
         <div 
-          className="absolute bottom-10 left-1/3 w-[350px] h-[350px] bg-primary-container/20 rounded-full blur-3xl pointer-events-none" 
+          className="absolute bottom-10 left-1/3 w-[350px] h-[350px] bg-primary-container/20 rounded-full blur-3xl pointer-events-none animate-ambient-glow [animation-delay:4s]" 
           aria-hidden="true"
         />
 

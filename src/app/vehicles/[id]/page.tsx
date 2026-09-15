@@ -6,20 +6,29 @@ import FuelCostEstimator from '@/components/vehicle/FuelCostEstimator'
 import { FUEL_TYPE_LABELS } from '@/lib/constants'
 import { FuelType } from '@prisma/client'
 import Navbar from '@/components/Navbar'
+import Footer from '@/components/Footer'
 import ScrollReveal from '@/components/ui/ScrollReveal'
+import { getLocale, getDictionary } from '@/lib/i18n/server'
+import { formatCurrency, formatDateTime } from '@/lib/i18n/formatters'
 
 export const dynamic = 'force-dynamic'
 
 export default async function VehicleDetail({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   
-  const vehicle = await getVehicleById(resolvedParams.id)
+  const [locale, vehicle, fuelPrices] = await Promise.all([
+    getLocale(),
+    getVehicleById(resolvedParams.id),
+    getFuelPrices(),
+  ])
 
   if (!vehicle) {
     notFound()
   }
 
-  const fuelPrices = await getFuelPrices()
+  const dict = await getDictionary(locale)
+  const isEn = locale === 'en'
+
   const fuelPricePerLiter = fuelPrices.find(p => p.fuelType === vehicle.fuelType)?.pricePerLiter || 10_000
 
   const { category } = vehicle
@@ -44,7 +53,6 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
     console.error('Failed to parse features')
   }
 
-  // Generate some feature mapping for the UI (using Material Icons)
   const featureIcons = [
     { name: 'Panoramic Sunroof', icon: 'light_mode' },
     { name: 'Leather Seats', icon: 'airline_seat_recline_extra' },
@@ -63,7 +71,7 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <div className="flex-grow flex flex-col">
+    <div className="flex-grow flex flex-col min-h-screen">
       {/* Top Navigation */}
       <Navbar />
 
@@ -94,16 +102,20 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                   {vehicleName}
                 </h1>
                 <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl animate-hero-desc">
-                  {category.description || 'The pinnacle of automotive engineering, offering unmatched comfort, cutting-edge technology, and a commanding presence on the road. Perfect for executive travel and special occasions.'}
+                  {category.description || (isEn ? 'The pinnacle of automotive engineering, offering unmatched comfort, cutting-edge technology, and a commanding presence on the road. Perfect for executive travel and special occasions.' : 'Puncak rekayasa otomotif dengan kenyamanan tanpa kompromi, teknologi mutakhir, dan profil berwibawa di jalan raya. Sempurna untuk perjalanan eksekutif dan momen istimewa Anda.')}
                 </p>
               </div>
               <div className="flex flex-col items-start md:items-end mt-6 md:mt-0 animate-hero-cta">
-                <span className="font-label-caps text-label-caps text-on-surface-variant mb-1 uppercase">Daily Rate</span>
+                <span className="font-label-caps text-label-caps text-on-surface-variant mb-1 uppercase">
+                  {dict.vehicles.pricePerDay}
+                </span>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-headline-lg text-headline-lg text-secondary">
-                    {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(vehicle.dailyRate))}
+                  <span className="font-headline-lg text-headline-lg text-secondary" data-testid="vehicle-detail-rate">
+                    {formatCurrency(vehicle.dailyRate, locale)}
                   </span>
-                  <span className="font-body-md text-body-md text-on-surface-variant">/ day</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant">
+                    {dict.vehicles.perDay}
+                  </span>
                 </div>
               </div>
             </div>
@@ -120,40 +132,52 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
               {/* Specifications Bento Grid */}
               <ScrollReveal>
                 <div>
-                  <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Vehicle Specifications</h2>
+                  <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">
+                    {dict.vehicles.specsTitle}
+                  </h2>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow border border-outline-variant/30 hover:border-secondary/50 transition-all duration-300 hover:-translate-y-1 group">
                       <span className="material-symbols-outlined text-secondary opacity-80 transition-transform duration-300 group-hover:scale-110">settings</span>
-                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Transmission</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">
+                        {dict.vehicles.transmission}
+                      </span>
                       <span className="font-body-lg text-body-lg text-on-surface">{category.transmission}</span>
                     </div>
                     <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow border border-outline-variant/30 hover:border-secondary/50 transition-all duration-300 hover:-translate-y-1 group">
                       <span className="material-symbols-outlined text-secondary opacity-80 transition-transform duration-300 group-hover:scale-110">local_gas_station</span>
-                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Fuel Type</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">
+                        {dict.vehicles.fuel}
+                      </span>
                       <span className="font-body-lg text-body-lg text-on-surface">
                         {FUEL_TYPE_LABELS[vehicle.fuelType as FuelType] || vehicle.fuelType}
                       </span>
                       {vehicle.fuelEfficiencyKmL && (
                         <span className="text-xs text-on-surface-variant">
-                          ~{Number(vehicle.fuelEfficiencyKmL)} km/Liter
+                          ~{Number(vehicle.fuelEfficiencyKmL)} km/L
                         </span>
                       )}
                     </div>
                     <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow border border-outline-variant/30 hover:border-secondary/50 transition-all duration-300 hover:-translate-y-1 group">
                       <span className="material-symbols-outlined text-secondary opacity-80 transition-transform duration-300 group-hover:scale-110">group</span>
-                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Capacity</span>
-                      <span className="font-body-lg text-body-lg text-on-surface">{category.capacity} Pass.</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">
+                        {dict.vehicles.capacity}
+                      </span>
+                      <span className="font-body-lg text-body-lg text-on-surface">
+                        {category.capacity} {isEn ? 'Seats' : 'Kursi'}
+                      </span>
                     </div>
                     <div className="bg-surface-container rounded p-6 flex flex-col gap-2 ambient-glow border border-outline-variant/30 hover:border-secondary/50 transition-all duration-300 hover:-translate-y-1 group">
                       <span className="material-symbols-outlined text-secondary opacity-80 transition-transform duration-300 group-hover:scale-110">directions_car</span>
-                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">Branch Location</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-2">
+                        {dict.vehicles.pickupBranch}
+                      </span>
                       <span className="font-body-lg text-body-lg text-on-surface">{vehicle.branch.name}</span>
                     </div>
                   </div>
                 </div>
               </ScrollReveal>
 
-              {/* Pre-Trip Fuel Estimator (Opsi A) */}
+              {/* Pre-Trip Fuel Estimator */}
               <ScrollReveal delay={100}>
                 <FuelCostEstimator
                   fuelType={vehicle.fuelType as FuelType}
@@ -166,7 +190,9 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
               {photos.length > 1 && (
                 <ScrollReveal delay={150}>
                   <div>
-                    <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Fleet Gallery</h2>
+                    <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">
+                      {isEn ? 'Fleet Gallery' : 'Galeri Armada'}
+                    </h2>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       {photos.map((photo, index) => (
                         <div key={index} className="group rounded-xl overflow-hidden aspect-video bg-surface-container border border-surface-variant hover:border-secondary/50 shadow-md transition-all duration-300 hover:-translate-y-1">
@@ -181,7 +207,9 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
               {/* Features */}
               <ScrollReveal delay={200}>
                 <div>
-                  <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">Premium Features</h2>
+                  <h2 className="font-headline-md text-headline-md text-on-surface mb-8 border-b border-surface-variant pb-4">
+                    {dict.vehicles.featuresTitle}
+                  </h2>
                   {features.length > 0 ? (
                     <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {features.map((feat, idx) => (
@@ -194,7 +222,9 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-on-surface-variant">No specific premium features listed.</p>
+                    <p className="text-on-surface-variant">
+                      {isEn ? 'Executive amenities & certified maintenance standards included.' : 'Standar kenyamanan eksekutif & inspeksi berkala terjamin.'}
+                    </p>
                   )}
                 </div>
               </ScrollReveal>
@@ -205,15 +235,18 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
               <ScrollReveal delay={100}>
                 <div className="bg-surface-container rounded-lg p-8 sticky top-28 border border-white/5 ambient-glow flex flex-col gap-6">
                   <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-headline-md text-headline-md text-on-surface">Reservation</h3>
+                    <h3 className="font-headline-md text-headline-md text-on-surface">
+                      {dict.booking.pageTitle}
+                    </h3>
                   </div>
                   
-                  {/* Clean Divider (Removed misleading partial progress line) */}
                   <div className="w-full h-[1px] bg-surface-variant/40 mb-4" />
                   
                   <div className="flex flex-col gap-4">
                     <div className="bg-surface-container-lowest p-4 rounded border border-surface-variant/50">
-                      <span className="font-label-caps text-label-caps text-on-surface-variant block uppercase mb-1">Selected Vehicle</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant block uppercase mb-1">
+                        {isEn ? 'Selected Vehicle' : 'Armada Terpilih'}
+                      </span>
                       <span className="font-headline-md text-on-surface text-lg font-bold block">{vehicleName}</span>
                       <span className="text-xs text-secondary">{category.name} • {vehicle.plateNumber}</span>
                     </div>
@@ -222,21 +255,33 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                       <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex flex-col gap-1.5">
                         <div className="flex items-center gap-1.5 font-semibold text-amber-300">
                           <span className="material-symbols-outlined text-[16px]">build</span>
-                          <span>Status: Dalam Perawatan Bengkel</span>
+                          <span>{isEn ? 'Status: Workshop Maintenance' : 'Status: Dalam Perawatan Bengkel'}</span>
                         </div>
                         {vehicle.unavailabilities?.[0]?.estimatedEndAt ? (
                           new Date() > new Date(vehicle.unavailabilities[0].estimatedEndAt) ? (
                             <p className="text-amber-300/80 leading-relaxed">
-                              Jadwal perbaikan sedang diperbarui oleh tim teknis. Pemesanan dibuka untuk jadwal setelah servis selesai.
+                              {isEn
+                                ? 'Maintenance schedule is being updated by the workshop team. Reservations are open for post-service schedules.'
+                                : 'Jadwal perbaikan sedang diperbarui oleh tim teknis. Pemesanan dibuka untuk jadwal setelah servis selesai.'}
                             </p>
                           ) : (
                             <p className="text-amber-300/80 leading-relaxed">
-                              Estimasi selesai servis: <strong>{new Date(vehicle.unavailabilities[0].estimatedEndAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB</strong>. Anda dapat memesan armada ini untuk tanggal setelah masa perawatan (+3 jam buffer).
+                              {isEn ? (
+                                <>
+                                  Estimated service completion: <strong>{formatDateTime(vehicle.unavailabilities[0].estimatedEndAt, locale)}</strong>. You may book this vehicle for dates after completion (+3 hr buffer).
+                                </>
+                              ) : (
+                                <>
+                                  Estimasi selesai servis: <strong>{formatDateTime(vehicle.unavailabilities[0].estimatedEndAt, locale)}</strong>. Anda dapat memesan armada ini untuk tanggal setelah masa perawatan (+3 jam buffer).
+                                </>
+                              )}
                             </p>
                           )
                         ) : (
                           <p className="text-amber-300/80 leading-relaxed">
-                            Perawatan intensif sedang berlangsung. Pemesanan masa depan dibuka segera setelah estimasi selesai ditetapkan.
+                            {isEn
+                              ? 'Intensive maintenance in progress. Future booking will open once estimated completion is confirmed.'
+                              : 'Perawatan intensif sedang berlangsung. Pemesanan masa depan dibuka segera setelah estimasi selesai ditetapkan.'}
                           </p>
                         )}
                       </div>
@@ -244,27 +289,31 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                   </div>
                   
                   <div className="flex justify-between items-center py-4 border-t border-surface-variant mt-2">
-                    <span className="font-body-lg text-body-lg text-on-surface-variant">Daily Rate</span>
+                    <span className="font-body-lg text-body-lg text-on-surface-variant">
+                      {dict.vehicles.pricePerDay}
+                    </span>
                     <span className="font-headline-md text-headline-md text-on-surface">
-                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(vehicle.dailyRate))}
+                      {formatCurrency(vehicle.dailyRate, locale)}
                     </span>
                   </div>
                   
                   {vehicle.status === 'maintenance' && !vehicle.unavailabilities?.[0]?.estimatedEndAt ? (
                     <div className="block w-full text-center bg-surface-container-high text-on-surface-variant font-button text-button py-4 rounded border border-outline-variant/40 cursor-not-allowed">
-                      Sedang Perawatan (Belum Dapat Dipesan)
+                      {isEn ? 'Under Maintenance (Unavailable)' : 'Sedang Perawatan (Belum Dapat Dipesan)'}
                     </div>
                   ) : (
                     <Link href={`/vehicles/${vehicle.id}/book`} className="shimmer-btn group block w-full text-center bg-secondary text-on-secondary font-button text-button py-4 rounded hover:bg-secondary-fixed transition-all duration-300 transform hover:-translate-y-0.5 shadow-[0_10px_20px_-10px_rgba(233,193,118,0.3)]">
                       <span className="inline-flex items-center justify-center gap-1.5">
-                        Rent This Car
+                        {dict.vehicles.startBooking}
                         <span className="material-symbols-outlined text-[18px] transition-transform duration-300 group-hover:translate-x-1">
                           arrow_forward
                         </span>
                       </span>
                     </Link>
                   )}
-                  <p className="font-label-caps text-label-caps text-on-surface-variant text-center lowercase tracking-normal">Requires security deposit and insurance verification.</p>
+                  <p className="font-label-caps text-label-caps text-on-surface-variant text-center lowercase tracking-normal">
+                    {dict.vehicles.guaranteeNotice}
+                  </p>
                 </div>
               </ScrollReveal>
             </div>
@@ -273,34 +322,8 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full pt-20 pb-10 bg-surface-container-lowest dark:bg-surface-container-lowest">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-gutter px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
-          <div className="col-span-1 md:col-span-1 flex flex-col gap-4">
-            <span className="font-display-lg text-headline-md text-secondary">Prestige Motion</span>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-2 max-w-xs">Elevating your journey with uncompromising luxury and discretion.</p>
-          </div>
-          <div className="col-span-1 md:col-span-2 flex gap-12 mt-8 md:mt-0">
-            <div className="flex flex-col gap-4">
-              <span className="font-label-caps text-label-caps text-on-surface uppercase tracking-widest mb-2">Explore</span>
-              <span className="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors cursor-pointer">Locations</span>
-              <span className="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors cursor-pointer">Categories</span>
-            </div>
-            <div className="flex flex-col gap-4">
-              <span className="font-label-caps text-label-caps text-on-surface uppercase tracking-widest mb-2">Legal</span>
-              <span className="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors cursor-pointer">Terms</span>
-              <span className="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors cursor-pointer">Privacy</span>
-            </div>
-            <div className="flex flex-col gap-4">
-              <span className="font-label-caps text-label-caps text-on-surface uppercase tracking-widest mb-2">Support</span>
-              <span className="font-body-md text-body-md text-on-surface-variant hover:text-white transition-colors cursor-pointer">Contact</span>
-            </div>
-          </div>
-          <div className="col-span-1 flex flex-col justify-end mt-12 md:mt-0 text-left md:text-right">
-            <span className="font-body-md text-body-md text-on-surface-variant">© 2026 Prestige Motion. All rights reserved.</span>
-          </div>
-        </div>
-      </footer>
+      {/* Global Footer */}
+      <Footer />
     </div>
   )
 }

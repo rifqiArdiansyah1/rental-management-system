@@ -94,6 +94,7 @@ export type CreateDraftBookingPayload = {
   startDate: Date
   endDate: Date
   rentalType: RentalType
+  locale?: 'id' | 'en'
 }
 
 export async function createDraftBookingCore(payload: CreateDraftBookingPayload) {
@@ -148,6 +149,7 @@ export async function createDraftBookingCore(payload: CreateDraftBookingPayload)
           totalPrice: pricing.grandTotal,
           agreedDailyRate: vehicle.dailyRate,
           status: BookingStatus.pending_payment,
+          locale: (payload.locale as any) || 'id',
         }
       })
 

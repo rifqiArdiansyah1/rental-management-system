@@ -8,8 +8,13 @@ import { getAuthErrorMessage } from '@/lib/authErrors'
 export async function requestPasswordReset(formData: FormData) {
   const email = (formData.get('email') as string)?.trim()
 
+  const { getLocale } = await import('@/lib/i18n/server')
+  const locale = await getLocale()
+  const isEn = locale === 'en'
+
   if (!email) {
-    redirect('/forgot-password?message=' + encodeURIComponent('Silakan masukkan alamat email Anda.') + '&type=error')
+    const emptyMsg = isEn ? 'Please enter your email address.' : 'Silakan masukkan alamat email Anda.'
+    redirect('/forgot-password?message=' + encodeURIComponent(emptyMsg) + '&type=error')
   }
 
   const supabase = await createClient()
@@ -32,15 +37,17 @@ export async function requestPasswordReset(formData: FormData) {
       msg.includes('rate limit') ||
       msg.includes('security purposes')
     ) {
-      redirect(`/forgot-password?message=${encodeURIComponent(getAuthErrorMessage(error))}&type=error`)
+      redirect(`/forgot-password?message=${encodeURIComponent(getAuthErrorMessage(error, locale))}&type=error`)
     }
   }
 
   // Perlindungan User Enumeration:
   // Selalu tampilkan pesan sukses yang seragam terlepas dari apakah email terdaftar atau tidak
+  const successMsg = isEn
+    ? 'If the email is registered in our system, a password recovery link has been sent. Please check your inbox or spam folder.'
+    : 'Jika email terdaftar di sistem kami, tautan pemulihan kata sandi telah dikirim. Silakan periksa kotak masuk atau folder spam Anda.'
+
   redirect(
-    `/forgot-password?message=${encodeURIComponent(
-      'Jika email terdaftar di sistem kami, tautan pemulihan kata sandi telah dikirim. Silakan periksa kotak masuk atau folder spam Anda.'
-    )}&type=success`
+    `/forgot-password?message=${encodeURIComponent(successMsg)}&type=success`
   )
 }

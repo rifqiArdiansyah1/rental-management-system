@@ -1,5 +1,10 @@
+'use client'
+
 import Link from 'next/link'
 import { Prisma } from '@prisma/client'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { Locale } from '@/lib/i18n/types'
+import { formatCurrency, formatDate } from '@/lib/i18n/formatters'
 
 type VehicleWithRelations = Prisma.VehicleGetPayload<{
   include: {
@@ -12,9 +17,14 @@ type VehicleWithRelations = Prisma.VehicleGetPayload<{
 interface VehicleCardProps {
   vehicle: VehicleWithRelations
   isPopular?: boolean
+  locale?: Locale
 }
 
-export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardProps) {
+export default function VehicleCard({ vehicle, isPopular = false, locale: propLocale }: VehicleCardProps) {
+  const context = useLanguage()
+  const activeLocale = context?.locale || propLocale || 'id'
+  const isEn = activeLocale === 'en'
+
   const { category } = vehicle
   const vehicleName = vehicle.name || category.name
   const imageUrl = (vehicle.photos && vehicle.photos.length > 0) 
@@ -37,9 +47,9 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
 
   const featureSummary = features.length > 0 
     ? features.slice(0, 3).join(' • ') 
-    : 'Standar kenyamanan premium & inspeksi ketat.'
+    : isEn ? 'Refined executive comfort & meticulous inspection.' : 'Standar kenyamanan premium & inspeksi ketat.'
 
-  // Unavailability & Maintenance Availability Badge (Gap 5)
+  // Unavailability & Maintenance Availability Badge
   const activeUnavail = vehicle.unavailabilities?.[0]
   const isMaintenance = vehicle.status === 'maintenance' && !!activeUnavail
   let availabilityBadge = null
@@ -51,11 +61,11 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
       availabilityBadge = (
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-medium w-fit">
           <span className="material-symbols-outlined text-[14px]">build</span>
-          <span>Dalam Perawatan (Jadwal Diperbarui)</span>
+          <span>{isEn ? 'In Maintenance (Schedule Updating)' : 'Dalam Perawatan (Jadwal Diperbarui)'}</span>
         </div>
       )
     } else {
-      const formattedDate = endAt.toLocaleDateString('id-ID', {
+      const formattedDate = formatDate(endAt, activeLocale, {
         day: 'numeric',
         month: 'short',
         hour: '2-digit',
@@ -64,7 +74,7 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
       availabilityBadge = (
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-medium w-fit">
           <span className="material-symbols-outlined text-[14px]">event_available</span>
-          <span>Tersedia Mulai {formattedDate}</span>
+          <span>{isEn ? `Available From ${formattedDate}` : `Tersedia Mulai ${formattedDate}`}</span>
         </div>
       )
     }
@@ -73,7 +83,7 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
   return (
     <Link 
       href={`/vehicles/${vehicle.id}`}
-      aria-label={`Lihat detail ${vehicleName}`}
+      aria-label={`${isEn ? 'View details for' : 'Lihat detail'} ${vehicleName}`}
       className="block h-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary/50 rounded-xl"
     >
       <article className={`card-hover-effect rounded-xl overflow-hidden flex flex-col group relative h-full transition-all duration-300 ease-out hover:-translate-y-1.5 ${
@@ -83,7 +93,7 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
       }`}>
         {isPopular && (
           <div className="absolute top-0 right-0 bg-secondary text-background font-label-caps text-xs px-3.5 py-1 rounded-bl-lg z-10 font-bold tracking-widest uppercase shadow-sm">
-            UNGGULAN
+            {isEn ? 'FEATURED' : 'UNGGULAN'}
           </div>
         )}
         
@@ -117,7 +127,7 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
             </div>
             <div className="flex items-center gap-1.5 text-on-surface-variant font-label-caps truncate">
               <span className="material-symbols-outlined text-[16px] text-secondary flex-shrink-0">group</span>
-              <span className="truncate">{category.capacity} Kursi</span>
+              <span className="truncate">{category.capacity} {isEn ? 'Seats' : 'Kursi'}</span>
             </div>
             <div className="flex items-center gap-1.5 text-on-surface-variant font-label-caps truncate">
               <span className="material-symbols-outlined text-[16px] text-secondary flex-shrink-0">location_on</span>
@@ -128,14 +138,14 @@ export default function VehicleCard({ vehicle, isPopular = false }: VehicleCardP
           <div className="flex justify-between items-center mt-auto">
             <div>
               <span className="font-label-caps text-xs text-on-surface-variant block uppercase tracking-wider mb-0.5">
-                Tarif Harian
+                {isEn ? 'Daily Rate' : 'Tarif Harian'}
               </span>
-              <span className="font-body-lg text-lg text-secondary font-semibold">
-                {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(vehicle.dailyRate))}
+              <span className="font-body-lg text-lg text-secondary font-semibold" data-testid="vehicle-daily-rate">
+                {formatCurrency(vehicle.dailyRate, activeLocale)}
               </span>
             </div>
 
-            {/* Visual Icon (Non-interactive span to preserve valid HTML inside Link) */}
+            {/* Visual Icon */}
             <span 
               aria-hidden="true"
               className={

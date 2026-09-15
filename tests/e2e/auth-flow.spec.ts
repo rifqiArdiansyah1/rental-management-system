@@ -9,7 +9,7 @@ test.describe('Customer Authentication Flow & Security Guards', () => {
     // 1. Verify site chrome (Navbar & Footer)
     const nav = page.locator('nav')
     await expect(nav).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Home' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: /Beranda|Home/ })).toBeVisible()
 
     const footer = page.locator('footer')
     await expect(footer).toBeVisible()

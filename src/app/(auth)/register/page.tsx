@@ -2,7 +2,8 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import { signup } from './actions'
 import { MIN_PASSWORD_LENGTH } from '@/lib/constants'
-import { User, Phone, Mail, Lock, AlertCircle } from 'lucide-react'
+import { User, Phone, Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react'
+import { getLocale, getDictionary } from '@/lib/i18n/server'
 
 export const metadata: Metadata = {
   title: 'Daftar Akun Baru | Prestige Motion',
@@ -15,19 +16,21 @@ export default async function RegisterPage({
   searchParams: Promise<{ message?: string }>
 }) {
   const resolvedSearchParams = await searchParams
+  const locale = await getLocale()
+  const dict = await getDictionary(locale)
 
   return (
-    <div className="max-w-md w-full bg-surface-container-lowest/80 backdrop-blur-xl border border-surface-variant/40 rounded-xl shadow-2xl p-8 sm:p-10 transition-all">
-      {/* Header Form */}
+    <div className="animate-auth-card max-w-md w-full bg-surface-container-lowest/85 backdrop-blur-xl border border-surface-variant/40 hover:border-secondary/40 rounded-xl shadow-2xl hover:shadow-secondary/5 p-8 sm:p-10 transition-all duration-500">
+      {/* Header Form (Pure CSS entrance, LCP safe) */}
       <div className="text-center mb-8">
-        <span className="font-label-caps text-xs text-secondary tracking-widest uppercase font-semibold block mb-2">
+        <span className="font-label-caps text-xs text-secondary tracking-widest uppercase font-semibold block mb-2 animate-hero-kicker">
           Prestige Motion
         </span>
-        <h1 className="font-display-lg text-2xl sm:text-3xl text-on-surface font-bold tracking-tight">
-          Daftar Akun Baru
+        <h1 className="font-display-lg text-2xl sm:text-3xl text-on-surface font-bold tracking-tight animate-page-header">
+          {dict.auth.registerTitle}
         </h1>
-        <p className="font-body-md text-sm text-on-surface-variant mt-2">
-          Mulai pengalaman mobilitas kelas atas Anda bersama kami.
+        <p className="font-body-md text-sm text-on-surface-variant mt-2 animate-page-desc">
+          {dict.auth.registerSubtitle}
         </p>
       </div>
 
@@ -35,7 +38,7 @@ export default async function RegisterPage({
         <div
           role="alert"
           data-testid="auth-alert"
-          className="mb-6 p-3.5 rounded-lg text-sm flex items-start gap-3 bg-error-container/20 border border-error/40 text-error transition-all"
+          className="animate-alert-slide mb-6 p-3.5 rounded-lg text-sm flex items-start gap-3 bg-error-container/20 border border-error/40 text-error transition-all"
         >
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
           <p className="leading-relaxed flex-1">{resolvedSearchParams.message}</p>
@@ -49,10 +52,10 @@ export default async function RegisterPage({
             htmlFor="name"
             className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-1.5"
           >
-            Nama Lengkap
+            {dict.auth.nameLabel}
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline transition-all duration-300 group-focus-within:text-secondary group-focus-within:scale-110">
               <User className="w-4 h-4" />
             </div>
             <input
@@ -60,8 +63,8 @@ export default async function RegisterPage({
               name="name"
               type="text"
               required
-              placeholder="Nama sesuai KTP"
-              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-2.5 pl-10 text-sm transition-all"
+              placeholder={dict.auth.namePlaceholder}
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 focus:bg-surface-container/90 px-4 py-2.5 pl-10 text-sm transition-all duration-300"
             />
           </div>
         </div>
@@ -72,10 +75,10 @@ export default async function RegisterPage({
             htmlFor="phone"
             className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-1.5"
           >
-            Nomor Telepon / WhatsApp
+            {dict.auth.phoneLabel}
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline transition-all duration-300 group-focus-within:text-secondary group-focus-within:scale-110">
               <Phone className="w-4 h-4" />
             </div>
             <input
@@ -83,8 +86,8 @@ export default async function RegisterPage({
               name="phone"
               type="tel"
               required
-              placeholder="08xxxxxxxxxx"
-              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-2.5 pl-10 text-sm transition-all"
+              placeholder={dict.auth.phonePlaceholder}
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 focus:bg-surface-container/90 px-4 py-2.5 pl-10 text-sm transition-all duration-300"
             />
           </div>
         </div>
@@ -95,10 +98,10 @@ export default async function RegisterPage({
             htmlFor="email"
             className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-1.5"
           >
-            Alamat Email
+            {dict.auth.emailLabel}
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline transition-all duration-300 group-focus-within:text-secondary group-focus-within:scale-110">
               <Mail className="w-4 h-4" />
             </div>
             <input
@@ -106,8 +109,8 @@ export default async function RegisterPage({
               name="email"
               type="email"
               required
-              placeholder="nama@email.com"
-              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-2.5 pl-10 text-sm transition-all"
+              placeholder={dict.auth.emailPlaceholder}
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 focus:bg-surface-container/90 px-4 py-2.5 pl-10 text-sm transition-all duration-300"
             />
           </div>
         </div>
@@ -118,10 +121,10 @@ export default async function RegisterPage({
             htmlFor="password"
             className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-1.5"
           >
-            Kata Sandi (Min. {MIN_PASSWORD_LENGTH} Karakter)
+            {dict.auth.passwordMinHint}
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline transition-all duration-300 group-focus-within:text-secondary group-focus-within:scale-110">
               <Lock className="w-4 h-4" />
             </div>
             <input
@@ -130,8 +133,8 @@ export default async function RegisterPage({
               type="password"
               required
               minLength={MIN_PASSWORD_LENGTH}
-              placeholder={`Minimal ${MIN_PASSWORD_LENGTH} karakter`}
-              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-2.5 pl-10 text-sm transition-all"
+              placeholder={dict.auth.passwordMinPlaceholder}
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 focus:bg-surface-container/90 px-4 py-2.5 pl-10 text-sm transition-all duration-300"
             />
           </div>
         </div>
@@ -140,9 +143,10 @@ export default async function RegisterPage({
         <div className="pt-3">
           <button
             type="submit"
-            className="w-full bg-secondary text-on-secondary font-bold text-sm tracking-wide rounded-lg py-3 px-4 hover:bg-secondary/90 transition-all shadow-lg shadow-secondary/15 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+            className="shimmer-btn group w-full bg-secondary text-on-secondary font-bold text-sm tracking-wide rounded-lg py-3 px-4 hover:bg-secondary/90 transition-all duration-300 shadow-lg shadow-secondary/15 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
           >
-            Daftar Sekarang
+            <span>{dict.auth.registerSubmitBtn}</span>
+            <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
           </button>
         </div>
       </form>
@@ -150,12 +154,12 @@ export default async function RegisterPage({
       {/* Footer Navigasi */}
       <div className="text-center mt-6 pt-6 border-t border-surface-variant/30">
         <p className="text-sm text-on-surface-variant">
-          Sudah memiliki akun?{' '}
+          {dict.auth.hasAccountPrompt}{' '}
           <Link
             href="/login"
-            className="text-secondary font-semibold hover:underline transition-colors inline-block ml-1 cursor-pointer"
+            className="text-secondary hover:text-secondary-fixed font-semibold hover:underline transition-colors duration-200 inline-block ml-1 cursor-pointer"
           >
-            Masuk ke akun Anda
+            {dict.auth.signInLink}
           </Link>
         </p>
       </div>

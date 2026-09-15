@@ -2,8 +2,9 @@
 
 import { useTransition } from 'react'
 import Link from 'next/link'
-import { Mail, CheckCircle2, AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
+import { Mail, CheckCircle2, AlertCircle, Loader2, ArrowLeft, Send } from 'lucide-react'
 import { requestPasswordReset } from './actions'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface ForgotPasswordFormProps {
   initialMessage?: string
@@ -15,11 +16,14 @@ export default function ForgotPasswordForm({
   messageType,
 }: ForgotPasswordFormProps) {
   const [isPending, startTransition] = useTransition()
+  const { t } = useLanguage()
 
   const isSuccess = messageType === 'success' || (
     initialMessage && (
       initialMessage.includes('telah dikirim') ||
-      initialMessage.includes('berhasil')
+      initialMessage.includes('berhasil') ||
+      initialMessage.includes('sent') ||
+      initialMessage.includes('success')
     )
   )
 
@@ -40,7 +44,7 @@ export default function ForgotPasswordForm({
         <div
           role="alert"
           data-testid="auth-alert"
-          className={`mb-6 p-3.5 rounded-lg text-sm flex items-start gap-3 border transition-all ${
+          className={`animate-alert-slide mb-6 p-3.5 rounded-lg text-sm flex items-start gap-3 border transition-all ${
             isSuccess
               ? 'bg-secondary/10 border-secondary/30 text-secondary'
               : 'bg-error-container/20 border-error/40 text-error'
@@ -61,10 +65,10 @@ export default function ForgotPasswordForm({
             htmlFor="email"
             className="block text-xs font-label-caps uppercase tracking-wider text-on-surface font-semibold mb-2"
           >
-            Alamat Email Akun
+            {t.auth.forgotEmailLabel}
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline transition-all duration-300 group-focus-within:text-secondary group-focus-within:scale-110">
               <Mail className="w-4 h-4" />
             </div>
             <input
@@ -74,12 +78,12 @@ export default function ForgotPasswordForm({
               required
               autoComplete="email"
               disabled={isPending}
-              placeholder="nama@email.com"
-              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/50 px-4 py-3 pl-10 text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              placeholder={t.auth.emailPlaceholder}
+              className="w-full bg-surface-container/60 border border-outline-variant/40 rounded-lg text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 focus:bg-surface-container/90 px-4 py-3 pl-10 text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
           <p className="text-xs text-on-surface-variant mt-2">
-            Kami akan mengirimkan tautan aman untuk mengatur ulang kata sandi Anda.
+            {t.auth.forgotEmailHelp}
           </p>
         </div>
 
@@ -87,15 +91,18 @@ export default function ForgotPasswordForm({
           <button
             type="submit"
             disabled={isPending}
-            className="w-full bg-secondary text-on-secondary font-bold text-sm tracking-wide rounded-lg py-3 px-4 hover:bg-secondary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-secondary/15 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+            className="shimmer-btn group w-full bg-secondary text-on-secondary font-bold text-sm tracking-wide rounded-lg py-3 px-4 hover:bg-secondary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-secondary/15 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
           >
             {isPending ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-on-secondary" />
-                <span>Mengirim Tautan...</span>
+                <span>{t.auth.sendingResetLink}</span>
               </>
             ) : (
-              <span>Kirim Tautan Pemulihan</span>
+              <>
+                <span>{t.auth.forgotSubmitBtn}</span>
+                <Send className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+              </>
             )}
           </button>
         </div>
@@ -105,10 +112,10 @@ export default function ForgotPasswordForm({
       <div className="text-center mt-6 pt-6 border-t border-surface-variant/30">
         <Link
           href="/login"
-          className="inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-secondary transition-colors cursor-pointer"
+          className="group inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-secondary transition-colors duration-200 cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Kembali ke halaman masuk</span>
+          <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" />
+          <span>{t.auth.backToLogin}</span>
         </Link>
       </div>
     </div>

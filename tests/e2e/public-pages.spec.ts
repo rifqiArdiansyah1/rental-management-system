@@ -48,10 +48,10 @@ test.describe('Footer & Halaman Publik', () => {
     const nav = page.locator('nav');
     await expect(nav).toBeVisible();
     // Use named link locators to avoid strict mode collision with brand logo (also href="/")
-    await expect(nav.getByRole('link', { name: 'Home' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: /Beranda|Home/ })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Armada' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Cabang' })).toBeVisible();
-    await expect(nav.getByRole('link', { name: 'Tentang' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: /Tentang/ })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Kontak' })).toBeVisible();
   });
 
@@ -181,10 +181,10 @@ test.describe('Footer & Halaman Publik', () => {
 
     // Verify links inside drawer (scoped to nav to avoid collision with footer links)
     const nav = page.locator('nav');
-    await expect(nav.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: /Beranda|Home/ })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Armada', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Cabang', exact: true })).toBeVisible();
-    await expect(nav.getByRole('link', { name: 'Tentang', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: /Tentang/ })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Kontak', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Masuk', exact: true })).toBeVisible();
 
