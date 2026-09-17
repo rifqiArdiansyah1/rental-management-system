@@ -6,7 +6,7 @@ export interface LogAuditParams {
   actorRole: UserRole
   branchId?: string | null // Konteks cabang target entity
   action: string
-  entityType: 'Booking' | 'Vehicle' | 'Driver' | 'Branch' | 'User' | 'Document' | 'Customer' | 'DriverLeave' | 'FuelPrice' | 'VehicleUnavailability'
+  entityType: 'Booking' | 'Vehicle' | 'Driver' | 'Branch' | 'User' | 'Document' | 'Customer' | 'DriverLeave' | 'FuelPrice' | 'VehicleUnavailability' | 'Review'
   entityId: string
   metadata?: Prisma.InputJsonValue
 }

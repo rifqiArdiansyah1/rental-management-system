@@ -8,6 +8,7 @@ import { FuelType } from '@prisma/client'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import ScrollReveal from '@/components/ui/ScrollReveal'
+import VehicleReviewsSection from '@/components/vehicle/VehicleReviewsSection'
 import { getLocale, getDictionary } from '@/lib/i18n/server'
 import { formatCurrency, formatDateTime } from '@/lib/i18n/formatters'
 
@@ -320,6 +321,15 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
 
           </div>
         </section>
+
+        {/* Customer Reviews Section */}
+        <VehicleReviewsSection
+          vehicleId={vehicle.id}
+          currentBranchId={vehicle.branchId}
+          currentBranchName={vehicle.branch?.name || ''}
+          locale={locale}
+          dict={dict}
+        />
       </main>
 
       {/* Global Footer */}

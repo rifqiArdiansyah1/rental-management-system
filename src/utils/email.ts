@@ -399,3 +399,100 @@ export async function sendDriverReassignedEmail(data: DriverReassignedData) {
     return null
   }
 }
+
+export interface ReviewInvitationData {
+  toEmail: string
+  customerName: string
+  bookingId: string
+  vehicleName: string
+  locale?: Locale
+}
+
+export async function sendReviewInvitationEmail(data: ReviewInvitationData) {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.APP_URL?.includes('3001') ||
+    !process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_KEY.includes('dummy') ||
+    data.toEmail.endsWith('@test.com')
+  ) {
+    return { id: 'mock-test-email-id' }
+  }
+
+  const isEn = data.locale === 'en'
+  const subject = isEn
+    ? `How was your journey with Prestige Motion? - ${data.bookingId.substring(0, 8).toUpperCase()}`
+    : `Bagaimana pengalaman perjalanan Anda bersama Prestige Motion? - ${data.bookingId.substring(0, 8).toUpperCase()}`
+
+  const greeting = isEn ? `Dear ${data.customerName},` : `Halo, ${data.customerName}`
+  const bodyIntro = isEn
+    ? `Your rental for <strong>${data.vehicleName}</strong> has been successfully completed. We hope your journey was seamless and refined in every detail.`
+    : `Masa sewa Anda untuk armada <strong>${data.vehicleName}</strong> telah selesai dengan baik. Kami berharap perjalanan Anda berlangsung nyaman, aman, dan memuaskan.`
+
+  const bodyAsk = isEn
+    ? `To help us continuously elevate our Quiet Luxury standards and guide future travelers, we would truly appreciate a moment of your time to share your rating and review.`
+    : `Untuk membantu kami senantiasa menyempurnakan standar layanan eksklusif kami serta membantu penyewa lainnya, kami sangat menghargai ulasan dan penilaian pengalaman Anda.`
+
+  const ctaBtn = isEn ? 'Share Your Experience' : 'Beri Ulasan Armada'
+  const footerCopyright = isEn
+    ? `© ${new Date().getFullYear()} Prestige Motion. All rights reserved.`
+    : `© ${new Date().getFullYear()} Prestige Motion. Seluruh hak cipta dilindungi.`
+
+  const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const reviewUrl = `${baseUrl}/booking/${data.bookingId}`
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${subject}</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; margin: 0 auto; max-width: 600px;">
+        <tr>
+          <td style="background-color: #0A192F; padding: 30px; text-align: center;">
+            <h1 style="color: #C5A059; margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 2px;">PRESTIGE MOTION</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 40px 30px;">
+            <h2 style="color: #1a1a1a; font-size: 20px; margin-top: 0;">${greeting}</h2>
+            <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 20px;">
+              ${bodyIntro}
+            </p>
+            <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 30px;">
+              ${bodyAsk}
+            </p>
+            
+            <div style="text-align: center; margin: 35px 0;">
+              <a href="${reviewUrl}" style="background-color: #C5A059; color: #000000; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(197, 160, 89, 0.3);">
+                ${ctaBtn}
+              </a>
+            </div>
+
+            <p style="color: #71717a; font-size: 13px; line-height: 1.5; text-align: center; margin-top: 25px;">
+              ${isEn ? 'You can also access this review form anytime from your Customer Dashboard.' : 'Anda juga dapat mengakses form ulasan ini kapan saja melalui Dasbor Pelanggan Anda.'}
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 13px; margin: 0;">
+              ${footerCopyright}
+            </p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  return resend.emails.send({
+    from: `Prestige Motion <${EMAIL_FROM}>`,
+    to: data.toEmail,
+    subject: subject,
+    html: htmlContent,
+  })
+}
+

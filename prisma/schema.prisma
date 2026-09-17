@@ -101,6 +101,7 @@ model Branch {
   users    User[]
   pickups  Booking[] @relation("PickupBranch")
   returns  Booking[] @relation("ReturnBranch")
+  reviews  Review[]
 
   @@index([city])
   @@index([isActive])
@@ -142,6 +143,7 @@ model Vehicle {
   relocatedTo     Vehicle? @relation("VehicleRelocationChain")
   bookings Booking[]
   unavailabilities VehicleUnavailability[]
+  reviews  Review[]
 
   // Query paling sering: "mobil tersedia di cabang X" -> filter branchId + status
   @@index([branchId, status])
@@ -181,6 +183,7 @@ model Customer {
 
   bookings  Booking[]
   documents Document[]
+  reviews   Review[]
 }
 
 model Driver {
@@ -273,6 +276,7 @@ model Booking {
 
   payments  Payment[]
   documents Document[]
+  review    Review?
 
   // Dipakai untuk cek ketersediaan mobil per rentang tanggal
   @@index([vehicleId, startDate, endDate])
@@ -350,6 +354,7 @@ model User {
   reassignedBookings  Booking[] @relation("AdminReassigner")
   auditLogs           AuditLog[] @relation("UserAuditLogs")
   fuelPriceUpdates    FuelPrice[]
+  moderatedReviews    Review[] @relation("ReviewModerator")
 
   @@index([branchId, role])
   @@index([branchId, isActive])
@@ -396,5 +401,31 @@ model AuditLog {
   @@index([branchId, createdAt])
   @@index([action, createdAt])
   @@index([createdAt])
+}
+
+model Review {
+  id           String    @id @default(uuid())
+  bookingId    String    @unique
+  customerId   String
+  vehicleId    String
+  branchId     String    // Snapshot cabang tempat sewa berlangsung (booking.pickupBranchId)
+  rating       Int       // 1 - 5
+  comment      String?
+  isPublished  Boolean   @default(true)
+  hiddenBy     String?
+  hiddenReason String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  moderator User?    @relation("ReviewModerator", fields: [hiddenBy], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId, isPublished])
+  @@index([branchId, isPublished])
+  @@index([customerId])
+  @@index([isPublished, createdAt])
 }
 

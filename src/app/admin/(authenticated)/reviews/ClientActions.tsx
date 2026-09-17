@@ -1,0 +1,235 @@
+'use client'
+
+import { useState, useTransition } from 'react'
+import { moderateReview } from '@/actions/adminReview'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { Eye, EyeOff, AlertCircle, X, Check } from 'lucide-react'
+
+interface ReviewActionProps {
+  reviewId: string
+  isPublished: boolean
+  vehicleName: string
+  customerName: string
+  currentReason?: string | null
+}
+
+export function ReviewRowActions({
+  reviewId,
+  isPublished,
+  vehicleName,
+  customerName,
+  currentReason,
+}: ReviewActionProps) {
+  const router = useRouter()
+  const [isHideModalOpen, setIsHideModalOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  const handleHideSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!reason || !reason.trim()) {
+      setError('Alasan penyembunyian ulasan wajib diisi.')
+      return
+    }
+
+    setError(null)
+    startTransition(async () => {
+      const res = await moderateReview({
+        reviewId,
+        action: 'hide',
+        reason: reason.trim(),
+      })
+
+      if (res.success) {
+        setIsHideModalOpen(false)
+        setReason('')
+        router.refresh()
+      } else {
+        setError(res.error || 'Gagal menyembunyikan ulasan.')
+      }
+    })
+  }
+
+  const handleUnhide = () => {
+    setError(null)
+    startTransition(async () => {
+      const res = await moderateReview({
+        reviewId,
+        action: 'unhide',
+      })
+
+      if (res.success) {
+        router.refresh()
+      } else {
+        alert(res.error || 'Gagal menampilkan ulasan.')
+      }
+    })
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        {isPublished ? (
+          <button
+            type="button"
+            onClick={() => setIsHideModalOpen(true)}
+            disabled={isPending}
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30 transition-colors disabled:opacity-50 cursor-pointer"
+            data-testid={`hide-review-btn-${reviewId}`}
+          >
+            <EyeOff className="w-3.5 h-3.5" />
+            <span>Sembunyikan</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleUnhide}
+            disabled={isPending}
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30 transition-colors disabled:opacity-50 cursor-pointer"
+            data-testid={`unhide-review-btn-${reviewId}`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Tampilkan</span>
+          </button>
+        )}
+      </div>
+
+      {/* Hide Review Modal */}
+      {isHideModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-700 rounded-xl p-6 text-zinc-100 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => {
+                setIsHideModalOpen(false)
+                setError(null)
+              }}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-white mb-1">
+              Sembunyikan Ulasan
+            </h3>
+            <p className="text-xs text-zinc-400 mb-4">
+              Ulasan untuk <strong className="text-zinc-200">{vehicleName}</strong> oleh <strong className="text-zinc-200">{customerName}</strong> akan disembunyikan dari halaman publik dan dicatat di Log Audit.
+            </p>
+
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-950/60 border border-red-700/50 text-xs text-red-300 flex items-center gap-2" data-testid="moderation-error-banner">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleHideSubmit} className="flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  Alasan Penyembunyian <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Contoh: Mengandung bahasa kasar, tuduhan tanpa dasar, dsb."
+                  className="w-full bg-zinc-800 border border-zinc-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-lg p-3 text-xs text-white placeholder-zinc-500 outline-none resize-none"
+                  data-testid="hide-reason-input"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsHideModalOpen(false)}
+                  disabled={isPending}
+                  className="px-4 py-2 text-xs text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg text-xs transition-colors disabled:opacity-50 cursor-pointer"
+                  data-testid="confirm-hide-btn"
+                >
+                  {isPending ? 'Menyimpan...' : 'Sembunyikan Ulasan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+export function ReviewFilterBar({
+  branches,
+  isPusat,
+}: {
+  branches?: Array<{ id: string; name: string }>
+  isPusat: boolean
+}) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const currentBranch = searchParams.get('branch') || 'all'
+  const currentStatus = searchParams.get('status') || 'all'
+
+  const updateParam = (key: string, val: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (val === 'all') {
+      params.delete(key)
+    } else {
+      params.set(key, val)
+    }
+    params.delete('page')
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 mb-6 bg-zinc-900/80 p-4 rounded-xl border border-zinc-800">
+      {/* Branch filter (only for admin_pusat) */}
+      {isPusat && branches && (
+        <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <span>Cabang:</span>
+          <select
+            value={currentBranch}
+            onChange={(e) => updateParam('branch', e.target.value)}
+            className="bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-3 py-1.5 outline-none focus:border-amber-400"
+            data-testid="admin-review-branch-filter"
+          >
+            <option value="all">Semua Cabang</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Status filter */}
+      <div className="flex items-center gap-2 text-xs text-zinc-400">
+        <span>Status:</span>
+        <select
+          value={currentStatus}
+          onChange={(e) => updateParam('status', e.target.value)}
+          className="bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-3 py-1.5 outline-none focus:border-amber-400"
+          data-testid="admin-review-status-filter"
+        >
+          <option value="all">Semua Status</option>
+          <option value="published">Terbit (Publik)</option>
+          <option value="hidden">Disembunyikan</option>
+        </select>
+      </div>
+    </div>
+  )
+}

@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { prisma } from '@/utils/prisma'
 import { createClient } from '@/utils/supabase/server'
 import PaymentClient from './PaymentClient'
+import BookingReviewCard from './BookingReviewCard'
 import { syncPaymentStatus } from '@/actions/payment'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +24,8 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
       vehicle: {
         include: { category: true }
       },
-      customer: true
+      customer: true,
+      review: true
     }
   })
 
@@ -45,7 +47,8 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
           vehicle: {
             include: { category: true }
           },
-          customer: true
+          customer: true,
+          review: true
         }
       }) || booking
     }
@@ -108,6 +111,12 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
           <div className="text-center p-4 bg-error-container/20 border border-error rounded-lg text-error">
             This booking has been cancelled.
           </div>
+        ) : booking.status === 'completed' ? (
+          <BookingReviewCard
+            bookingId={booking.id}
+            vehicleName={vehicleName}
+            review={booking.review ? { id: booking.review.id, rating: booking.review.rating, comment: booking.review.comment } : null}
+          />
         ) : (
           <div className="flex flex-col gap-4 text-center p-6 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
             <div className="flex justify-center">

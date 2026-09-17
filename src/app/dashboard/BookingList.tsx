@@ -7,6 +7,8 @@ import Script from 'next/script'
 import { customerCancelBooking } from '@/actions/booking'
 import { createLateFeeSnapToken, syncLateFeePaymentStatus } from '@/actions/payment'
 import { useRouter } from 'next/navigation'
+import ReviewModal from '@/components/review/ReviewModal'
+import { Star } from 'lucide-react'
 
 type BookingWithRelations = {
   id: string
@@ -35,6 +37,11 @@ type BookingWithRelations = {
     status: string
     amount: number
   }>
+  review?: {
+    id: string
+    rating: number
+    comment?: string | null
+  } | null
 }
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
@@ -69,6 +76,7 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [snapLoadingId, setSnapLoadingId] = useState<string | null>(null)
   const [snapError, setSnapError] = useState<string | null>(null)
+  const [reviewTarget, setReviewTarget] = useState<{ bookingId: string; vehicleName: string } | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const isProd = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true'
@@ -313,6 +321,35 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
                       Batalkan Pesanan
                     </button>
                   )}
+
+                  {/* Review action (only for completed) */}
+                  {booking.status === 'completed' && (
+                    <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-surface-variant/30">
+                      {booking.review ? (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30" data-testid="reviewed-badge">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                          <span>Ulasan Terkirim ({booking.review.rating}/5)</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setReviewTarget({
+                              bookingId: booking.id,
+                              vehicleName: booking.vehicle.name || booking.vehicle.plateNumber,
+                            })
+                          }}
+                          className="shimmer-btn px-3 py-1.5 bg-gradient-to-r from-amber-400 to-secondary hover:brightness-110 text-black font-bold rounded-lg text-xs transition-all cursor-pointer shadow-sm inline-flex items-center gap-1.5"
+                          data-testid="open-review-modal-btn"
+                        >
+                          <Star className="w-3.5 h-3.5 fill-black text-black" />
+                          <span>Beri Ulasan</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </Link>
@@ -359,6 +396,19 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
             </div>
           </div>
         </div>
+      )}
+
+      {reviewTarget && (
+        <ReviewModal
+          isOpen={true}
+          onClose={() => setReviewTarget(null)}
+          bookingId={reviewTarget.bookingId}
+          vehicleName={reviewTarget.vehicleName}
+          onSuccess={() => {
+            setReviewTarget(null)
+            router.refresh()
+          }}
+        />
       )}
     </>
   )

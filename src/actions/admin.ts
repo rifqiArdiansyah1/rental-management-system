@@ -279,7 +279,7 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
     // 1. Dapatkan informasi Booking beserta unit kendaraan
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { vehicle: true }
+      include: { vehicle: true, customer: true }
     })
 
     if (!booking) {
@@ -391,6 +391,21 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
     revalidatePath('/admin/vehicles')
     revalidatePath('/admin/dashboard')
     revalidatePath('/dashboard')
+
+    // Kirim email ajakan ulasan (di-await secara aman di dalam try-catch terisolasi)
+    try {
+      const { sendReviewInvitationEmail } = await import('@/utils/email')
+      const bookingLocale = (booking.locale as any) || 'id'
+      await sendReviewInvitationEmail({
+        toEmail: booking.customer.email,
+        customerName: booking.customer.name,
+        bookingId: booking.id,
+        vehicleName: booking.vehicle.name || `${booking.vehicle.plateNumber}`,
+        locale: bookingLocale,
+      })
+    } catch (emailErr: any) {
+      console.error('[EMAIL ERROR] Failed to send review invitation:', emailErr.message)
+    }
 
     return { success: true }
   } catch (error: any) {

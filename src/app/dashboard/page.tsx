@@ -41,6 +41,9 @@ export default async function DashboardPage() {
           },
           payments: {
             select: { id: true, method: true, status: true, amount: true }
+          },
+          review: {
+            select: { id: true, rating: true, comment: true }
           }
         }
       }
@@ -81,7 +84,8 @@ export default async function DashboardPage() {
       method: p.method,
       status: p.status,
       amount: Number(p.amount)
-    }))
+    })),
+    review: b.review ? { id: b.review.id, rating: b.review.rating, comment: b.review.comment } : null
   }))
 
   return (
