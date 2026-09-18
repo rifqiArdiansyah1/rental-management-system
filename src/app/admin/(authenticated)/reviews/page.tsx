@@ -169,15 +169,26 @@ export default async function AdminReviewsPage({
 
                     {/* Status */}
                     <td className="px-5 py-4 whitespace-nowrap">
-                      {rev.isPublished ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          Terbit (Publik)
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
-                          Disembunyikan
-                        </span>
-                      )}
+                      <div className="flex flex-col gap-1 items-start">
+                        {rev.isPublished ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Terbit (Publik)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                            Disembunyikan
+                          </span>
+                        )}
+                        {rev.isFeatured && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
+                            data-testid={`featured-badge-${rev.id}`}
+                          >
+                            <Star className="w-3 h-3 fill-amber-500 text-amber-600" />
+                            <span>Unggulan Beranda</span>
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Aksi */}
@@ -185,6 +196,9 @@ export default async function AdminReviewsPage({
                       <ReviewRowActions
                         reviewId={rev.id}
                         isPublished={rev.isPublished}
+                        isFeatured={rev.isFeatured}
+                        hasComment={Boolean(rev.comment && rev.comment.trim())}
+                        isPusat={isPusat}
                         vehicleName={rev.vehicle.name || rev.vehicle.plateNumber}
                         customerName={rev.customer.name}
                         currentReason={rev.hiddenReason}

@@ -54,6 +54,18 @@ export const en: Dictionary = {
       digitalDesc:
         'Identity documents and rental records are secured under statutory PDP Law standards with role-based access control.',
     },
+    testimonials: {
+      kicker: 'Client Testimonials',
+      title: 'Real Experiences from Verified Renters',
+      subtitle:
+        'Authentic feedback and journey stories from verified clients who completed their journeys with us.',
+      verifiedRenter: 'Verified Renter',
+      rentedFromBranch: 'Rented at',
+      nowAtBranchNotice: 'Fleet now stationed at',
+      rentNowCTA: 'Rent',
+      rentAtNewBranchCTA: 'Rent at Branch',
+      archivedFleet: 'Retired Fleet / Inactive',
+    },
   },
   vehicles: {
     dailyFrom: 'Starting from',

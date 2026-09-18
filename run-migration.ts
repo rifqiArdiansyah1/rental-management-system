@@ -160,6 +160,10 @@ async function main() {
       CREATE INDEX IF NOT EXISTS "Review_customerId_idx" ON "Review"("customerId");
       CREATE INDEX IF NOT EXISTS "Review_isPublished_createdAt_idx" ON "Review"("isPublished", "createdAt");
 
+      ALTER TABLE "Review" ADD COLUMN IF NOT EXISTS "isFeatured" BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE "Review" ADD COLUMN IF NOT EXISTS "featuredAt" TIMESTAMP(3);
+      CREATE INDEX IF NOT EXISTS "Review_isFeatured_isPublished_featuredAt_idx" ON "Review"("isFeatured", "isPublished", "featuredAt" DESC);
+
       DO $$ BEGIN
         ALTER TABLE "Review" ADD CONSTRAINT "Review_bookingId_fkey" FOREIGN KEY ("bookingId") REFERENCES "Booking"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
       EXCEPTION

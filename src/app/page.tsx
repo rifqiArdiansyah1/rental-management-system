@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/server'
 import ScrollReveal from '@/components/ui/ScrollReveal'
 import HeroAmbientController from '@/components/ui/HeroAmbientController'
 import { getLocale, getDictionary } from '@/lib/i18n/server'
+import HomeReviewsSection from '@/components/home/HomeReviewsSection'
 
 export const dynamic = 'force-dynamic'
 
@@ -145,6 +146,9 @@ export default async function Home({
             </ScrollReveal>
           )}
         </section>
+
+        {/* Verified Customer Testimonials / Reviews Section */}
+        <HomeReviewsSection locale={locale} dict={dict} />
 
         {/* Value Proposition / 3-Pillar Banner */}
         <section className="w-full bg-surface-container-lowest border-y border-surface-variant/40 py-20 mt-auto">

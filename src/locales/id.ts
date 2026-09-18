@@ -52,6 +52,18 @@ export const id = {
       digitalDesc:
         'Dokumen identitas (KTP/SIM) dan riwayat sewa Anda diamankan sesuai standar UU PDP dengan kontrol akses berjenjang.',
     },
+    testimonials: {
+      kicker: 'Testimoni Nyata',
+      title: 'Pengalaman Nyata Para Penyewa',
+      subtitle:
+        'Kisah dan kepuasan otentik dari pelanggan terverifikasi yang telah menyelesaikan perjalanan mereka bersama kami.',
+      verifiedRenter: 'Penyewa Terverifikasi',
+      rentedFromBranch: 'Disewa di',
+      nowAtBranchNotice: 'Unit fisik kini beroperasi di',
+      rentNowCTA: 'Sewa',
+      rentAtNewBranchCTA: 'Sewa di Cabang',
+      archivedFleet: 'Unit Pensiun / Tidak Beroperasi Lagi',
+    },
   },
   vehicles: {
     dailyFrom: 'Mulai dari',

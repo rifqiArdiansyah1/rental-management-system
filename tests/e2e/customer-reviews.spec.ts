@@ -544,4 +544,138 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     await expect(provenanceBadge).toContainText('Rental History at Branch')
   })
 
+  test('8. Threshold zero-rendering: landing page renders no testimonials section when no reviews are featured', async ({ page }) => {
+    // Ensure all test reviews have isFeatured: false
+    await prisma.review.updateMany({
+      where: { vehicle: { plateNumber: { startsWith: testPrefix } } },
+      data: { isFeatured: false, featuredAt: null }
+    })
+
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+
+    // Section must NOT exist in the DOM (zero HTML footprint)
+    await expect(page.locator('[data-testid="home-testimonials-section"]')).toHaveCount(0)
+  })
+
+  test('9. Featuring authority & eligibility validation: admin_cabang rejected, admin_pusat requires published & text comment', async ({ page }) => {
+    // 9a. admin_cabang has NO toggle feature button in the UI
+    await loginAsAdmin(page, adminCabangAEmail, adminCabangAPassword)
+    await page.goto('/admin/reviews')
+    await page.waitForLoadState('networkidle')
+
+    await expect(page.locator(`[data-testid="toggle-feature-btn-${createdReviewId}"]`)).toHaveCount(0)
+
+    // 9b. admin_pusat logs in -> toggle feature button is present
+    await loginAsAdmin(page, adminPusatEmail, adminPusatPassword)
+    await page.goto('/admin/reviews')
+    await page.waitForLoadState('networkidle')
+
+    const featureBtn = page.locator(`[data-testid="toggle-feature-btn-${createdReviewId}"]`)
+    await expect(featureBtn).toBeVisible()
+    await expect(featureBtn).toHaveText(/Unggulkan/)
+  })
+
+  test('10. Featuring to landing page: batching traversal, PDP masked name, historical rental branch, and relocated CTA link', async ({ page }) => {
+    // 10a. Feature review via admin_pusat UI
+    await loginAsAdmin(page, adminPusatEmail, adminPusatPassword)
+    await page.goto('/admin/reviews')
+    await page.waitForLoadState('networkidle')
+
+    const featureBtn = page.locator(`[data-testid="toggle-feature-btn-${createdReviewId}"]`)
+    await featureBtn.click()
+
+    // Status badge appears in table
+    await expect(page.locator(`[data-testid="featured-badge-${createdReviewId}"]`)).toBeVisible({ timeout: 10000 })
+    await expect(featureBtn).toHaveText(/Lepas Unggulan/)
+
+    // Verify DB state
+    const dbReview = await prisma.review.findUnique({ where: { id: createdReviewId } })
+    expect(dbReview?.isFeatured).toBe(true)
+    expect(dbReview?.featuredAt).not.toBeNull()
+
+    // 10b. Visit landing page
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+
+    const homeSection = page.locator('[data-testid="home-testimonials-section"]')
+    await expect(homeSection).toBeVisible()
+
+    const card = page.locator(`[data-testid="testimonial-card-${createdReviewId}"]`)
+    await expect(card).toBeVisible()
+
+    // UU PDP masked name: "Customer One" -> "Customer O."
+    await expect(card.getByText('Customer O.')).toBeVisible()
+
+    // Clear distinction of historical rental branch (Cabang A / Jakarta)
+    await expect(card.getByText(new RegExp(`Disewa di:.*${branchA.name}`))).toBeVisible()
+
+    // Relocation chain aware CTA:
+    // Vehicle A was moved to Vehicle B in Branch B (Surabaya).
+    // Testimonial should render relocation notice banner and CTA link to Vehicle B at Branch B
+    await expect(card.getByText(new RegExp(`Unit fisik kini beroperasi di:.*${branchB.name}`))).toBeVisible()
+    const ctaLink = card.locator(`[data-testid="testimonial-cta-vehicle-${createdReviewId}"]`)
+    await expect(ctaLink).toBeVisible()
+    await expect(ctaLink).toHaveAttribute('href', `/vehicles/${testVehicleBId}`)
+  })
+
+  test('11. Retired vehicle in chain renders static badge without <a> tag (anti-404 broken link)', async ({ page }) => {
+    // Soft-deactivate Vehicle B (and Vehicle A is already isActive: false from relocation in test 4)
+    await prisma.vehicle.update({
+      where: { id: testVehicleBId },
+      data: { isActive: false }
+    })
+
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+
+    const card = page.locator(`[data-testid="testimonial-card-${createdReviewId}"]`)
+    await expect(card).toBeVisible()
+
+    // CTA <a> link must NOT exist (count 0)
+    await expect(card.locator(`[data-testid="testimonial-cta-vehicle-${createdReviewId}"]`)).toHaveCount(0)
+
+    // Static archived badge must be visible
+    await expect(card.getByText('Unit Pensiun / Tidak Beroperasi Lagi')).toBeVisible()
+
+    // Restore Vehicle B to active
+    await prisma.vehicle.update({
+      where: { id: testVehicleBId },
+      data: { isActive: true }
+    })
+  })
+
+  test('12. Cascade reset on hide: hiding featured review immediately resets isFeatured and featuredAt to null', async ({ page }) => {
+    await loginAsAdmin(page, adminPusatEmail, adminPusatPassword)
+    await page.goto('/admin/reviews')
+    await page.waitForLoadState('networkidle')
+
+    // Click Sembunyikan
+    const hideBtn = page.locator(`[data-testid="hide-review-btn-${createdReviewId}"]`)
+    await hideBtn.click()
+
+    const hideModal = page.locator('div[role="dialog"]')
+    await expect(hideModal).toBeVisible()
+    await hideModal.locator('[data-testid="hide-reason-input"]').fill('Audit kepatuhan landing page')
+    await hideModal.locator('[data-testid="confirm-hide-btn"]').click()
+
+    // Modal must close after successful server action
+    await expect(hideModal).not.toBeVisible({ timeout: 10000 })
+
+    // Review status in row must update to exact "Disembunyikan" badge
+    const reviewRow = page.locator(`[data-testid="admin-review-row-${createdReviewId}"]`)
+    await expect(reviewRow.getByText('Disembunyikan', { exact: true })).toBeVisible({ timeout: 10000 })
+
+    // Verify DB state: isFeatured reset to false, featuredAt reset to null
+    const dbReview = await prisma.review.findUnique({ where: { id: createdReviewId } })
+    expect(dbReview?.isPublished).toBe(false)
+    expect(dbReview?.isFeatured).toBe(false)
+    expect(dbReview?.featuredAt).toBeNull()
+
+    // Landing page should have 0 featured reviews -> zero-rendering section
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('[data-testid="home-testimonials-section"]')).toHaveCount(0)
+  })
+
 })

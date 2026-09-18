@@ -156,6 +156,8 @@ export async function moderateReview(params: ModerateReviewParams) {
       where: { id: reviewId },
       data: {
         isPublished,
+        isFeatured: action === 'hide' ? false : undefined,
+        featuredAt: action === 'hide' ? null : undefined,
         hiddenBy: action === 'hide' ? adminUser.id : null,
         hiddenReason: trimmedReason,
       }
@@ -183,6 +185,7 @@ export async function moderateReview(params: ModerateReviewParams) {
     })
 
     // 5. Revalidasi halaman
+    revalidatePath('/')
     revalidatePath(`/vehicles/${review.vehicleId}`)
     revalidatePath('/admin/reviews')
 
@@ -190,5 +193,93 @@ export async function moderateReview(params: ModerateReviewParams) {
   } catch (error: any) {
     console.error('[MODERATE_REVIEW_ERROR]', error)
     return { error: error.message || 'Terjadi kesalahan sistem saat memoderasi ulasan.' }
+  }
+}
+
+export interface ToggleFeaturedReviewParams {
+  reviewId: string
+  isFeatured: boolean
+}
+
+/**
+ * Server Action kurasi ulasan unggulan beranda (Featured Testimonials).
+ * - Dibatasi ketat HANYA untuk admin_pusat (representasi citra brand utama perusahaan).
+ * - Validasi kelayakan: ulasan wajib isPublished === true dan memiliki teks komentar non-kosong.
+ * - Mencatat featuredAt DateTime saat di-feature dan mereset ke null saat dilepas.
+ * - Dicatat ke AuditLog (review.feature / review.unfeature).
+ * - Revalidasi '/' dan '/admin/reviews'.
+ */
+export async function toggleFeaturedReview(params: ToggleFeaturedReviewParams) {
+  try {
+    const adminUser = await requireAdminSession()
+
+    if (adminUser.role !== 'admin_pusat') {
+      return { error: 'Akses ditolak: Hanya Admin Pusat yang memiliki wewenang mengelola ulasan unggulan di beranda.' }
+    }
+
+    const { reviewId, isFeatured } = params
+    if (!reviewId) {
+      return { error: 'ID Ulasan wajib diisi.' }
+    }
+
+    const review = await prisma.review.findUnique({
+      where: { id: reviewId },
+      select: {
+        id: true,
+        branchId: true,
+        vehicleId: true,
+        bookingId: true,
+        isPublished: true,
+        comment: true,
+        isFeatured: true,
+      }
+    })
+
+    if (!review) {
+      return { error: 'Ulasan tidak ditemukan.' }
+    }
+
+    if (isFeatured) {
+      if (!review.isPublished) {
+        return { error: 'Hanya ulasan yang berstatus terbit (publik) yang dapat diunggulkan di beranda.' }
+      }
+      if (!review.comment || !review.comment.trim()) {
+        return { error: 'Ulasan tanpa komentar teks tidak dapat diunggulkan di beranda.' }
+      }
+    }
+
+    const featuredAt = isFeatured ? new Date() : null
+
+    await prisma.review.update({
+      where: { id: reviewId },
+      data: {
+        isFeatured,
+        featuredAt,
+      }
+    })
+
+    await logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: review.branchId,
+      action: isFeatured ? 'review.feature' : 'review.unfeature',
+      entityType: 'Review',
+      entityId: review.id,
+      metadata: {
+        bookingId: review.bookingId,
+        vehicleId: review.vehicleId,
+        branchId: review.branchId,
+        previousFeatured: review.isFeatured,
+        featuredAt: featuredAt ? featuredAt.toISOString() : null,
+      }
+    })
+
+    revalidatePath('/')
+    revalidatePath('/admin/reviews')
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('[TOGGLE_FEATURED_REVIEW_ERROR]', error)
+    return { error: error.message || 'Terjadi kesalahan sistem saat memperbarui ulasan unggulan.' }
   }
 }

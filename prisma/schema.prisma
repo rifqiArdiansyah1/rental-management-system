@@ -412,6 +412,8 @@ model Review {
   rating       Int       // 1 - 5
   comment      String?
   isPublished  Boolean   @default(true)
+  isFeatured   Boolean   @default(false)
+  featuredAt   DateTime?
   hiddenBy     String?
   hiddenReason String?
   createdAt    DateTime  @default(now())
@@ -427,5 +429,6 @@ model Review {
   @@index([branchId, isPublished])
   @@index([customerId])
   @@index([isPublished, createdAt])
+  @@index([isFeatured, isPublished, featuredAt])
 }
 

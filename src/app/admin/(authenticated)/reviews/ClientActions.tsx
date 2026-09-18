@@ -1,13 +1,16 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
-import { moderateReview } from '@/actions/adminReview'
+import { moderateReview, toggleFeaturedReview } from '@/actions/adminReview'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Eye, EyeOff, AlertCircle, X, Search, RotateCcw } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, X, Search, RotateCcw, Star, Sparkles } from 'lucide-react'
 
 interface ReviewActionProps {
   reviewId: string
   isPublished: boolean
+  isFeatured?: boolean
+  hasComment?: boolean
+  isPusat?: boolean
   vehicleName: string
   customerName: string
   currentReason?: string | null
@@ -16,6 +19,9 @@ interface ReviewActionProps {
 export function ReviewRowActions({
   reviewId,
   isPublished,
+  isFeatured = false,
+  hasComment = true,
+  isPusat = false,
   vehicleName,
   customerName,
   currentReason,
@@ -67,9 +73,60 @@ export function ReviewRowActions({
     })
   }
 
+  const handleToggleFeature = () => {
+    setError(null)
+    startTransition(async () => {
+      const res = await toggleFeaturedReview({
+        reviewId,
+        isFeatured: !isFeatured,
+      })
+
+      if (res.success) {
+        router.refresh()
+      } else {
+        alert(res.error || 'Gagal mengubah status unggulan ulasan.')
+      }
+    })
+  }
+
   return (
     <>
       <div className="flex items-center gap-2 justify-end">
+        {/* Toggle Feature Button (Exclusive for admin_pusat) */}
+        {isPusat && (
+          isFeatured ? (
+            <button
+              type="button"
+              onClick={handleToggleFeature}
+              disabled={isPending}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+              data-testid={`toggle-feature-btn-${reviewId}`}
+              title="Lepas status unggulan dari beranda"
+            >
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+              <span>Lepas Unggulan</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleToggleFeature}
+              disabled={isPending || !isPublished || !hasComment}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-zinc-50 hover:bg-amber-50 text-zinc-700 hover:text-amber-800 border border-zinc-200 hover:border-amber-300 transition-colors disabled:opacity-40 disabled:hover:bg-zinc-50 disabled:hover:text-zinc-700 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+              data-testid={`toggle-feature-btn-${reviewId}`}
+              title={
+                !isPublished
+                  ? 'Ulasan yang disembunyikan tidak dapat diunggulkan'
+                  : !hasComment
+                  ? 'Ulasan tanpa teks komentar tidak dapat diunggulkan'
+                  : 'Unggulkan ulasan ini di beranda'
+              }
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Unggulkan</span>
+            </button>
+          )
+        )}
+
         {isPublished ? (
           <button
             type="button"
