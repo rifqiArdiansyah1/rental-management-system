@@ -189,9 +189,9 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
               href={`/booking/${booking.id}`}
               className="block rounded-xl border border-surface-variant bg-surface-container-low hover:border-secondary/50 transition-colors group"
             >
-              <div className="flex gap-4 p-4">
+              <div className="flex gap-4 p-4 sm:p-5">
                 {/* Thumbnail */}
-                <div className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-surface-variant flex items-center justify-center">
+                <div className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden bg-surface-variant flex items-center justify-center">
                   {thumb ? (
                     <img
                       src={thumb}
@@ -208,7 +208,7 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h4 className="font-semibold text-sm text-on-surface group-hover:text-secondary transition-colors truncate">
+                    <h4 className="font-semibold text-sm sm:text-base text-on-surface group-hover:text-secondary transition-colors truncate">
                       {vehicleName}
                     </h4>
                     <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${badge.className}`}>
@@ -218,7 +218,7 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
 
                   <p className="text-xs text-zinc-500 font-mono mb-2">{booking.vehicle.plateNumber}</p>
 
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm text-on-surface-variant">
                     <span>
                       {new Date(booking.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                       {' — '}

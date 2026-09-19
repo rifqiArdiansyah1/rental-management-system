@@ -6,6 +6,7 @@ import BookingList from './BookingList'
 import DocumentSection from './DocumentSection'
 import EditProfileModal from './EditProfileModal'
 import Navbar from '@/components/Navbar'
+import Footer from '@/components/Footer'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,13 +93,13 @@ export default async function DashboardPage() {
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
 
-      <main className="flex-grow py-10 px-margin-mobile md:px-margin-desktop max-w-4xl mx-auto w-full">
+      <main className="flex-grow py-10 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full">
         <h1 className="text-2xl font-bold text-on-surface mb-8 tracking-tight">Dashboard Saya</h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
           {/* ── Left Column: Profile & Docs ── */}
-          <div className="flex flex-col gap-6">
+          <div className="lg:col-span-5 flex flex-col gap-6">
 
             {/* Profile Card */}
             <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm">
@@ -137,13 +138,15 @@ export default async function DashboardPage() {
           </div>
 
           {/* ── Right Column: Booking History ── */}
-          <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm h-fit">
+          <div className="lg:col-span-7 bg-surface p-6 sm:p-8 rounded-xl border border-surface-variant shadow-sm h-fit">
             <h2 className="font-semibold text-on-surface text-lg mb-6">Riwayat Pemesanan</h2>
             <BookingList bookings={serializedBookings} />
           </div>
 
         </div>
       </main>
+
+      <Footer />
     </div>
   )
 }

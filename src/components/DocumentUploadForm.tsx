@@ -38,7 +38,7 @@ export default function DocumentUploadForm() {
   }
 
   return (
-    <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm w-full max-w-md">
+    <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm w-full">
       <h3 className="font-headline-sm text-on-surface mb-4">Upload Identitas</h3>
       
       {errorMsg && (
