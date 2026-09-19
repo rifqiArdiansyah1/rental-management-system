@@ -118,7 +118,7 @@ async function ensureStaffUser(email: string, password: string, appMetadata: Rec
 async function loginAsCustomer(page: Page) {
   await page.context().clearCookies()
   await page.goto('/login')
-  await page.waitForLoadState('networkidle')
+  await page.waitForLoadState('domcontentloaded')
   await page.fill('input[name="email"]', customerEmail)
   await page.fill('input[name="password"]', customerPassword)
   await page.click('button[type="submit"]')
@@ -128,7 +128,7 @@ async function loginAsCustomer(page: Page) {
 async function loginAsAdmin(page: Page, email: string, password = 'Password123!') {
   await page.context().clearCookies()
   await page.goto('/admin/login')
-  await page.waitForLoadState('networkidle')
+  await page.waitForLoadState('domcontentloaded')
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)
   await page.click('button[type="submit"]')
@@ -257,7 +257,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
   test('1. Non-completed bookings (ongoing, confirmed) do NOT show review options', async ({ page }) => {
     await loginAsCustomer(page)
     await page.goto('/dashboard')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     // Find ongoing booking card
     const ongoingCard = page.locator(`a[href="/booking/${testOngoingBookingId}"]`)
@@ -269,7 +269,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
 
     // Navigate to booking detail page for ongoing booking
     await page.goto(`/booking/${testOngoingBookingId}`)
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     // Ensure review invitation card is not visible on ongoing booking detail
     await expect(page.locator('text=Beri Ulasan Pengalaman')).toHaveCount(0)
@@ -278,7 +278,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
   test('2. Customer submits 5-star review + comment for completed booking & TOCTOU defense', async ({ page }) => {
     await loginAsCustomer(page)
     await page.goto('/dashboard')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     // The completed booking card should have the review button
     const completedCard = page.locator(`a[href="/booking/${testBookingAId}"]`)
@@ -340,7 +340,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
 
   test('3. Public vehicle detail page (/vehicles/[id]) renders review with UU PDP masked name and verified badge', async ({ page }) => {
     await page.goto(`/vehicles/${testVehicleAId}`)
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     // Reviews section should be rendered
     const section = page.locator('[data-testid="vehicle-reviews-section"]')
@@ -390,7 +390,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
 
     // Visit new vehicle at Branch B
     await page.goto(`/vehicles/${testVehicleBId}`)
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     const section = page.locator('[data-testid="vehicle-reviews-section"]')
     await expect(section).toBeVisible()
@@ -411,7 +411,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     // 5a. Login as staff_cabang -> blocked from /admin/reviews
     await loginAsAdmin(page, staffEmail, staffPassword)
     await page.goto('/admin/reviews')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     await expect(page.locator('[data-testid="staff-restricted-screen"]')).toBeVisible()
     await expect(page.locator('text=Akses Terbatas')).toBeVisible()
@@ -419,7 +419,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     // 5b. Login as Admin Cabang A -> sees Branch A review
     await loginAsAdmin(page, adminCabangAEmail, adminCabangAPassword)
     await page.goto('/admin/reviews')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     await expect(page.locator('[data-testid="admin-reviews-table"]')).toBeVisible()
     const reviewRow = page.locator(`[data-testid="admin-review-row-${createdReviewId}"]`)
@@ -429,7 +429,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     // 5c. Admin Cabang A attempts query injection ?branch=[branchB.id]
     // Server scoping must ignore the client branchId parameter and keep showing Branch A
     await page.goto(`/admin/reviews?branch=${branchB.id}`)
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     // Branch A review is still returned, zero leak of Branch B
     await expect(reviewRow).toBeVisible()
@@ -439,7 +439,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     // 6a. Login as Admin Pusat to test full moderation flow
     await loginAsAdmin(page, adminPusatEmail, adminPusatPassword)
     await page.goto('/admin/reviews')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     const hideBtn = page.locator(`[data-testid="hide-review-btn-${createdReviewId}"]`)
     await expect(hideBtn).toBeVisible()
@@ -483,7 +483,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     const targetVehicleId = activeVehicle?.id || testVehicleBId
 
     await page.goto(`/vehicles/${targetVehicleId}`)
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     // Now empty state should appear
     await expect(page.locator('[data-testid="reviews-empty-state"]')).toBeVisible()
@@ -491,7 +491,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
 
     // 6b. Test Unhide: Go back to admin reviews and unhide
     await page.goto('/admin/reviews?status=hidden')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     const unhideBtn = page.locator(`[data-testid="unhide-review-btn-${createdReviewId}"]`)
     await expect(unhideBtn).toBeVisible()
@@ -502,7 +502,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
 
     // Return to main review list to verify status is restored to Terbit (Publik)
     await page.goto('/admin/reviews')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
     await expect(reviewRow.getByText('Terbit (Publik)', { exact: true })).toBeVisible({ timeout: 10000 })
 
     const dbReviewUnhidden = await prisma.review.findUnique({ where: { id: createdReviewId } })
@@ -520,7 +520,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
 
     // Public vehicle page shows review again
     await page.goto(`/vehicles/${targetVehicleId}`)
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
     await expect(page.locator('[data-testid="review-card"]')).toHaveCount(1)
   })
 
@@ -530,7 +530,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
 
     // Navigate with ?lang=en to activate English dictionary
     await page.goto(`/vehicles/${targetVehicleId}?lang=en`)
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     const section = page.locator('[data-testid="vehicle-reviews-section"]')
     await expect(section).toBeVisible()
@@ -552,7 +552,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     })
 
     await page.goto('/')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     // Section must NOT exist in the DOM (zero HTML footprint)
     await expect(page.locator('[data-testid="home-testimonials-section"]')).toHaveCount(0)
@@ -562,14 +562,14 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     // 9a. admin_cabang has NO toggle feature button in the UI
     await loginAsAdmin(page, adminCabangAEmail, adminCabangAPassword)
     await page.goto('/admin/reviews')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     await expect(page.locator(`[data-testid="toggle-feature-btn-${createdReviewId}"]`)).toHaveCount(0)
 
     // 9b. admin_pusat logs in -> toggle feature button is present
     await loginAsAdmin(page, adminPusatEmail, adminPusatPassword)
     await page.goto('/admin/reviews')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     const featureBtn = page.locator(`[data-testid="toggle-feature-btn-${createdReviewId}"]`)
     await expect(featureBtn).toBeVisible()
@@ -580,7 +580,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     // 10a. Feature review via admin_pusat UI
     await loginAsAdmin(page, adminPusatEmail, adminPusatPassword)
     await page.goto('/admin/reviews')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     const featureBtn = page.locator(`[data-testid="toggle-feature-btn-${createdReviewId}"]`)
     await featureBtn.click()
@@ -596,7 +596,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
 
     // 10b. Visit landing page
     await page.goto('/')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     const homeSection = page.locator('[data-testid="home-testimonials-section"]')
     await expect(homeSection).toBeVisible()
@@ -627,7 +627,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
     })
 
     await page.goto('/')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     const card = page.locator(`[data-testid="testimonial-card-${createdReviewId}"]`)
     await expect(card).toBeVisible()
@@ -648,7 +648,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
   test('12. Cascade reset on hide: hiding featured review immediately resets isFeatured and featuredAt to null', async ({ page }) => {
     await loginAsAdmin(page, adminPusatEmail, adminPusatPassword)
     await page.goto('/admin/reviews')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     // Click Sembunyikan
     const hideBtn = page.locator(`[data-testid="hide-review-btn-${createdReviewId}"]`)
@@ -674,7 +674,7 @@ test.describe('Verified Customer Reviews Feature Suite', () => {
 
     // Landing page should have 0 featured reviews -> zero-rendering section
     await page.goto('/')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
     await expect(page.locator('[data-testid="home-testimonials-section"]')).toHaveCount(0)
   })
 
