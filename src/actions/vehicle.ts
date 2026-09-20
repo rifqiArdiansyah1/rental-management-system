@@ -9,6 +9,7 @@ export async function getVehicles(filters?: { branchId?: string; categoryId?: st
       isActive: true,
       OR: [
         { status: 'available' },
+        { status: 'rented' },
         {
           status: 'maintenance',
           unavailabilities: {

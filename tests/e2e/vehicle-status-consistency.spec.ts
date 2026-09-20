@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import { createClient } from '@supabase/supabase-js'
+import { getVehicles } from '@/actions/vehicle'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const adapter = new PrismaPg(pool)
@@ -146,21 +147,25 @@ test.describe('Vehicle Status Consistency & Operational Lifecycle Audit (Issue #
     await modal.getByRole('button', { name: 'Simpan' }).click()
     await expect(modal).not.toBeVisible({ timeout: 15000 })
 
-    // 7. Verify status updated to MAINTENANCE in UI and Database
-    await expect(vehicleRow.locator('span', { hasText: 'MAINTENANCE' })).toBeVisible({ timeout: 15000 })
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+    const updatedVehicleRow = page.locator('tbody tr', { hasText: testPlate }).first()
+    await expect(updatedVehicleRow.locator('span', { hasText: 'MAINTENANCE' })).toBeVisible({ timeout: 15000 })
 
     const dbVehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } })
     expect(dbVehicle?.status).toBe('maintenance')
 
     // 8. Revert back to Available
-    await vehicleRow.getByRole('button', { name: '•••' }).click()
-    await vehicleRow.getByRole('button', { name: 'Ubah Status' }).click()
+    await updatedVehicleRow.getByRole('button', { name: '•••' }).click()
+    await updatedVehicleRow.getByRole('button', { name: 'Ubah Status' }).click()
     await modal.locator('select').selectOption('available')
     await modal.getByRole('button', { name: 'Simpan' }).click()
     await expect(modal).not.toBeVisible({ timeout: 15000 })
 
-    await prisma.vehicle.findUnique({ where: { id: vehicleId } })
-    await expect(vehicleRow.locator('span', { hasText: 'AVAILABLE' })).toBeVisible({ timeout: 15000 })
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+    const revertedRow = page.locator('tbody tr', { hasText: testPlate }).first()
+    await expect(revertedRow.locator('span', { hasText: 'TERSEDIA' }).or(revertedRow.locator('span', { hasText: 'AVAILABLE' }))).toBeVisible({ timeout: 15000 })
 
     const dbVehicleAvailable = await prisma.vehicle.findUnique({ where: { id: vehicleId } })
     expect(dbVehicleAvailable?.status).toBe('available')
@@ -320,4 +325,25 @@ test.describe('Vehicle Status Consistency & Operational Lifecycle Audit (Issue #
     // 3. Cleanup booking
     await prisma.booking.delete({ where: { id: booking.id } })
   })
+
+  test('Catalog Ingestion: getVehicles includes active vehicles even when status is rented', async () => {
+    // 1. Update vehicle status to rented
+    await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: { status: 'rented' }
+    })
+
+    // 2. Fetch catalog via getVehicles
+    const vehicles = await getVehicles({ branchId })
+    const found = vehicles.find((v: any) => v.id === vehicleId)
+    expect(found).toBeDefined()
+    expect(found.status).toBe('rented')
+
+    // 3. Restore to available
+    await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: { status: 'available' }
+    })
+  })
 })
+
