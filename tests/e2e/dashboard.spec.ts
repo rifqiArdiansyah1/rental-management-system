@@ -9,13 +9,13 @@ const prisma = new PrismaClient({ adapter })
 
 async function loginAsCustomer(page: Page) {
   await page.goto('/login')
-  await page.waitForLoadState('networkidle')
+  await page.waitForLoadState('domcontentloaded')
   await page.fill('input[name="email"]', 'customer1@test.com')
   await page.fill('input[name="password"]', 'Password123!')
   await page.click('button[type="submit"]')
   await page.waitForURL('/', { timeout: 15000 })
   await page.goto('/dashboard')
-  await page.waitForLoadState('networkidle')
+  await page.waitForLoadState('domcontentloaded')
 }
 
 test.describe('Dashboard User Enhancement', () => {
@@ -26,6 +26,37 @@ test.describe('Dashboard User Enhancement', () => {
     const category = await prisma.vehicleCategory.findFirst()
 
     if (customer && branch && category) {
+      // Late return booking matching user's scenario created first so testVehicle remains first in createdAt desc
+      const lateVehicle = await prisma.vehicle.create({
+        data: {
+          name: 'Toyota GR Supra Test',
+          plateNumber: `SUPRA-${Date.now()}`,
+          dailyRate: 3500000,
+          status: 'available',
+          branchId: branch.id,
+          categoryId: category.id,
+          photos: ['https://example.com/supra.png']
+        }
+      })
+
+      await prisma.booking.create({
+        data: {
+          customerId: customer.id,
+          vehicleId: lateVehicle.id,
+          pickupBranchId: branch.id,
+          returnBranchId: branch.id,
+          rentalType: 'self_drive',
+          startDate: new Date('2026-09-12T08:00:00Z'),
+          endDate: new Date('2026-09-12T17:00:00Z'),
+          actualReturnAt: new Date('2026-09-18T14:54:00Z'),
+          status: 'completed',
+          totalPrice: 3500000,
+          lateMinutes: 8574,
+          lateFeeAmount: 21000000,
+          lateFeeNote: 'terlambat',
+        }
+      })
+
       const testVehicle = await prisma.vehicle.create({
         data: {
           name: 'BMW 730Li Executive Test',
@@ -118,7 +149,7 @@ test.describe('Dashboard User Enhancement', () => {
 
     // Click confirm -> booking cancelled
     await page.locator('button', { hasText: 'Ya, Batalkan' }).click()
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
     // After cancel, badge changes to Dibatalkan
     await expect(page.locator('text=Dibatalkan').first()).toBeVisible({ timeout: 10000 })
@@ -127,14 +158,21 @@ test.describe('Dashboard User Enhancement', () => {
   test('7. Responsive design renders on tablet and mobile viewports', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 })
     await page.goto('/dashboard')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
     await expect(page.locator('text=Profil Pelanggan')).toBeVisible()
     await expect(page.locator('text=Riwayat Pemesanan')).toBeVisible()
 
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/dashboard')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
     await expect(page.locator('text=Profil Pelanggan')).toBeVisible()
+  })
+
+  test('8. Late duration is formatted human-readably (5 hari 22 jam 54 menit) instead of raw large digit minutes', async ({ page }) => {
+    // Assert formatted duration is displayed
+    await expect(page.locator('text=Terlambat 5 hari 22 jam 54 menit')).toBeVisible()
+    // Raw 4-digit minutes text must NOT be present
+    await expect(page.locator('text=8574 menit')).toHaveCount(0)
   })
 
 })

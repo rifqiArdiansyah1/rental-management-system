@@ -113,3 +113,44 @@ export function calculateLateFee(
     breakdownText: `Keterlambatan ekstrem ${hoursLate} jam (${daysLate} hari tarif sewa) × Rp ${agreedDailyRate.toLocaleString('id-ID')}`,
   }
 }
+
+/**
+ * Memformat durasi keterlambatan (dalam menit) ke dalam format yang ramah dan mudah dibaca manusia.
+ * Menghindari tampilan ribuan/puluhan ribu digit menit (misal: "8574 menit") yang membingungkan pengguna.
+ *
+ * Aturan format:
+ * - <= 0 atau null/undefined: "0 menit"
+ * - < 60 menit: "X menit"
+ * - 60 s/d < 1440 menit (kurang dari 1 hari): "X jam" atau "X jam Y menit"
+ * - >= 1440 menit (1 hari atau lebih): "X hari", "X hari Y jam", "X hari Y jam Z menit", dst.
+ *
+ * Contoh:
+ * - 25 -> "25 menit"
+ * - 60 -> "1 jam"
+ * - 90 -> "1 jam 30 menit"
+ * - 1440 -> "1 hari"
+ * - 8574 -> "5 hari 22 jam 54 menit"
+ *
+ * Mendukung opsi bahasa ('id' | 'en'), default: 'id'.
+ */
+export function formatLateDuration(
+  minutes: number | null | undefined,
+  locale: string = 'id'
+): string {
+  const m = Math.max(0, Math.round(minutes || 0))
+  const isEn = locale === 'en'
+  if (m === 0) return isEn ? '0 minutes' : '0 menit'
+
+  const days = Math.floor(m / 1440)
+  const remMinutesAfterDays = m % 1440
+  const hours = Math.floor(remMinutesAfterDays / 60)
+  const mins = remMinutesAfterDays % 60
+
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days} ${isEn ? (days > 1 ? 'days' : 'day') : 'hari'}`)
+  if (hours > 0) parts.push(`${hours} ${isEn ? (hours > 1 ? 'hours' : 'hour') : 'jam'}`)
+  if (mins > 0) parts.push(`${mins} ${isEn ? (mins > 1 ? 'minutes' : 'minute') : 'menit'}`)
+
+  return parts.join(' ') || (isEn ? '0 minutes' : '0 menit')
+}
+

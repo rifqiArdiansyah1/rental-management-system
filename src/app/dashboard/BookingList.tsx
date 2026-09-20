@@ -9,6 +9,7 @@ import { createLateFeeSnapToken, syncLateFeePaymentStatus } from '@/actions/paym
 import { useRouter } from 'next/navigation'
 import ReviewModal from '@/components/review/ReviewModal'
 import { Star } from 'lucide-react'
+import { formatLateDuration } from '@/lib/lateFee'
 
 type BookingWithRelations = {
   id: string
@@ -250,8 +251,11 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
                         <span className="text-red-400 font-semibold text-xs block">
                           Denda Keterlambatan: Rp {Number(booking.lateFeeAmount).toLocaleString('id-ID')}
                         </span>
-                        <span className="text-zinc-400 text-[11px]">
-                          Terlambat {booking.lateMinutes || 0} menit
+                        <span
+                          className="text-zinc-400 text-[11px]"
+                          title={booking.lateMinutes && booking.lateMinutes >= 60 ? `Total: ${booking.lateMinutes.toLocaleString('id-ID')} menit` : undefined}
+                        >
+                          Terlambat {formatLateDuration(booking.lateMinutes)}
                           {booking.lateFeeNote && ` • ${booking.lateFeeNote}`}
                         </span>
                       </div>

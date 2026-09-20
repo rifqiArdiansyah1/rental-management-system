@@ -19,6 +19,7 @@ import { getFuelPrices } from '@/actions/fuelPrice'
 import { calculateTripOdometer } from '@/lib/fuelEstimation'
 import { FUEL_TYPE_LABELS } from '@/lib/constants'
 import { FuelType } from '@prisma/client'
+import { formatLateDuration } from '@/lib/lateFee'
 
 export const dynamic = 'force-dynamic'
 
@@ -174,7 +175,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
           <div>
             <p className="font-bold text-sm">💰 Tagihan Denda Keterlambatan Belum Lunas</p>
             <p className="text-xs mt-0.5">
-              Pesanan ini memiliki tagihan denda keterlambatan sebesar <strong>Rp {Number(booking.lateFeeAmount).toLocaleString('id-ID')}</strong> ({booking.lateMinutes || 0} menit keterlambatan) yang belum diselesaikan oleh pelanggan.
+              Pesanan ini memiliki tagihan denda keterlambatan sebesar <strong>Rp {Number(booking.lateFeeAmount).toLocaleString('id-ID')}</strong> ({formatLateDuration(booking.lateMinutes)} keterlambatan) yang belum diselesaikan oleh pelanggan.
             </p>
           </div>
         </div>
@@ -225,10 +226,13 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                     <span className="text-zinc-500">Waktu Aktual Kembali: </span>
                     <span className="font-semibold text-zinc-800">{formatWibDateTime(booking.actualReturnAt)}</span>
                     {booking.lateMinutes && booking.lateMinutes > 0 ? (
-                      <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                        booking.lateMinutes > 45 ? 'bg-red-100 text-red-800' : 'bg-zinc-100 text-zinc-700'
-                      }`}>
-                        Terlambat {booking.lateMinutes} Menit
+                      <span
+                        className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          booking.lateMinutes > 45 ? 'bg-red-100 text-red-800' : 'bg-zinc-100 text-zinc-700'
+                        }`}
+                        title={booking.lateMinutes >= 60 ? `Total: ${booking.lateMinutes.toLocaleString('id-ID')} menit` : undefined}
+                      >
+                        Terlambat {formatLateDuration(booking.lateMinutes)}
                       </span>
                     ) : (
                       <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
@@ -381,8 +385,11 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
               {booking.lateFeeAmount && Number(booking.lateFeeAmount) > 0 ? (
                 <div className="flex justify-between items-center text-sm pt-2 border-t border-zinc-200/60">
                   <div>
-                    <span className="text-red-700 font-semibold block">
-                      Denda Keterlambatan ({booking.lateMinutes || 0} menit)
+                    <span
+                      className="text-red-700 font-semibold block"
+                      title={booking.lateMinutes && booking.lateMinutes >= 60 ? `Total: ${booking.lateMinutes.toLocaleString('id-ID')} menit` : undefined}
+                    >
+                      Denda Keterlambatan ({formatLateDuration(booking.lateMinutes)})
                     </span>
                     {booking.lateFeeNote && (
                       <span className="text-[11px] text-zinc-500 block italic">{booking.lateFeeNote}</span>
