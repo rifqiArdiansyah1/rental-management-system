@@ -43,6 +43,16 @@ type BookingWithRelations = {
     rating: number
     comment?: string | null
   } | null
+  kycStatus?: {
+    isCustomerVerified: boolean
+    isKtpVerified: boolean
+    isSimVerified: boolean
+    isKtpRejected: boolean
+    isSimRejected: boolean
+    hasKtp: boolean
+    hasSim: boolean
+    kycReason: 'rejected' | 'missing_both' | 'missing_ktp' | 'missing_sim' | 'pending' | 'verified'
+  }
 }
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
@@ -227,6 +237,43 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
                     </span>
                     <span className="text-secondary font-semibold">{price}</span>
                   </div>
+
+                  {/* KYC Status Badge for Confirmed or Ongoing Bookings */}
+                  {booking.kycStatus && (booking.status === 'confirmed' || booking.status === 'ongoing') && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      {booking.kycStatus.kycReason === 'verified' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-md" data-testid="kyc-badge-verified">
+                          <span className="material-symbols-outlined text-[13px]">verified</span>
+                          Identitas Terverifikasi ✓
+                        </span>
+                      ) : booking.kycStatus.kycReason === 'rejected' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400 bg-red-500/10 border border-red-500/25 px-2 py-0.5 rounded-md" data-testid="kyc-badge-rejected">
+                          <span className="material-symbols-outlined text-[13px]">cancel</span>
+                          Dokumen Ditolak — Perlu Diperbaiki ⚠️
+                        </span>
+                      ) : booking.kycStatus.kycReason === 'missing_both' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-md" data-testid="kyc-badge-missing-both">
+                          <span className="material-symbols-outlined text-[13px]">warning</span>
+                          Wajib Unggah KTP & SIM ⚠️
+                        </span>
+                      ) : booking.kycStatus.kycReason === 'missing_ktp' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-md" data-testid="kyc-badge-missing-ktp">
+                          <span className="material-symbols-outlined text-[13px]">badge</span>
+                          Lengkapi KTP ⚠️
+                        </span>
+                      ) : booking.kycStatus.kycReason === 'missing_sim' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-md" data-testid="kyc-badge-missing-sim">
+                          <span className="material-symbols-outlined text-[13px]">directions_car</span>
+                          Lengkapi SIM ⚠️
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 bg-amber-400/10 border border-amber-400/25 px-2 py-0.5 rounded-md" data-testid="kyc-badge-pending">
+                          <span className="material-symbols-outlined text-[13px]">schedule</span>
+                          Verifikasi: Menunggu Review ⏳
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Driver info (with_driver bookings) */}
                   {booking.rentalType === 'with_driver' && booking.driver && (

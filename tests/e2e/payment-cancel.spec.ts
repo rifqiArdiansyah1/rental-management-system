@@ -28,11 +28,11 @@ test.describe('Payment Cancellation & Vehicle Lock Release', () => {
     endDate.setDate(endDate.getDate() + 21);
     
     const dateInputs = await page.locator('input[type="datetime-local"]').all();
-    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T00:00');
-    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T00:00');
+    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T10:00');
+    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T10:00');
 
-    await page.waitForSelector('text=Price Breakdown');
-    await page.getByRole('button', { name: 'Confirm Booking' }).click();
+    await page.locator('text=Price Breakdown').or(page.locator('text=Ringkasan Biaya')).first().waitFor({ state: 'visible' });
+    await page.getByRole('button', { name: /Confirm Booking|Lanjutkan ke Pembayaran|Proceed to Payment/i }).click();
     await page.waitForURL(/\/booking\/.*/);
     
     const url = page.url();
@@ -85,12 +85,12 @@ test.describe('Payment Cancellation & Vehicle Lock Release', () => {
 
     // 4. Verify vehicle is available again for the same dates by attempting to book it again
     await page.goto(`/vehicles/${vehicleId}/book`);
-    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T00:00');
-    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T00:00');
-    await page.waitForSelector('text=Price Breakdown');
+    await dateInputs[0].fill(startDate.toISOString().split('T')[0] + 'T10:00');
+    await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T10:00');
+    await page.locator('text=Price Breakdown').or(page.locator('text=Ringkasan Biaya')).first().waitFor({ state: 'visible' });
     
     // Attempt booking again
-    await page.getByRole('button', { name: 'Confirm Booking' }).click();
+    await page.getByRole('button', { name: /Confirm Booking|Lanjutkan ke Pembayaran|Proceed to Payment/i }).click();
     
     // Should succeed and redirect to new booking
     await page.waitForURL(/\/booking\/.*/);

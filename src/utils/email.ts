@@ -99,7 +99,24 @@ export async function sendBookingConfirmedEmail(data: BookingConfirmedData) {
               </tr>
             </table>
 
-            <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 30px;">
+            <!-- High-Contrast KYC Callout Box -->
+            <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 20px; margin-bottom: 30px; text-align: left;">
+              <h3 style="color: #92400e; margin: 0 0 8px 0; font-size: 15px; font-weight: bold;">
+                ${isEn ? '⚠️ Action Required Before Vehicle Handover' : '⚠️ Tindakan Diperlukan Sebelum Penjemputan Armada'}
+              </h3>
+              <p style="color: #78350f; font-size: 13px; line-height: 1.5; margin: 0 0 16px 0;">
+                ${isEn 
+                  ? 'Vehicle keys can only be handed over at scheduled pickup time if both your National ID (KTP) and Driver License (SIM) are verified by branch staff.' 
+                  : 'Sesuai regulasi persewaan, kunci kendaraan hanya dapat diserahterimakan pada hari-H jika foto KTP & SIM Anda telah diverifikasi oleh staf cabang kami.'}
+              </p>
+              <div style="text-align: center;">
+                <a href="${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/booking/${data.bookingId}" style="background-color: #d97706; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 13px; display: inline-block;">
+                  ${isEn ? 'Complete Verification Documents' : 'Lengkapi Dokumen Verifikasi Sekarang'}
+                </a>
+              </div>
+            </div>
+
+            <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 24px;">
               ${bodyNotice}
             </p>
 

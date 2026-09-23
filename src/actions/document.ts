@@ -1,10 +1,13 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getStaffScope } from '@/lib/auth/scope'
 import { logAudit } from '@/lib/audit'
+
+export type SupportedDocumentType = 'ktp' | 'sim'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'application/pdf']
@@ -18,16 +21,18 @@ export async function uploadIdentityDocument(formData: FormData) {
   }
 
   const file = formData.get('file') as File | null
-  const type = formData.get('type') as string // 'ktp' or 'sim'
-  const identityNumber = formData.get('identityNumber') as string
+  const rawType = (formData.get('type') as string || '').toLowerCase().trim()
+  const identityNumber = (formData.get('identityNumber') as string || '').trim()
+  const bookingId = formData.get('bookingId') as string | null
 
-  if (!file || !type || !identityNumber) {
+  if (!file || !rawType || !identityNumber) {
     return { error: 'Semua field wajib diisi' }
   }
 
-  if (type !== 'ktp' && type !== 'sim') {
+  if (rawType !== 'ktp' && rawType !== 'sim') {
     return { error: 'Tipe dokumen tidak valid' }
   }
+  const type: SupportedDocumentType = rawType
 
   if (file.size > MAX_FILE_SIZE) {
     return { error: 'Ukuran file maksimal 5MB' }
@@ -65,7 +70,7 @@ export async function uploadIdentityDocument(formData: FormData) {
       if (existingDoc) {
         await tx.document.update({
           where: { id: existingDoc.id },
-          data: { fileUrl: filePath, updatedAt: new Date(), verifiedAt: null }
+          data: { fileUrl: filePath, updatedAt: new Date(), verifiedAt: null, rejectionReason: null }
         })
       } else {
         await tx.document.create({
@@ -86,6 +91,11 @@ export async function uploadIdentityDocument(formData: FormData) {
         }
       })
     })
+
+    revalidatePath('/dashboard')
+    if (bookingId) {
+      revalidatePath(`/booking/${bookingId}`)
+    }
 
     return { success: true }
   } catch (dbError: any) {

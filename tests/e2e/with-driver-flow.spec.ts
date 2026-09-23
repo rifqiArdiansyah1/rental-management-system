@@ -31,11 +31,11 @@ test.describe('With Driver Booking Flow & Admin Scoping', () => {
     await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T10:00');
 
     // Select With Driver
-    await page.getByRole('button', { name: 'With Driver' }).click();
-    await page.waitForSelector('text=Driver Fee');
+    await page.getByRole('button', { name: /With Driver|Dengan Sopir/i }).click();
+    await page.locator('text=Driver Fee').or(page.locator('text=Biaya Layanan Sopir')).first().waitFor({ state: 'visible' });
 
     // Confirm Booking
-    await page.getByRole('button', { name: 'Confirm Booking' }).click();
+    await page.getByRole('button', { name: /Confirm Booking|Lanjutkan ke Pembayaran|Proceed to Payment/i }).click();
     await page.waitForURL(/\/booking\/.*/);
 
     const bookingUrl = page.url();

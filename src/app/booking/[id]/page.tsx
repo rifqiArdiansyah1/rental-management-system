@@ -3,6 +3,7 @@ import { prisma } from '@/utils/prisma'
 import { createClient } from '@/utils/supabase/server'
 import PaymentClient from './PaymentClient'
 import BookingReviewCard from './BookingReviewCard'
+import PostPaymentKycSection from '@/components/booking/PostPaymentKycSection'
 import { syncPaymentStatus } from '@/actions/payment'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +25,14 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
       vehicle: {
         include: { category: true }
       },
-      customer: true,
+      customer: {
+        include: {
+          documents: {
+            orderBy: { createdAt: 'desc' }
+          }
+        }
+      },
+      pickupBranch: true,
       review: true
     }
   })
@@ -47,7 +55,14 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
           vehicle: {
             include: { category: true }
           },
-          customer: true,
+          customer: {
+            include: {
+              documents: {
+                orderBy: { createdAt: 'desc' }
+              }
+            }
+          },
+          pickupBranch: true,
           review: true
         }
       }) || booking
@@ -61,9 +76,36 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
 
   const vehicleName = booking.vehicle.name || `${booking.vehicle.category.name} (${booking.vehicle.plateNumber})`
 
+  const docs = booking.customer.documents || []
+  const rawKtp = docs.find(d => d.type.toLowerCase() === 'ktp')
+  const ktpDoc = rawKtp ? {
+    id: rawKtp.id,
+    type: 'ktp',
+    fileUrl: rawKtp.fileUrl,
+    verifiedAt: rawKtp.verifiedAt,
+    rejectionReason: rawKtp.rejectionReason,
+  } : null
+
+  const rawSim = docs.find(d => d.type.toLowerCase() === 'sim')
+  const simDoc = rawSim ? {
+    id: rawSim.id,
+    type: 'sim',
+    fileUrl: rawSim.fileUrl,
+    verifiedAt: rawSim.verifiedAt,
+    rejectionReason: rawSim.rejectionReason,
+  } : null
+
+  const branchName = booking.pickupBranch?.name || 'Prestige Motion'
+  const startDateFormatted = booking.startDate.toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  })
+
   return (
     <div className="flex-grow flex flex-col items-center justify-center p-4 bg-background min-h-[calc(100vh-80px)]">
-      <div className="max-w-xl w-full bg-surface p-8 rounded-xl border border-surface-variant shadow-xl">
+      <div className="max-w-2xl w-full bg-surface p-6 sm:p-8 rounded-xl border border-surface-variant shadow-xl">
         <h1 className="font-display-md text-on-surface mb-6 text-center tracking-tight">Booking Summary</h1>
         
         <div className="flex flex-col gap-4 mb-8">
@@ -118,21 +160,20 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
             review={booking.review ? { id: booking.review.id, rating: booking.review.rating, comment: booking.review.comment } : null}
           />
         ) : (
-          <div className="flex flex-col gap-4 text-center p-6 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
-            <div className="flex justify-center">
-              <span className="material-symbols-outlined text-4xl text-emerald-400">check_circle</span>
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-on-surface">Pembayaran Berhasil Terverifikasi!</h3>
-              <p className="text-sm text-on-surface-variant mt-1">Pesanan Anda telah dikonfirmasi. Anda dapat memantau status pesanan di Dashboard.</p>
-            </div>
-            <a
-              href="/dashboard"
-              className="mt-2 inline-block bg-secondary text-on-secondary font-button text-sm py-2.5 px-4 rounded-lg hover:bg-secondary-fixed transition-colors"
-            >
-              Buka Dashboard Saya
-            </a>
-          </div>
+          <PostPaymentKycSection
+            bookingId={booking.id}
+            branchName={branchName}
+            startDateFormatted={startDateFormatted}
+            customer={{
+              id: booking.customer.id,
+              name: booking.customer.name,
+              verificationStatus: booking.customer.verificationStatus,
+              ktpNumber: booking.customer.ktpNumber,
+              simNumber: booking.customer.simNumber,
+            }}
+            ktpDoc={ktpDoc}
+            simDoc={simDoc}
+          />
         )}
       </div>
     </div>

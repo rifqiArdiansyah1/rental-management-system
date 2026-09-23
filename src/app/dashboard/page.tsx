@@ -5,6 +5,7 @@ import DocumentUploadForm from '@/components/DocumentUploadForm'
 import BookingList from './BookingList'
 import DocumentSection from './DocumentSection'
 import EditProfileModal from './EditProfileModal'
+import UrgentKycBanner from '@/components/dashboard/UrgentKycBanner'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 
@@ -18,12 +19,13 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Enriched query: vehicle name + photos + driver info
+  // Enriched query: vehicle name + photos + driver info + documents with verifiedAt
   const customer = await prisma.customer.findUnique({
     where: { id: user.id },
     include: {
       documents: {
-        select: { id: true, type: true, fileUrl: true, rejectionReason: true }
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, type: true, fileUrl: true, verifiedAt: true, rejectionReason: true, createdAt: true }
       },
       bookings: {
         orderBy: { createdAt: 'desc' },
@@ -36,6 +38,9 @@ export default async function DashboardPage() {
               photos: true,
               category: { select: { name: true } }
             }
+          },
+          pickupBranch: {
+            select: { name: true }
           },
           driver: {
             select: { name: true, phone: true }
@@ -55,8 +60,59 @@ export default async function DashboardPage() {
     redirect('/')
   }
 
-  const ktpDoc = customer.documents.find(d => d.type === 'ktp') ?? null
-  const simDoc = customer.documents.find(d => d.type === 'sim') ?? null
+  const docs = customer.documents || []
+  const rawKtp = docs.find(d => d.type.toLowerCase() === 'ktp')
+  const ktpDoc = rawKtp ? {
+    id: rawKtp.id,
+    type: 'ktp',
+    fileUrl: rawKtp.fileUrl,
+    verifiedAt: rawKtp.verifiedAt,
+    rejectionReason: rawKtp.rejectionReason,
+  } : null
+
+  const rawSim = docs.find(d => d.type.toLowerCase() === 'sim')
+  const simDoc = rawSim ? {
+    id: rawSim.id,
+    type: 'sim',
+    fileUrl: rawSim.fileUrl,
+    verifiedAt: rawSim.verifiedAt,
+    rejectionReason: rawSim.rejectionReason,
+  } : null
+
+  const isKtpVerified = Boolean(ktpDoc?.verifiedAt)
+  const isSimVerified = Boolean(simDoc?.verifiedAt)
+  const isKtpRejected = Boolean(ktpDoc?.rejectionReason && !ktpDoc?.verifiedAt)
+  const isSimRejected = Boolean(simDoc?.rejectionReason && !simDoc?.verifiedAt)
+  const hasKtp = Boolean(ktpDoc)
+  const hasSim = Boolean(simDoc)
+
+  // Prioritas Deterministik: rejected > missing_both > missing_ktp > missing_sim > pending > verified
+  let kycReason: 'rejected' | 'missing_both' | 'missing_ktp' | 'missing_sim' | 'pending' | 'verified' = 'verified'
+  if (isKtpRejected || isSimRejected) {
+    kycReason = 'rejected'
+  } else if (!hasKtp && !hasSim) {
+    kycReason = 'missing_both'
+  } else if (!hasKtp) {
+    kycReason = 'missing_ktp'
+  } else if (!hasSim) {
+    kycReason = 'missing_sim'
+  } else if (!isKtpVerified || !isSimVerified) {
+    kycReason = 'pending'
+  } else {
+    kycReason = 'verified'
+  }
+
+  const activeConfirmedBooking = customer.bookings.find(b => b.status === 'confirmed')
+  const showUrgentBanner = Boolean(activeConfirmedBooking && kycReason !== 'verified')
+  const urgentVehicleName = activeConfirmedBooking ? (activeConfirmedBooking.vehicle.name || activeConfirmedBooking.vehicle.category.name) : ''
+  const urgentBranchName = activeConfirmedBooking?.pickupBranch?.name || 'Prestige Motion'
+  const urgentStartDateFormatted = activeConfirmedBooking ? new Date(activeConfirmedBooking.startDate).toLocaleDateString('id-ID', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }) : ''
+  const activeRejectionReason = ktpDoc?.rejectionReason || simDoc?.rejectionReason || null
 
   // Serialize bookings (Dates and Decimals must be serializable for client components)
   const serializedBookings = customer.bookings.map(b => ({
@@ -86,7 +142,17 @@ export default async function DashboardPage() {
       status: p.status,
       amount: Number(p.amount)
     })),
-    review: b.review ? { id: b.review.id, rating: b.review.rating, comment: b.review.comment } : null
+    review: b.review ? { id: b.review.id, rating: b.review.rating, comment: b.review.comment } : null,
+    kycStatus: {
+      isCustomerVerified: customer.verificationStatus === 'verified',
+      isKtpVerified,
+      isSimVerified,
+      isKtpRejected,
+      isSimRejected,
+      hasKtp,
+      hasSim,
+      kycReason,
+    }
   }))
 
   return (
@@ -95,6 +161,17 @@ export default async function DashboardPage() {
 
       <main className="flex-grow py-10 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full">
         <h1 className="text-2xl font-bold text-on-surface mb-8 tracking-tight">Dashboard Saya</h1>
+
+        {/* Proactive Urgent KYC Banner */}
+        {showUrgentBanner && (
+          <UrgentKycBanner
+            vehicleName={urgentVehicleName}
+            startDateFormatted={urgentStartDateFormatted}
+            branchName={urgentBranchName}
+            reason={kycReason}
+            rejectionReason={activeRejectionReason}
+          />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
@@ -131,9 +208,15 @@ export default async function DashboardPage() {
               rejectionNote={ktpDoc?.rejectionReason || simDoc?.rejectionReason || null}
             />
 
-            {/* Upload Form (anchored for rejected CTA scroll) */}
+            {/* Upload Form (anchored for rejected / urgent CTA scroll) */}
             <div id="document-upload-form">
-              <DocumentUploadForm />
+              <DocumentUploadForm
+                initialKtpNumber={customer.ktpNumber}
+                initialSimNumber={customer.simNumber}
+                ktpDoc={ktpDoc}
+                simDoc={simDoc}
+                verificationStatus={customer.verificationStatus}
+              />
             </div>
           </div>
 

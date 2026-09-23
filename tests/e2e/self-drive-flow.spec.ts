@@ -32,11 +32,11 @@ test.describe('Self-Drive Booking Flow & Webhook Security', () => {
     await dateInputs[1].fill(endDate.toISOString().split('T')[0] + 'T10:00');
 
     // Ensure Self-Drive is selected (default)
-    await page.getByRole('button', { name: 'Self-Drive' }).click();
-    await page.waitForSelector('text=Price Breakdown');
+    await page.getByRole('button', { name: /Self-Drive|Lepas Kunci/i }).click();
+    await page.locator('text=Price Breakdown').or(page.locator('text=Ringkasan Biaya')).first().waitFor({ state: 'visible' });
 
     // 3. Confirm Booking
-    await page.getByRole('button', { name: 'Confirm Booking' }).click();
+    await page.getByRole('button', { name: /Confirm Booking|Lanjutkan ke Pembayaran|Proceed to Payment/i }).click();
 
     // 4. Wait for redirect to Booking Detail/Payment Page
     await page.waitForURL(/\/booking\/.*/);
