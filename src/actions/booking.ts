@@ -4,6 +4,7 @@ import { checkVehicleAvailability, createDraftBookingCore, CreateDraftBookingPay
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import { RentalType } from '@prisma/client'
+import { revalidatePath } from 'next/cache'
 import { TURNOVER_BUFFER_MS, isWithinOperatingHoursWIB } from '@/lib/constants'
 import { getLocale } from '@/lib/i18n/server'
 import { getActionErrorMessage, ActionErrorCode } from '@/lib/i18n/errors'
@@ -153,10 +154,10 @@ export async function customerCancelBooking(bookingId: string): Promise<BookingA
     }
   }
 
-  // Fetch booking and verify ownership
+  // Fetch booking to verify existence, customer ownership, and get vehicleId for precise revalidation
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    select: { id: true, customerId: true, status: true, pickupBranchId: true }
+    select: { id: true, customerId: true, status: true, vehicleId: true }
   })
 
   if (!booking) {
@@ -176,24 +177,70 @@ export async function customerCancelBooking(bookingId: string): Promise<BookingA
     }
   }
 
-  // Guard: only pending_payment can be self-cancelled
-  if (booking.status !== 'pending_payment') {
+  // Atomic Conditional Update:
+  // Combine status guard and cancellation write into a single conditional updateMany inside a transaction.
+  // This prevents race condition if a payment gateway settlement webhook commits concurrently.
+  const cancellationNote = locale === 'en'
+    ? 'Cancelled by customer prior to payment.'
+    : 'Dibatalkan oleh pelanggan sebelum pembayaran.'
+
+  const result = await prisma.$transaction(async (tx) => {
+    const updateResult = await tx.booking.updateMany({
+      where: {
+        id: bookingId,
+        customerId: user.id,
+        status: 'pending_payment',
+      },
+      data: {
+        status: 'cancelled',
+        cancellationNote,
+        cancelledBy: null, // explicit null: customer initiative, not staff
+      },
+    })
+
+    if (updateResult.count === 0) {
+      // The booking was NOT updated. Query current status to give precise friendly error
+      // without modifying Payment status under any circumstance!
+      const current = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: { status: true },
+      })
+
+      if (current?.status === 'cancelled') {
+        return { success: false, errorCode: 'ALREADY_CANCELLED' as ActionErrorCode }
+      }
+      return { success: false, errorCode: 'CANNOT_CANCEL_STATUS' as ActionErrorCode }
+    }
+
+    // Only cascade to Payment if booking was successfully transitioned from pending_payment
+    // Note: status 'failed' denotes unpaid-abandoned/cancelled before settlement.
+    await tx.payment.updateMany({
+      where: {
+        bookingId,
+        status: 'pending',
+      },
+      data: { status: 'failed' },
+    })
+
+    return { success: true }
+  })
+
+  if (!result.success && result.errorCode) {
     return {
       success: false,
-      error: getActionErrorMessage('CANNOT_CANCEL_STATUS', locale),
-      errorCode: 'CANNOT_CANCEL_STATUS',
+      error: getActionErrorMessage(result.errorCode, locale),
+      errorCode: result.errorCode,
     }
   }
 
-  // Cancel the booking
-  await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      status: 'cancelled',
-      cancellationNote: locale === 'en' ? 'Cancelled by customer prior to payment.' : 'Dibatalkan oleh customer sebelum pembayaran.',
-      cancelledBy: user.id,
-    }
-  })
+  // Invalidate paths so that vehicle availability, dashboard, and checkout are immediately fresh
+  revalidatePath('/dashboard')
+  revalidatePath(`/booking/${bookingId}`)
+  revalidatePath('/')
+  if (booking.vehicleId) {
+    revalidatePath(`/vehicles/${booking.vehicleId}`)
+  }
+  revalidatePath('/admin/bookings')
 
   return { success: true }
 }

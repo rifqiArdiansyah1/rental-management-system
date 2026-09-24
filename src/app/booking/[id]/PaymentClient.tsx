@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { getSnapToken, syncPaymentStatus } from '@/actions/payment'
+import { customerCancelBooking } from '@/actions/booking'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { useRouter } from 'next/navigation'
 import Script from 'next/script'
 
@@ -14,11 +16,15 @@ type Props = {
 
 export default function PaymentClient({ bookingId, createdAtMs, clientKey, isProduction = false }: Props) {
   const router = useRouter()
+  const { t } = useLanguage()
   const [isPending, startTransition] = useTransition()
   const [isSyncing, setIsSyncing] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number>(0)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [infoMsg, setInfoMsg] = useState<string | null>(null)
+  const [showCancelModal, setShowCancelModal] = useState<boolean>(false)
+  const [isCancelling, setIsCancelling] = useState<boolean>(false)
+  const [cancelModalError, setCancelModalError] = useState<string | null>(null)
 
   useEffect(() => {
     // 60 minutes expiry
@@ -117,6 +123,25 @@ export default function PaymentClient({ bookingId, createdAtMs, clientKey, isPro
     }
   }
 
+  const handleConfirmCancel = async () => {
+    if (isCancelling) return
+    setIsCancelling(true)
+    setCancelModalError(null)
+    try {
+      const res = await customerCancelBooking(bookingId)
+      if (res.success) {
+        setShowCancelModal(false)
+        router.refresh()
+      } else {
+        setCancelModalError(res.error || 'Gagal membatalkan pemesanan.')
+      }
+    } catch (err: any) {
+      setCancelModalError(err.message || 'Terjadi kesalahan sistem saat membatalkan.')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
   const snapScriptUrl = isProduction 
     ? "https://app.midtrans.com/snap/snap.js"
     : "https://app.sandbox.midtrans.com/snap/snap.js"
@@ -165,7 +190,7 @@ export default function PaymentClient({ bookingId, createdAtMs, clientKey, isPro
         <button
           type="button"
           onClick={handleManualSync}
-          disabled={isPending || isSyncing}
+          disabled={isPending || isSyncing || isCancelling}
           className="w-full border border-surface-variant hover:bg-surface-variant/50 text-on-surface font-button py-3 rounded-lg transition-colors text-sm flex justify-center items-center gap-2"
         >
           {isSyncing ? (
@@ -180,7 +205,78 @@ export default function PaymentClient({ bookingId, createdAtMs, clientKey, isPro
             </>
           )}
         </button>
+
+        <div className="w-full pt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              setCancelModalError(null)
+              setShowCancelModal(true)
+            }}
+            disabled={isPending || isSyncing || isCancelling}
+            className="text-xs text-zinc-400 hover:text-red-400 transition-colors flex items-center gap-1.5 py-1 px-3 rounded cursor-pointer disabled:opacity-50"
+            data-testid="self-cancel-btn"
+          >
+            <span className="material-symbols-outlined text-sm">cancel</span>
+            <span>{t.booking?.selfCancel?.cancelBtn || 'Batalkan Pemesanan Ini'}</span>
+          </button>
+        </div>
       </div>
+
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-surface border border-surface-variant rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl">event_busy</span>
+              </div>
+              <h3 className="font-bold text-on-surface text-lg">
+                {t.booking?.selfCancel?.confirmModalTitle || 'Batalkan Pemesanan?'}
+              </h3>
+            </div>
+            
+            <p className="text-sm text-on-surface-variant mb-4 leading-relaxed">
+              {t.booking?.selfCancel?.confirmModalDesc ||
+                'Pemesanan ini belum dibayar. Jika Anda membatalkannya, slot jadwal armada akan segera dibuka kembali untuk pelanggan lain. Tindakan ini tidak dapat dibatalkan.'}
+            </p>
+
+            {cancelModalError && (
+              <div className="p-3 mb-4 bg-error-container/20 border border-error rounded-lg text-error text-xs">
+                {cancelModalError}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isCancelling) setShowCancelModal(false)
+                }}
+                disabled={isCancelling}
+                className="flex-1 border border-surface-variant text-on-surface-variant py-2.5 rounded-lg text-sm hover:border-zinc-400 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {t.booking?.selfCancel?.keepBtn || 'Tidak, Lanjutkan Pembayaran'}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={isCancelling}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-lg text-sm hover:bg-red-500 transition-colors cursor-pointer disabled:opacity-50 font-semibold flex items-center justify-center gap-2"
+                data-testid="confirm-self-cancel-btn"
+              >
+                {isCancelling ? (
+                  <>
+                    <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                    <span>{t.booking?.selfCancel?.cancelling || 'Membatalkan...'}</span>
+                  </>
+                ) : (
+                  t.booking?.selfCancel?.confirmBtn || 'Ya, Batalkan Pemesanan'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

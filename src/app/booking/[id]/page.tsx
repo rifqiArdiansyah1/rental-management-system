@@ -1,10 +1,12 @@
 import { notFound, redirect } from 'next/navigation'
+import Link from 'next/link'
 import { prisma } from '@/utils/prisma'
 import { createClient } from '@/utils/supabase/server'
 import PaymentClient from './PaymentClient'
 import BookingReviewCard from './BookingReviewCard'
 import PostPaymentKycSection from '@/components/booking/PostPaymentKycSection'
 import { syncPaymentStatus } from '@/actions/payment'
+import { getDictionary } from '@/lib/i18n/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +20,8 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
   if (!user) {
     redirect('/login')
   }
+
+  const t = await getDictionary()
 
   let booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -150,8 +154,44 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
             This booking has expired. Please make a new reservation.
           </div>
         ) : booking.status === 'cancelled' ? (
-          <div className="text-center p-4 bg-error-container/20 border border-error rounded-lg text-error">
-            This booking has been cancelled.
+          <div className="flex flex-col items-center text-center p-6 bg-error-container/10 border border-error/30 rounded-2xl" data-testid="cancelled-booking-card">
+            <div className="w-14 h-14 rounded-full bg-error-container/20 text-error flex items-center justify-center mb-4">
+              <span className="material-symbols-outlined text-3xl">event_busy</span>
+            </div>
+            
+            <h2 className="font-bold text-on-surface text-lg mb-1">
+              {t.booking?.selfCancel?.cancelledTitle || 'Pemesanan Telah Dibatalkan'}
+            </h2>
+            
+            {booking.cancellationNote && (
+              <p className="text-xs font-medium text-error mb-2 bg-error-container/20 px-3 py-1 rounded-full border border-error/20">
+                {booking.cancellationNote}
+              </p>
+            )}
+
+            <p className="text-sm text-on-surface-variant max-w-md mb-6 leading-relaxed">
+              {t.booking?.selfCancel?.cancelledDesc ||
+                'Slot jadwal armada telah dilepaskan dan tagihan pembayaran ini sudah tidak berlaku.'}
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md justify-center">
+              <Link
+                href="/#vehicles"
+                className="flex-1 bg-secondary text-on-secondary font-button py-3 px-4 rounded-lg hover:bg-secondary-fixed transition-colors text-sm font-semibold flex items-center justify-center gap-2"
+                data-testid="explore-other-vehicles-btn"
+              >
+                <span className="material-symbols-outlined text-base">directions_car</span>
+                <span>{t.booking?.selfCancel?.exploreFleetBtn || 'Jelajahi Armada Lain'}</span>
+              </Link>
+              <Link
+                href="/dashboard"
+                className="flex-1 border border-surface-variant hover:bg-surface-variant/50 text-on-surface font-button py-3 px-4 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                data-testid="dashboard-from-cancelled-btn"
+              >
+                <span className="material-symbols-outlined text-base">dashboard</span>
+                <span>{t.booking?.selfCancel?.myDashboardBtn || 'Lihat Dasbor Saya'}</span>
+              </Link>
+            </div>
           </div>
         ) : booking.status === 'completed' ? (
           <BookingReviewCard

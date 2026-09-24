@@ -10,6 +10,7 @@ export type ActionErrorCode =
   | 'BOOKING_NOT_FOUND'
   | 'FORBIDDEN_CANCELLATION'
   | 'CANNOT_CANCEL_STATUS'
+  | 'ALREADY_CANCELLED'
   | 'KYC_NOT_VERIFIED'
   | 'INVALID_CREDENTIALS'
   | 'EMAIL_NOT_CONFIRMED'
@@ -53,8 +54,12 @@ export const ACTION_ERRORS: Record<ActionErrorCode, { id: string; en: string }> 
     en: 'You are not authorized to cancel this reservation.',
   },
   CANNOT_CANCEL_STATUS: {
-    id: 'Hanya pesanan yang belum dibayar yang dapat dibatalkan secara mandiri.',
-    en: 'Only unpaid reservations can be cancelled directly.',
+    id: 'Pesanan ini sudah tidak bisa dibatalkan, silakan refresh halaman.',
+    en: 'This reservation can no longer be cancelled. Please refresh the page.',
+  },
+  ALREADY_CANCELLED: {
+    id: 'Pesanan ini sudah dibatalkan sebelumnya.',
+    en: 'This reservation has already been cancelled.',
   },
   KYC_NOT_VERIFIED: {
     id: 'Kunci tidak dapat diserahkan. Identitas pelanggan (KTP/SIM) belum diverifikasi.',
