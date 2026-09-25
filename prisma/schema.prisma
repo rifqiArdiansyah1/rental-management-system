@@ -265,6 +265,9 @@ model Booking {
   // Bahasa preferensi saat pemesanan dibuat (untuk korespondensi email & dokumen)
   locale         Locale    @default(id)
 
+  // Waktu pengiriman pengingat jadwal penjemputan hari-H (mencegah duplikasi pesan)
+  pickupReminderSentAt DateTime? @db.Timestamptz(6)
+
   customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   pickupBranch    Branch   @relation("PickupBranch", fields: [pickupBranchId], references: [id], onDelete: Restrict)
@@ -285,6 +288,7 @@ model Booking {
   // Indeks komposit performa query antrian operasional & filter cabang
   @@index([pickupBranchId, status])
   @@index([status, startDate])
+  @@index([status, startDate, pickupReminderSentAt])
   @@index([createdAt])
   // Indeks komposit observabilitas query oldest pending booking (global & per-cabang)
   @@index([status, createdAt])

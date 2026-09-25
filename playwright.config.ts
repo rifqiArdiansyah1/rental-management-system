@@ -50,7 +50,7 @@ export default defineConfig({
     command: 'npm run build && npm run start -- -p 3001',
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
-    timeout: 240000,
+    timeout: 420000,
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
@@ -66,7 +66,10 @@ export default defineConfig({
       CRON_CLEANUP_INTERVAL_MINUTES: process.env.CRON_CLEANUP_INTERVAL_MINUTES || '15',
       RESEND_API_KEY: process.env.RESEND_API_KEY || 're_placeholder_key_here',
       EMAIL_FROM: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-      APP_URL: 'http://localhost:3001'
+      APP_URL: 'http://localhost:3001',
+      IS_E2E_TEST: 'true',
+      WHATSAPP_API_TOKEN: 'test_token',
+      OFFICIAL_WHATSAPP_NUMBER: '6281234567890'
     }
   },
 });

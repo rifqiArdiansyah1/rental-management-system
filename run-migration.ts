@@ -62,6 +62,11 @@ async function main() {
       WHEN duplicate_object THEN null;
     END $$;`);
     await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "locale" "Locale" NOT NULL DEFAULT 'id';`);
+
+    console.log('Ensuring Booking pickupReminderSentAt column and index exist...');
+    await pool.query(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "pickupReminderSentAt" TIMESTAMPTZ(6);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "Booking_status_startDate_pickupReminderSentAt_idx" ON "Booking"("status", "startDate", "pickupReminderSentAt");`);
+
     await pool.query(`DO $$ BEGIN
       CREATE TYPE "FuelType" AS ENUM ('pertalite', 'pertamax', 'pertamax_turbo', 'solar', 'dexlite');
     EXCEPTION

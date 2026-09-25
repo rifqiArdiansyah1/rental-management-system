@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
-import { Locale } from '@/lib/i18n/types'
+import { Locale } from '../lib/i18n/types'
+import { LATE_RETURN_GRACE_MINUTES } from '../lib/constants'
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build')
 const EMAIL_FROM = process.env.EMAIL_FROM || 'onboarding@resend.dev'
@@ -150,8 +151,10 @@ export async function sendBookingConfirmedEmail(data: BookingConfirmedData) {
 export interface DocumentStatusData {
   toEmail: string
   customerName: string
+  documentType?: string | null
   status: 'verified' | 'rejected'
-  reason?: string
+  reason?: string | null
+  rejectionReason?: string | null
   locale?: Locale
 }
 
@@ -165,6 +168,8 @@ export async function sendDocumentStatusEmail(data: DocumentStatusData) {
   ) {
     return { id: 'mock-test-email-id' }
   }
+
+  const effectiveReason = data.rejectionReason || data.reason
 
   const isEn = data.locale === 'en'
   const isVerified = data.status === 'verified'
@@ -225,10 +230,10 @@ export async function sendDocumentStatusEmail(data: DocumentStatusData) {
             </div>
 
             ${
-              !isVerified && data.reason
+              !isVerified && effectiveReason
                 ? `
               <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin-bottom: 30px;">
-                <p style="color: #991b1b; margin: 0; font-size: 14px;"><strong>${adminNoteLabel}</strong> ${data.reason}</p>
+                <p style="color: #991b1b; margin: 0; font-size: 14px;"><strong>${adminNoteLabel}</strong> ${effectiveReason}</p>
               </div>
               <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 30px;">
                 ${reuploadNotice}
@@ -286,8 +291,9 @@ export interface DriverReassignedData {
   oldDriverName?: string
   newDriverName: string
   newDriverPhone: string
-  isOngoing: boolean
-  reason?: string
+  isOngoing?: boolean
+  vehicleName?: string
+  reason?: string | null
   locale?: Locale
 }
 
@@ -512,4 +518,440 @@ export async function sendReviewInvitationEmail(data: ReviewInvitationData) {
     html: htmlContent,
   })
 }
+
+export interface PickupReminderEmailData {
+  toEmail: string
+  customerName: string
+  bookingId: string
+  vehicleName: string
+  pickupBranchName: string
+  pickupBranchAddress: string
+  pickupBranchPhone: string
+  pickupDate: string
+  isKycVerified: boolean
+  locale?: Locale
+}
+
+export async function sendPickupReminderEmail(data: PickupReminderEmailData) {
+  if (
+    process.env.IS_E2E_TEST === 'true' ||
+    process.env.NODE_ENV === 'test' ||
+    process.env.APP_URL?.includes('3001') ||
+    !process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_KEY.includes('dummy') ||
+    data.toEmail.endsWith('@test.com')
+  ) {
+    return { id: 'mock-test-email-id' }
+  }
+
+  const isEn = data.locale === 'en'
+  const shortId = data.bookingId.substring(0, 8).toUpperCase()
+  const subject = isEn
+    ? `Vehicle Pickup Reminder - ${shortId}`
+    : `Pengingat Penjemputan Armada - ${shortId}`
+
+  const greeting = isEn ? `Dear ${data.customerName},` : `Halo, ${data.customerName}`
+  const bodyIntro = isEn
+    ? `Today is the scheduled day for your vehicle pickup with Prestige Motion. Our team is ready to welcome you.`
+    : `Hari ini adalah jadwal penjemputan armada sewa Anda di Prestige Motion. Tim staf operasional kami siap menyambut kedatangan Anda.`
+
+  const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const bookingUrl = `${baseUrl}/booking/${data.bookingId}`
+
+  const kycCallout = data.isKycVerified
+    ? `
+      <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 18px; margin-bottom: 25px;">
+        <strong style="color: #065f46; font-size: 14px; display: block; margin-bottom: 6px;">
+          ${isEn ? '✅ Identity Verification Complete' : '✅ Dokumen Identitas Terverifikasi'}
+        </strong>
+        <p style="color: #047857; font-size: 13px; line-height: 1.5; margin: 0;">
+          ${isEn
+            ? 'Please present your physical National ID (KTP) and Driver License (SIM) upon vehicle handover for a quick security check.'
+            : 'Mohon tunjukkan fisik KTP & SIM asli Anda saat serah-terima unit di cabang untuk proses verifikasi kilat.'}
+        </p>
+      </div>
+    `
+    : `
+      <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 18px; margin-bottom: 25px;">
+        <strong style="color: #92400e; font-size: 14px; display: block; margin-bottom: 6px;">
+          ${isEn ? '⚠️ Action Required: Identity Documents Pending' : '⚠️ Perhatian: Verifikasi Dokumen Belum Lengkap'}
+        </strong>
+        <p style="color: #b45309; font-size: 13px; line-height: 1.5; margin: 0 0 12px 0;">
+          ${isEn
+            ? 'Vehicle keys CANNOT be handed over without verified National ID (KTP) and Driver License (SIM). Please upload your documents now before visiting the branch.'
+            : 'Sesuai regulasi keamanan, kunci kendaraan TIDAK DAPAT diserahterimakan sebelum foto KTP & SIM diverifikasi. Silakan lengkapi dokumen Anda sekarang sebelum menuju lokasi cabang.'}
+        </p>
+        <a href="${bookingUrl}" style="background-color: #d97706; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; font-size: 13px; display: inline-block;">
+          ${isEn ? 'Upload Documents Now' : 'Unggah Dokumen Sekarang'}
+        </a>
+      </div>
+    `
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${subject}</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; margin: 0 auto; max-width: 600px;">
+        <tr>
+          <td style="background-color: #1a1a1a; padding: 30px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: normal; letter-spacing: 2px;">PRESTIGE MOTION</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 40px 30px;">
+            <h2 style="color: #1a1a1a; font-size: 20px; margin-top: 0;">${greeting}</h2>
+            <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 24px;">
+              ${bodyIntro}
+            </p>
+
+            ${kycCallout}
+
+            <table width="100%" cellpadding="14" cellspacing="0" border="0" style="background-color: #f8f9fa; border-radius: 6px; margin-bottom: 25px;">
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Booking Reference' : 'Nomor Pesanan'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">#${shortId}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Reserved Vehicle' : 'Armada Pilihan'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.vehicleName}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Pickup Location' : 'Lokasi Cabang Penjemputan'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.pickupBranchName}</strong><br>
+                  <span style="color: #4b5563; font-size: 13px;">${data.pickupBranchAddress}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Branch Contact' : 'Nomor Telepon Cabang'}</span><br>
+                  <strong style="color: #111827; font-size: 14px;">${data.pickupBranchPhone}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Pickup Schedule' : 'Waktu Penjemputan'}</span><br>
+                  <strong style="color: #111827; font-size: 14px;">${data.pickupDate}</strong>
+                </td>
+              </tr>
+            </table>
+
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="${bookingUrl}" style="background-color: #1a1a1a; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; display: inline-block;">
+                ${isEn ? 'View Booking Details' : 'Lihat Detail Pesanan'}
+              </a>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 13px; margin: 0;">
+              © ${new Date().getFullYear()} Prestige Motion. All rights reserved.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  return resend.emails.send({
+    from: `Prestige Motion <${EMAIL_FROM}>`,
+    to: data.toEmail,
+    subject: subject,
+    html: htmlContent,
+  })
+}
+
+export interface RentalStartedEmailData {
+  toEmail: string
+  customerName: string
+  bookingId: string
+  vehicleName: string
+  odometerStart?: number | null
+  endDate: string
+  returnBranchName: string
+  returnBranchAddress: string
+  returnBranchPhone: string
+  locale?: Locale
+}
+
+export async function sendRentalStartedEmail(data: RentalStartedEmailData) {
+  if (
+    process.env.IS_E2E_TEST === 'true' ||
+    process.env.NODE_ENV === 'test' ||
+    process.env.APP_URL?.includes('3001') ||
+    !process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_KEY.includes('dummy') ||
+    data.toEmail.endsWith('@test.com')
+  ) {
+    return { id: 'mock-test-email-id' }
+  }
+
+  const isEn = data.locale === 'en'
+  const shortId = data.bookingId.substring(0, 8).toUpperCase()
+  const subject = isEn
+    ? `Rental Started - ${shortId}`
+    : `Sewa Dimulai - ${shortId}`
+
+  const greeting = isEn ? `Dear ${data.customerName},` : `Halo, ${data.customerName}`
+  const bodyIntro = isEn
+    ? `Vehicle handover has been successfully completed. Your rental period for <strong>${data.vehicleName}</strong> is officially underway!`
+    : `Serah terima kendaraan telah berhasil dilakukan. Masa sewa armada <strong>${data.vehicleName}</strong> Anda resmi dimulai!`
+
+  const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const bookingUrl = `${baseUrl}/booking/${data.bookingId}`
+
+  const odoRow = data.odometerStart != null
+    ? `
+      <tr>
+        <td style="border-bottom: 1px solid #e5e7eb;">
+          <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Starting Odometer' : 'Odometer Awal'}</span><br>
+          <strong style="color: #111827; font-size: 15px;">${data.odometerStart.toLocaleString('id-ID')} km</strong>
+        </td>
+      </tr>
+    `
+    : ''
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${subject}</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; margin: 0 auto; max-width: 600px;">
+        <tr>
+          <td style="background-color: #1a1a1a; padding: 30px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: normal; letter-spacing: 2px;">PRESTIGE MOTION</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 40px 30px;">
+            <h2 style="color: #1a1a1a; font-size: 20px; margin-top: 0;">${greeting}</h2>
+            <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 24px;">
+              ${bodyIntro}
+            </p>
+
+            <table width="100%" cellpadding="14" cellspacing="0" border="0" style="background-color: #f8f9fa; border-radius: 6px; margin-bottom: 25px;">
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Booking Reference' : 'Nomor Pesanan'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">#${shortId}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Vehicle' : 'Armada'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.vehicleName}</strong>
+                </td>
+              </tr>
+              ${odoRow}
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Scheduled Return' : 'Batas Waktu Pengembalian'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.endDate}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Return Location' : 'Lokasi Cabang Pengembalian'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.returnBranchName}</strong><br>
+                  <span style="color: #4b5563; font-size: 13px;">${data.returnBranchAddress}</span>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Return Branch Contact' : 'Nomor Telepon Cabang'}</span><br>
+                  <strong style="color: #111827; font-size: 14px;">${data.returnBranchPhone}</strong>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Grace Period Information -->
+            <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 25px;">
+              <strong style="color: #166534; font-size: 13px; display: block; margin-bottom: 4px;">
+                ${isEn ? '⏱️ Return Policy & Grace Period' : '⏱️ Ketentuan Toleransi Pengembalian'}
+              </strong>
+              <p style="color: #15803d; font-size: 13px; line-height: 1.5; margin: 0;">
+                ${isEn
+                  ? `A grace period of ${LATE_RETURN_GRACE_MINUTES} minutes is granted beyond your scheduled return time before late return fees apply.`
+                  : `Tersedia masa tenggang keterlambatan selama ${LATE_RETURN_GRACE_MINUTES} menit sebelum denda keterlambatan/overtime mulai dihitung oleh sistem.`}
+              </p>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="${bookingUrl}" style="background-color: #1a1a1a; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; display: inline-block;">
+                ${isEn ? 'View Booking Details' : 'Lihat Detail Pesanan'}
+              </a>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 13px; margin: 0;">
+              © ${new Date().getFullYear()} Prestige Motion. All rights reserved.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  return resend.emails.send({
+    from: `Prestige Motion <${EMAIL_FROM}>`,
+    to: data.toEmail,
+    subject: subject,
+    html: htmlContent,
+  })
+}
+
+export interface RentalCompletedEmailData {
+  toEmail: string
+  customerName: string
+  bookingId: string
+  vehicleName: string
+  odometerEnd?: number | null
+  lateMinutes?: number | null
+  lateFeeAmount?: string | null
+  reviewUrl: string
+  locale?: Locale
+}
+
+export async function sendRentalCompletedEmail(data: RentalCompletedEmailData) {
+  if (
+    process.env.IS_E2E_TEST === 'true' ||
+    process.env.NODE_ENV === 'test' ||
+    process.env.APP_URL?.includes('3001') ||
+    !process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_KEY.includes('dummy') ||
+    data.toEmail.endsWith('@test.com')
+  ) {
+    return { id: 'mock-test-email-id' }
+  }
+
+  const isEn = data.locale === 'en'
+  const shortId = data.bookingId.substring(0, 8).toUpperCase()
+  const subject = isEn
+    ? `Rental Receipt & Completed - ${shortId}`
+    : `Tanda Terima Pengembalian & Sewa Selesai - ${shortId}`
+
+  const greeting = isEn ? `Dear ${data.customerName},` : `Halo, ${data.customerName}`
+  const bodyIntro = isEn
+    ? `Vehicle return has been verified and your rental for <strong>${data.vehicleName}</strong> is now officially completed. Thank you for choosing Prestige Motion!`
+    : `Pengembalian kendaraan telah diverifikasi dan masa sewa armada <strong>${data.vehicleName}</strong> Anda telah selesai dengan baik. Terima kasih telah mempercayakan perjalanan Anda kepada Prestige Motion!`
+
+  const odoRow = data.odometerEnd != null
+    ? `
+      <tr>
+        <td style="border-bottom: 1px solid #e5e7eb;">
+          <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Final Odometer' : 'Odometer Akhir'}</span><br>
+          <strong style="color: #111827; font-size: 15px;">${data.odometerEnd.toLocaleString('id-ID')} km</strong>
+        </td>
+      </tr>
+    `
+    : ''
+
+  const lateRow = data.lateMinutes && data.lateMinutes > 0 && data.lateFeeAmount
+    ? `
+      <tr>
+        <td style="border-bottom: 1px solid #e5e7eb;">
+          <span style="color: #dc2626; font-size: 12px; text-transform: uppercase;">${isEn ? 'Late Return Penalty' : 'Keterlambatan & Denda'}</span><br>
+          <strong style="color: #b91c1c; font-size: 15px;">${data.lateMinutes} ${isEn ? 'mins' : 'menit'} (${data.lateFeeAmount})</strong>
+        </td>
+      </tr>
+    `
+    : `
+      <tr>
+        <td style="border-bottom: 1px solid #e5e7eb;">
+          <span style="color: #16a34a; font-size: 12px; text-transform: uppercase;">${isEn ? 'Return Status' : 'Status Pengembalian'}</span><br>
+          <strong style="color: #15803d; font-size: 14px;">${isEn ? 'On-time return (no late fees)' : 'Tepat waktu (bebas biaya denda)'}</strong>
+        </td>
+      </tr>
+    `
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${subject}</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; margin: 0 auto; max-width: 600px;">
+        <tr>
+          <td style="background-color: #1a1a1a; padding: 30px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: normal; letter-spacing: 2px;">PRESTIGE MOTION</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 40px 30px;">
+            <h2 style="color: #1a1a1a; font-size: 20px; margin-top: 0;">${greeting}</h2>
+            <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 24px;">
+              ${bodyIntro}
+            </p>
+
+            <table width="100%" cellpadding="14" cellspacing="0" border="0" style="background-color: #f8f9fa; border-radius: 6px; margin-bottom: 25px;">
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Booking Reference' : 'Nomor Pesanan'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">#${shortId}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Vehicle' : 'Armada'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.vehicleName}</strong>
+                </td>
+              </tr>
+              ${odoRow}
+              ${lateRow}
+            </table>
+
+            <!-- Review Invitation Section -->
+            <div style="background-color: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 24px; margin-bottom: 25px; text-align: center;">
+              <h3 style="color: #6b21a8; margin: 0 0 8px 0; font-size: 16px;">
+                ${isEn ? '⭐ Share Your Quiet Luxury Experience' : '⭐ Bagaimana Pengalaman Perjalanan Anda?'}
+              </h3>
+              <p style="color: #581c87; font-size: 13px; line-height: 1.5; margin: 0 0 16px 0;">
+                ${isEn
+                  ? 'Your rating and feedback help us continuously elevate our service standards.'
+                  : 'Ulasan dan penilaian Anda sangat berarti untuk menjaga standar keunggulan layanan kami.'}
+              </p>
+              <a href="${data.reviewUrl}" style="background-color: #C5A059; color: #000000; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">
+                ${isEn ? 'Write a Review' : 'Beri Ulasan Armada'}
+              </a>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 13px; margin: 0;">
+              © ${new Date().getFullYear()} Prestige Motion. All rights reserved.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  return resend.emails.send({
+    from: `Prestige Motion <${EMAIL_FROM}>`,
+    to: data.toEmail,
+    subject: subject,
+    html: htmlContent,
+  })
+}
+
 

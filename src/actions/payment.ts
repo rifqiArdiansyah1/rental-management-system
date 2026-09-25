@@ -130,6 +130,7 @@ export async function syncPaymentStatus(bookingId: string) {
     include: {
       customer: true,
       vehicle: { include: { category: true } },
+      pickupBranch: true,
       payments: {
         orderBy: { createdAt: 'desc' },
         take: 1
@@ -194,21 +195,23 @@ export async function syncPaymentStatus(bookingId: string) {
       })
 
       try {
-        const { sendBookingConfirmedEmail } = await import('@/utils/email')
+        const { notifyBookingConfirmed } = await import('@/utils/notifications')
         const { formatCurrency, formatDate } = await import('@/lib/i18n/formatters')
         const bookingLocale = (booking.locale as any) || 'id'
-        await sendBookingConfirmedEmail({
-          toEmail: booking.customer.email,
-          customerName: booking.customer.name,
+        await notifyBookingConfirmed({
           bookingId: booking.id,
+          customerName: booking.customer.name,
+          customerEmail: booking.customer.email,
+          customerPhone: booking.customer.phone,
           vehicleName: booking.vehicle.name || booking.vehicle.category.name,
+          pickupBranchName: booking.pickupBranch?.name || 'Cabang Prestige Motion',
           startDate: formatDate(booking.startDate, bookingLocale),
           endDate: formatDate(booking.endDate, bookingLocale),
           totalPrice: formatCurrency(booking.totalPrice, bookingLocale),
           locale: bookingLocale,
         })
       } catch (e: any) {
-        console.error('[EMAIL ERROR] Failed to send confirmation email on sync:', e.message)
+        console.error('[NOTIFICATION ERROR] Failed to send confirmation notification on sync:', e.message)
       }
 
       revalidatePath(`/booking/${bookingId}`)

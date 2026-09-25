@@ -4,8 +4,13 @@ import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/utils/prisma'
 import { revalidatePath } from 'next/cache'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
-import { sendDriverReassignedEmail } from '@/utils/email'
 import { logAudit } from '@/lib/audit'
+import {
+  notifyRentalStarted,
+  notifyRentalCompleted,
+  notifyDocumentStatus,
+  notifyDriverReassigned,
+} from '@/utils/notifications'
 
 // Valid roles
 const VALID_ROLES = ['staff_cabang', 'admin_cabang', 'admin_pusat']
@@ -50,7 +55,11 @@ export async function startRental(bookingId: string, options?: { odometerStart?:
     // 1. Dapatkan informasi Booking beserta Customer-nya
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { customer: true }
+      include: {
+        customer: true,
+        vehicle: true,
+        returnBranch: true,
+      }
     })
 
     if (!booking) {
@@ -142,6 +151,27 @@ export async function startRental(bookingId: string, options?: { odometerStart?:
     revalidatePath(`/admin/bookings/${bookingId}`)
     revalidatePath('/admin/vehicles')
     revalidatePath('/admin/dashboard')
+
+    // Non-blocking fire-and-forget notification (Email + WhatsApp)
+    notifyRentalStarted({
+      bookingId: booking.id,
+      customerName: booking.customer.name,
+      customerEmail: booking.customer.email,
+      customerPhone: booking.customer.phone,
+      vehicleName: booking.vehicle.name || booking.vehicle.plateNumber,
+      odometerStart: odometerStart ?? null,
+      endDate: new Date(booking.endDate).toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Jakarta',
+      }),
+      returnBranchName: booking.returnBranch.name,
+      returnBranchAddress: booking.returnBranch.address,
+      returnBranchPhone: booking.returnBranch.phone,
+      locale: (booking.locale as any) || 'id',
+    }).catch((err) => {
+      console.error('[NOTIFICATION ERROR] startRental notification failed:', err)
+    })
 
     return { success: true }
   } catch (error: any) {
@@ -392,20 +422,25 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
     revalidatePath('/admin/dashboard')
     revalidatePath('/dashboard')
 
-    // Kirim email ajakan ulasan (di-await secara aman di dalam try-catch terisolasi)
-    try {
-      const { sendReviewInvitationEmail } = await import('@/utils/email')
-      const bookingLocale = (booking.locale as any) || 'id'
-      await sendReviewInvitationEmail({
-        toEmail: booking.customer.email,
-        customerName: booking.customer.name,
-        bookingId: booking.id,
-        vehicleName: booking.vehicle.name || `${booking.vehicle.plateNumber}`,
-        locale: bookingLocale,
-      })
-    } catch (emailErr: any) {
-      console.error('[EMAIL ERROR] Failed to send review invitation:', emailErr.message)
-    }
+    // Non-blocking fire-and-forget notification (Email + WhatsApp)
+    const bookingLocale = (booking.locale as any) || 'id'
+    const formattedLateFee = lateFeeRes.finalLateFeeAmount > 0 && !lateFeeRes.isWaived
+      ? `Rp ${lateFeeRes.finalLateFeeAmount.toLocaleString('id-ID')}`
+      : null
+
+    notifyRentalCompleted({
+      bookingId: booking.id,
+      customerName: booking.customer.name,
+      customerEmail: booking.customer.email,
+      customerPhone: booking.customer.phone,
+      vehicleName: booking.vehicle.name || `${booking.vehicle.plateNumber}`,
+      odometerEnd: odoRes.odometerEnd ?? null,
+      lateMinutes: lateFeeRes.lateMinutes > 0 ? lateFeeRes.lateMinutes : null,
+      lateFeeAmount: formattedLateFee,
+      locale: bookingLocale,
+    }).catch((notifErr: any) => {
+      console.error('[NOTIFICATION ERROR] Failed to send rental completed notification:', notifErr.message)
+    })
 
     return { success: true }
   } catch (error: any) {
@@ -478,20 +513,24 @@ export async function verifyDocument(documentId: string, status: 'verified' | 'r
       }
     })
     
-    // Non-blocking fire-and-forget email so network latency doesn't stall the UI response
-    sendDocumentStatusEmail({
-      toEmail: document.customer.email,
-      customerName: document.customer.name,
-      status: status,
-      reason: reason
-    }).catch((e) => {
-      console.error('Failed to send document status email:', e)
-    })
-
     const adminUser = await requireAdminSession()
     const targetBooking = await prisma.booking.findFirst({
       where: { customerId },
       orderBy: { createdAt: 'desc' }
+    })
+
+    // Non-blocking fire-and-forget notification (Email + WhatsApp)
+    notifyDocumentStatus({
+      customerName: document.customer.name,
+      customerEmail: document.customer.email,
+      customerPhone: document.customer.phone,
+      documentType: document.type,
+      status: status,
+      rejectionReason: reason,
+      bookingId: targetBooking?.id,
+      locale: (targetBooking?.locale as any) || 'id',
+    }).catch((e) => {
+      console.error('[NOTIFICATION ERROR] Failed to send document status notification:', e)
     })
 
     logAudit({
@@ -529,7 +568,8 @@ export async function assignDriver(bookingId: string, driverId: string, reason?:
       where: { id: bookingId },
       include: {
         customer: true,
-        driver: true
+        driver: true,
+        vehicle: true,
       }
     })
     
@@ -683,21 +723,20 @@ export async function assignDriver(bookingId: string, driverId: string, reason?:
       timeout: 20000
     })
 
-    // 5. Notifikasi Email ke Pelanggan (khusus reassignment atau booking ongoing)
+    // 5. Notifikasi ke Pelanggan (khusus reassignment atau booking ongoing)
     if (isReassignment && booking.customer && newDriverInfo) {
       const driverData = newDriverInfo as { name: string; phone: string }
-      // Non-blocking fire-and-forget email so network latency doesn't stall the UI response
-      sendDriverReassignedEmail({
-        toEmail: booking.customer.email,
-        customerName: booking.customer.name,
+      notifyDriverReassigned({
         bookingId: booking.id,
-        oldDriverName: oldDriverName,
+        customerName: booking.customer.name,
+        customerEmail: booking.customer.email,
+        customerPhone: booking.customer.phone,
         newDriverName: driverData.name,
         newDriverPhone: driverData.phone,
-        isOngoing: booking.status === 'ongoing',
-        reason: reason?.trim()
+        vehicleName: booking.vehicle?.name || 'armada sewa',
+        locale: (booking.locale as any) || 'id',
       }).catch((err) => {
-        console.error('[Email Error] Failed to send driver reassigned email:', err)
+        console.error('[NOTIFICATION ERROR] Failed to send driver reassigned notification:', err)
       })
     }
 

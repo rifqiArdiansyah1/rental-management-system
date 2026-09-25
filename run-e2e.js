@@ -15,7 +15,11 @@ function main() {
 
     console.log('🚀 Running Playwright tests...');
     const extraArgs = process.argv.slice(2);
-    const result = spawnSync('npx', ['playwright', 'test', ...extraArgs], { stdio: 'inherit', shell: true });
+    const result = spawnSync('npx', ['playwright', 'test', ...extraArgs], {
+      stdio: 'inherit',
+      shell: true,
+      env: { ...process.env, IS_E2E_TEST: 'true' }
+    });
     
     // Instead of process.exit which skips finally, store status and exit later
     process.exitCode = result.status;

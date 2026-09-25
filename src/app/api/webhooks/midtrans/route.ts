@@ -102,32 +102,35 @@ export async function POST(req: Request) {
           data: { status: PaymentStatus.success }
         })
 
-        // Fetch details for Email
+        // Fetch details for Notification (Email + WhatsApp)
         const fullBooking = await prisma.booking.findUnique({
           where: { id: bookingId },
           include: { 
             customer: true, 
-            vehicle: { include: { category: true } } 
+            vehicle: { include: { category: true } },
+            pickupBranch: true,
           }
         })
 
         if (fullBooking) {
           try {
-            const { sendBookingConfirmedEmail } = await import('@/utils/email')
+            const { notifyBookingConfirmed } = await import('@/utils/notifications')
             const { formatCurrency, formatDate } = await import('@/lib/i18n/formatters')
             const bookingLocale = (fullBooking.locale as any) || 'id'
-            await sendBookingConfirmedEmail({
-              toEmail: fullBooking.customer.email,
-              customerName: fullBooking.customer.name,
+            await notifyBookingConfirmed({
               bookingId: fullBooking.id,
+              customerName: fullBooking.customer.name,
+              customerEmail: fullBooking.customer.email,
+              customerPhone: fullBooking.customer.phone,
               vehicleName: fullBooking.vehicle.category.name,
+              pickupBranchName: fullBooking.pickupBranch?.name || 'Cabang Prestige Motion',
               startDate: formatDate(fullBooking.startDate, bookingLocale),
               endDate: formatDate(fullBooking.endDate, bookingLocale),
               totalPrice: formatCurrency(fullBooking.totalPrice, bookingLocale),
               locale: bookingLocale,
             })
-          } catch (emailError: any) {
-            console.error('[EMAIL ERROR] Failed to send booking confirmation:', emailError.message)
+          } catch (notifError: any) {
+            console.error('[NOTIFICATION ERROR] Failed to send booking confirmation:', notifError.message)
             // Error is isolated. Webhook will still return 200 OK.
           }
         }
