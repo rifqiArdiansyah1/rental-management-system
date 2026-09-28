@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import PaymentClient from './PaymentClient'
 import BookingReviewCard from './BookingReviewCard'
 import PostPaymentKycSection from '@/components/booking/PostPaymentKycSection'
+import OngoingRentalCard from '@/components/booking/OngoingRentalCard'
 import { syncPaymentStatus } from '@/actions/payment'
 import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 import { getDictionary } from '@/lib/i18n/server'
@@ -38,6 +39,8 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
         }
       },
       pickupBranch: true,
+      returnBranch: true,
+      driver: true,
       review: true
     }
   })
@@ -68,6 +71,8 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
             }
           },
           pickupBranch: true,
+          returnBranch: true,
+          driver: true,
           review: true
         }
       }) || booking
@@ -199,6 +204,19 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
             bookingId={booking.id}
             vehicleName={vehicleName}
             review={booking.review ? { id: booking.review.id, rating: booking.review.rating, comment: booking.review.comment } : null}
+          />
+        ) : booking.status === 'ongoing' ? (
+          <OngoingRentalCard
+            bookingId={booking.id}
+            vehicleName={vehicleName}
+            plateNumber={booking.vehicle.plateNumber}
+            startDate={booking.startDate}
+            endDate={booking.endDate}
+            odometerStart={booking.odometerStart}
+            returnBranch={booking.returnBranch}
+            pickupBranch={booking.pickupBranch}
+            driver={booking.driver}
+            rentalType={booking.rentalType}
           />
         ) : (
           <PostPaymentKycSection
