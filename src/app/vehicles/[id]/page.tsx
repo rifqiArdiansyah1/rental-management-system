@@ -11,6 +11,7 @@ import ScrollReveal from '@/components/ui/ScrollReveal'
 import VehicleReviewsSection from '@/components/vehicle/VehicleReviewsSection'
 import { getLocale, getDictionary } from '@/lib/i18n/server'
 import { formatCurrency, formatDateTime } from '@/lib/i18n/formatters'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,7 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
   const fuelPricePerLiter = fuelPrices.find(p => p.fuelType === vehicle.fuelType)?.pricePerLiter || 10_000
 
   const { category } = vehicle
-  const vehicleName = vehicle.name || `${category.name} (${vehicle.plateNumber})`
+  const vehicleName = getVehicleDisplayName(vehicle, { mode: 'customer' })
   const photos: string[] = (vehicle.photos && vehicle.photos.length > 0) 
     ? vehicle.photos 
     : (category.imageUrl ? [category.imageUrl] : ['https://via.placeholder.com/1200x800?text=Vehicle'])

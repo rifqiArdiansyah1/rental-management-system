@@ -6,6 +6,8 @@ import { createDraftBookingAction, BookingFormPayload } from '@/actions/booking'
 import { calculateEstimatedPrice } from '@/lib/pricing'
 import { RentalType } from '@prisma/client'
 import { TURNOVER_BUFFER_MS, isWithinOperatingHoursWIB } from '@/lib/constants'
+import { checkIntervalOverlap } from '@/lib/utils/date'
+import { OccupiedRange } from '@/actions/vehicle'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 type Branch = {
@@ -21,9 +23,20 @@ type Props = {
   defaultBranchId: string
   vehicleBranch?: Branch | null
   maintenanceEndAt?: string | null
+  vehicleStatus?: string
+  occupiedRanges?: OccupiedRange[]
 }
 
-export default function BookingForm({ vehicleId, dailyRate, branches, defaultBranchId, vehicleBranch, maintenanceEndAt }: Props) {
+export default function BookingForm({
+  vehicleId,
+  dailyRate,
+  branches,
+  defaultBranchId,
+  vehicleBranch,
+  maintenanceEndAt,
+  vehicleStatus,
+  occupiedRanges = [],
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -44,7 +57,26 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
   const isEndInHours = parsedEndDate ? isWithinOperatingHoursWIB(parsedEndDate) : true
   const isOperatingHoursValid = isStartInHours && isEndInHours
 
-  const isFormValid = startDate && endDate && new Date(startDate) <= new Date(endDate) && branchId === defaultBranchId && isOperatingHoursValid
+  // Instant client-side conflict check with existing occupied ranges (including 3-hour buffer)
+  const hasScheduleConflict = Boolean(
+    parsedStartDate &&
+    parsedEndDate &&
+    occupiedRanges.length > 0 &&
+    occupiedRanges.some((range) => {
+      const userEndWithBuffer = new Date(parsedEndDate.getTime() + TURNOVER_BUFFER_MS)
+      const rangeStart = new Date(range.start)
+      const rangeEnd = new Date(range.end)
+      return checkIntervalOverlap(parsedStartDate, userEndWithBuffer, rangeStart, rangeEnd)
+    })
+  )
+
+  const isFormValid =
+    startDate &&
+    endDate &&
+    new Date(startDate) <= new Date(endDate) &&
+    branchId === defaultBranchId &&
+    isOperatingHoursValid &&
+    !hasScheduleConflict
   
   let pricing = null
   if (startDate && endDate && parsedStartDate && parsedEndDate) {
@@ -60,6 +92,15 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
         isEn
           ? `This vehicle is only available at ${assignedBranch?.name || 'its home branch'}. Reservations cannot be made from other branches.`
           : `Armada ini hanya tersedia di ${assignedBranch?.name || 'cabang asalnya'}. Pemesanan tidak dapat dilakukan di cabang lain.`
+      )
+      return
+    }
+
+    if (hasScheduleConflict) {
+      setErrorMsg(
+        isEn
+          ? 'The selected dates conflict with an existing reservation (including 3-hour turnover buffer). Please choose another schedule.'
+          : 'Tanggal yang dipilih bertabrakan dengan jadwal reservasi lain (termasuk buffer jeda 3 jam). Silakan pilih jadwal lain.'
       )
       return
     }
@@ -133,6 +174,47 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
         </div>
       )}
 
+      {/* Rented Status Notice */}
+      {vehicleStatus === 'rented' && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-lg text-xs flex items-start gap-2" data-testid="rented-vehicle-notice">
+          <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
+          <span>
+            {isEn
+              ? 'This vehicle is currently on an active rental. You can still reserve it for future dates that are not yet occupied.'
+              : 'Armada ini sedang dalam masa sewa aktif. Anda tetap dapat melakukan reservasi untuk jadwal di luar tanggal sewa yang sedang berjalan.'}
+          </span>
+        </div>
+      )}
+
+      {/* Occupied Ranges List */}
+      {occupiedRanges.length > 0 && (
+        <div className="p-3 bg-surface-container border border-outline-variant/40 rounded-lg text-xs flex flex-col gap-2" data-testid="occupied-ranges-box">
+          <div className="flex items-center gap-1.5 text-on-surface font-semibold">
+            <span className="material-symbols-outlined text-[16px] text-secondary">event_busy</span>
+            <span>{isEn ? 'Reserved Dates (Unavailable):' : 'Jadwal Terisi (Tidak Tersedia):'}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {occupiedRanges.map((range, idx) => {
+              const startD = new Date(range.start)
+              const endD = new Date(range.end)
+              return (
+                <span key={idx} className="px-2.5 py-1 rounded bg-surface-variant text-[11px] text-on-surface-variant font-mono flex items-center gap-1">
+                  <span>{formatDate(startD, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span>—</span>
+                  <span>{formatDate(endD, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} WIB</span>
+                  {range.reason === 'maintenance' && (
+                    <span className="text-[10px] text-amber-400 font-sans ml-1">({isEn ? 'Maint.' : 'Perawatan'})</span>
+                  )}
+                </span>
+              )
+            })}
+          </div>
+          <span className="text-[10px] text-on-surface-variant/70">
+            {isEn ? '*Includes 3-hour turnover buffer for vehicle cleaning & inspection.' : '*Termasuk jeda buffer 3 jam untuk pencucian & inspeksi armada.'}
+          </span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-8">
         
         {/* Date Inputs */}
@@ -186,6 +268,18 @@ export default function BookingForm({ vehicleId, dailyRate, branches, defaultBra
                 {isEn
                   ? 'Vehicle pickup and return times must be within branch operating hours (08:00 – 21:00 WIB).'
                   : 'Waktu penjemputan dan pengembalian harus berada dalam rentang jam operasional cabang (08:00 – 21:00 WIB).'}
+              </span>
+            </div>
+          )}
+
+          {/* Warning if selected time conflicts with occupied ranges */}
+          {hasScheduleConflict && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-xs flex items-center gap-2" data-testid="schedule-conflict-warning">
+              <span className="material-symbols-outlined text-[16px] flex-shrink-0">event_busy</span>
+              <span>
+                {isEn
+                  ? 'The selected dates conflict with an existing reservation (including 3-hour turnover buffer). Please choose another schedule.'
+                  : 'Tanggal yang dipilih bertabrakan dengan jadwal reservasi lain (termasuk buffer jeda 3 jam). Silakan pilih jadwal lain.'}
               </span>
             </div>
           )}

@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import ReviewModal from '@/components/review/ReviewModal'
 import { Star } from 'lucide-react'
 import { formatLateDuration } from '@/lib/lateFee'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 type BookingWithRelations = {
   id: string
@@ -187,7 +188,7 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
             className: 'bg-surface-variant text-on-surface-variant',
           }
           const thumb = booking.vehicle.photos?.[0]
-          const vehicleName = booking.vehicle.name || `${booking.vehicle.category.name} (${booking.vehicle.plateNumber})`
+          const vehicleName = getVehicleDisplayName(booking.vehicle, { mode: 'customer' })
           const price = new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
@@ -389,7 +390,7 @@ export default function BookingList({ bookings }: { bookings: BookingWithRelatio
                             e.stopPropagation()
                             setReviewTarget({
                               bookingId: booking.id,
-                              vehicleName: booking.vehicle.name || booking.vehicle.plateNumber,
+                              vehicleName: getVehicleDisplayName(booking.vehicle, { mode: 'customer' }),
                             })
                           }}
                           className="shimmer-btn px-3 py-1.5 bg-gradient-to-r from-amber-400 to-secondary hover:brightness-110 text-black font-bold rounded-lg text-xs transition-all cursor-pointer shadow-sm inline-flex items-center gap-1.5"

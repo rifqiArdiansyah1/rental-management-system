@@ -2,6 +2,7 @@
 
 import { prisma } from '@/utils/prisma'
 import { Prisma } from '@prisma/client'
+import { TURNOVER_BUFFER_MS } from '@/lib/constants'
 
 export async function getVehicles(filters?: { branchId?: string; categoryId?: string }) {
   try {
@@ -103,3 +104,69 @@ export async function getCategories() {
     return []
   }
 }
+
+export type OccupiedRange = {
+  start: string
+  end: string
+  reason: 'booked' | 'maintenance'
+}
+
+export async function getVehicleOccupiedRanges(vehicleId: string): Promise<OccupiedRange[]> {
+  try {
+    const [bookings, unavailabilities] = await Promise.all([
+      prisma.booking.findMany({
+        where: {
+          vehicleId,
+          status: { in: ['pending_payment', 'confirmed', 'ongoing'] },
+          endDate: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+        select: {
+          startDate: true,
+          endDate: true,
+        },
+        orderBy: { startDate: 'asc' },
+      }),
+      prisma.vehicleUnavailability.findMany({
+        where: {
+          vehicleId,
+          actualEndAt: null,
+          estimatedEndAt: { not: null },
+        },
+        select: {
+          startAt: true,
+          estimatedEndAt: true,
+          reason: true,
+        },
+        orderBy: { startAt: 'asc' },
+      }),
+    ])
+
+    const ranges: OccupiedRange[] = []
+
+    for (const b of bookings) {
+      ranges.push({
+        start: b.startDate.toISOString(),
+        end: new Date(b.endDate.getTime() + TURNOVER_BUFFER_MS).toISOString(),
+        reason: 'booked',
+      })
+    }
+
+    for (const u of unavailabilities) {
+      if (u.estimatedEndAt) {
+        ranges.push({
+          start: u.startAt.toISOString(),
+          end: new Date(u.estimatedEndAt.getTime() + TURNOVER_BUFFER_MS).toISOString(),
+          reason: 'maintenance',
+        })
+      }
+    }
+
+    ranges.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+
+    return ranges
+  } catch (error) {
+    console.error('Failed to get vehicle occupied ranges:', error)
+    return []
+  }
+}
+

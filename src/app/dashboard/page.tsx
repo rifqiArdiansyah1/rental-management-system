@@ -6,6 +6,7 @@ import BookingList from './BookingList'
 import DocumentSection from './DocumentSection'
 import EditProfileModal from './EditProfileModal'
 import UrgentKycBanner from '@/components/dashboard/UrgentKycBanner'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 
@@ -104,7 +105,7 @@ export default async function DashboardPage() {
 
   const activeConfirmedBooking = customer.bookings.find(b => b.status === 'confirmed')
   const showUrgentBanner = Boolean(activeConfirmedBooking && kycReason !== 'verified')
-  const urgentVehicleName = activeConfirmedBooking ? (activeConfirmedBooking.vehicle.name || activeConfirmedBooking.vehicle.category.name) : ''
+  const urgentVehicleName = activeConfirmedBooking ? getVehicleDisplayName(activeConfirmedBooking.vehicle, { mode: 'customer' }) : ''
   const urgentBranchName = activeConfirmedBooking?.pickupBranch?.name || 'Prestige Motion'
   const urgentStartDateFormatted = activeConfirmedBooking ? new Date(activeConfirmedBooking.startDate).toLocaleDateString('id-ID', {
     weekday: 'short',

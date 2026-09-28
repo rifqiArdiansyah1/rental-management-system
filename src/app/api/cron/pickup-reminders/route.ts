@@ -4,6 +4,7 @@ import { prisma } from '@/utils/prisma'
 import { BookingStatus } from '@prisma/client'
 import { parseWibDateBoundary } from '@/lib/bookingFilters'
 import { notifyPickupReminder } from '@/utils/notifications'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
       },
       include: {
         customer: true,
-        vehicle: true,
+        vehicle: { include: { category: true } },
         pickupBranch: true,
       },
     })
@@ -77,7 +78,7 @@ export async function GET(req: Request) {
           customerName: booking.customer.name,
           customerEmail: booking.customer.email,
           customerPhone: booking.customer.phone,
-          vehicleName: booking.vehicle.name || booking.vehicle.plateNumber,
+          vehicleName: getVehicleDisplayName(booking.vehicle, { mode: 'customer' }),
           pickupBranchName: booking.pickupBranch.name,
           pickupBranchAddress: booking.pickupBranch.address,
           pickupBranchPhone: booking.pickupBranch.phone,

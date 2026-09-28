@@ -8,6 +8,7 @@ import { PaymentStatus, BookingStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { MIDTRANS_SNAP_EXPIRY_MINUTES, SNAP_TOKEN_REUSE_WINDOW_MINUTES } from '@/lib/constants'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 const serverKey = process.env.MIDTRANS_SERVER_KEY || ''
 const isProd = (process.env.MIDTRANS_IS_PRODUCTION || process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION) === 'true'
@@ -30,7 +31,7 @@ export async function getSnapToken(bookingId: string) {
   // 1. Fetch the booking
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { customer: true, vehicle: true }
+    include: { customer: true, vehicle: { include: { category: true } } }
   })
 
   if (!booking) {
@@ -82,7 +83,7 @@ export async function getSnapToken(bookingId: string) {
       id: booking.vehicleId,
       price: grossAmount,
       quantity: 1,
-      name: `Sewa ${booking.vehicle.name || booking.vehicle.plateNumber}`
+      name: `Sewa ${getVehicleDisplayName(booking.vehicle, { mode: 'customer' })}`
     }],
     expiry: {
       unit: "minutes",
@@ -203,7 +204,7 @@ export async function syncPaymentStatus(bookingId: string) {
           customerName: booking.customer.name,
           customerEmail: booking.customer.email,
           customerPhone: booking.customer.phone,
-          vehicleName: booking.vehicle.name || booking.vehicle.category.name,
+          vehicleName: getVehicleDisplayName(booking.vehicle, { mode: 'customer' }),
           pickupBranchName: booking.pickupBranch?.name || 'Cabang Prestige Motion',
           startDate: formatDate(booking.startDate, bookingLocale),
           endDate: formatDate(booking.endDate, bookingLocale),

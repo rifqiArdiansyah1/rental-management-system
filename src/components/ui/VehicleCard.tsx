@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { Locale } from '@/lib/i18n/types'
 import { formatCurrency, formatDate } from '@/lib/i18n/formatters'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 type VehicleWithRelations = Prisma.VehicleGetPayload<{
   include: {
@@ -26,7 +27,7 @@ export default function VehicleCard({ vehicle, isPopular = false, locale: propLo
   const isEn = activeLocale === 'en'
 
   const { category } = vehicle
-  const vehicleName = vehicle.name || category.name
+  const vehicleName = getVehicleDisplayName(vehicle, { mode: 'customer' })
   const imageUrl = (vehicle.photos && vehicle.photos.length > 0) 
     ? vehicle.photos[0] 
     : (category.imageUrl || 'https://via.placeholder.com/600x400?text=Vehicle')

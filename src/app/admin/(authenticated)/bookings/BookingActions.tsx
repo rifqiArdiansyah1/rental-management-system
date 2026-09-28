@@ -4,12 +4,15 @@ import { startRental, endRental } from '@/actions/admin'
 import { useState, useTransition } from 'react'
 import { Play, Square } from 'lucide-react'
 
-export function StartRentalButton({ bookingId }: { bookingId: string }) {
+export function StartRentalButton({ bookingId, vehicleName }: { bookingId: string; vehicleName?: string }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   const handleStart = () => {
-    if (!confirm('Apakah Anda yakin ingin memulai penyewaan ini? Pastikan dokumen pengguna dan penugasan sopir sudah beres.')) return
+    const confirmMsg = vehicleName
+      ? `Apakah Anda yakin ingin menyerahkan armada dan kunci untuk ${vehicleName}? Pastikan fisik unit dan dokumen pelanggan sudah sesuai.`
+      : 'Apakah Anda yakin ingin memulai penyewaan ini? Pastikan dokumen pengguna dan penugasan sopir sudah beres.'
+    if (!confirm(confirmMsg)) return
 
     startTransition(async () => {
       setError(null)

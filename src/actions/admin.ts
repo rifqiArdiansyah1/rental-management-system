@@ -11,6 +11,7 @@ import {
   notifyDocumentStatus,
   notifyDriverReassigned,
 } from '@/utils/notifications'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 // Valid roles
 const VALID_ROLES = ['staff_cabang', 'admin_cabang', 'admin_pusat']
@@ -57,7 +58,7 @@ export async function startRental(bookingId: string, options?: { odometerStart?:
       where: { id: bookingId },
       include: {
         customer: true,
-        vehicle: true,
+        vehicle: { include: { category: true } },
         returnBranch: true,
       }
     })
@@ -158,7 +159,7 @@ export async function startRental(bookingId: string, options?: { odometerStart?:
       customerName: booking.customer.name,
       customerEmail: booking.customer.email,
       customerPhone: booking.customer.phone,
-      vehicleName: booking.vehicle.name || booking.vehicle.plateNumber,
+      vehicleName: getVehicleDisplayName(booking.vehicle, { mode: 'customer' }),
       odometerStart: odometerStart ?? null,
       endDate: new Date(booking.endDate).toLocaleString('id-ID', {
         dateStyle: 'medium',
@@ -309,7 +310,7 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
     // 1. Dapatkan informasi Booking beserta unit kendaraan
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { vehicle: true, customer: true }
+      include: { vehicle: { include: { category: true } }, customer: true }
     })
 
     if (!booking) {
@@ -433,7 +434,7 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
       customerName: booking.customer.name,
       customerEmail: booking.customer.email,
       customerPhone: booking.customer.phone,
-      vehicleName: booking.vehicle.name || `${booking.vehicle.plateNumber}`,
+      vehicleName: getVehicleDisplayName(booking.vehicle, { mode: 'customer' }),
       odometerEnd: odoRes.odometerEnd ?? null,
       lateMinutes: lateFeeRes.lateMinutes > 0 ? lateFeeRes.lateMinutes : null,
       lateFeeAmount: formattedLateFee,
@@ -569,7 +570,7 @@ export async function assignDriver(bookingId: string, driverId: string, reason?:
       include: {
         customer: true,
         driver: true,
-        vehicle: true,
+        vehicle: { include: { category: true } },
       }
     })
     
@@ -733,7 +734,7 @@ export async function assignDriver(bookingId: string, driverId: string, reason?:
         customerPhone: booking.customer.phone,
         newDriverName: driverData.name,
         newDriverPhone: driverData.phone,
-        vehicleName: booking.vehicle?.name || 'armada sewa',
+        vehicleName: getVehicleDisplayName(booking.vehicle, { mode: 'customer' }),
         locale: (booking.locale as any) || 'id',
       }).catch((err) => {
         console.error('[NOTIFICATION ERROR] Failed to send driver reassigned notification:', err)

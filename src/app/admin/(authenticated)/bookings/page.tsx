@@ -5,6 +5,7 @@ import { prisma } from '@/utils/prisma'
 import Link from 'next/link'
 import { StartRentalButton, EndRentalButton } from './BookingActions'
 import { getStaffScope } from '@/lib/auth/scope'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 import {
   BookingActionTabs,
   BookingFilterBar,
@@ -254,7 +255,7 @@ export default async function AdminBookingsPage({
                   </div>
                   <div>
                     <span className="text-xs text-zinc-500 block mb-1">Armada & Sopir</span>
-                    <div className="font-medium text-zinc-900">{booking.vehicle.name || booking.vehicle.plateNumber}</div>
+                    <div className="font-medium text-zinc-900">{getVehicleDisplayName(booking.vehicle, { mode: 'customer' })}</div>
                     <div className="text-xs font-mono text-zinc-500">{booking.vehicle.plateNumber}</div>
                     <div className="text-xs text-zinc-500 mt-0.5">
                       {booking.rentalType === 'with_driver'
@@ -283,13 +284,18 @@ export default async function AdminBookingsPage({
                     <span>Detail Pesanan</span>
                     <ChevronRight className="w-4 h-4 text-blue-500" />
                   </Link>
-                  {booking.status === 'confirmed' && <StartRentalButton bookingId={booking.id} />}
+                  {booking.status === 'confirmed' && (
+                    <StartRentalButton 
+                      bookingId={booking.id} 
+                      vehicleName={getVehicleDisplayName(booking.vehicle, { mode: 'staff' })} 
+                    />
+                  )}
                   {booking.status === 'ongoing' && (
                     <EndRentalButton
                       bookingId={booking.id}
                       endDate={booking.endDate.toISOString()}
                       agreedDailyRate={Number(booking.agreedDailyRate || booking.vehicle.dailyRate)}
-                      vehicleName={booking.vehicle.name || booking.vehicle.category.name}
+                      vehicleName={getVehicleDisplayName(booking.vehicle, { mode: 'staff' })}
                       userRole={adminUser.role}
                       variant="compact"
                     />
@@ -366,7 +372,7 @@ export default async function AdminBookingsPage({
 
                       {/* Vehicle & Driver */}
                       <td className="px-6 py-4 align-top">
-                        <div className="font-bold text-zinc-900">{booking.vehicle.name || booking.vehicle.plateNumber}</div>
+                        <div className="font-bold text-zinc-900">{getVehicleDisplayName(booking.vehicle, { mode: 'customer' })}</div>
                         <div className="text-xs font-mono text-zinc-500">
                           {booking.vehicle.plateNumber} • {booking.vehicle.category.name}
                         </div>
@@ -477,13 +483,18 @@ export default async function AdminBookingsPage({
                             <span>Detail Pesanan</span>
                             <ChevronRight className="w-3.5 h-3.5 text-blue-500" />
                           </Link>
-                          {booking.status === 'confirmed' && <StartRentalButton bookingId={booking.id} />}
+                          {booking.status === 'confirmed' && (
+                            <StartRentalButton 
+                              bookingId={booking.id} 
+                              vehicleName={getVehicleDisplayName(booking.vehicle, { mode: 'staff' })} 
+                            />
+                          )}
                           {booking.status === 'ongoing' && (
                             <EndRentalButton
                               bookingId={booking.id}
                               endDate={booking.endDate.toISOString()}
                               agreedDailyRate={Number(booking.agreedDailyRate || booking.vehicle.dailyRate)}
-                              vehicleName={booking.vehicle.name || booking.vehicle.category.name}
+                              vehicleName={getVehicleDisplayName(booking.vehicle, { mode: 'staff' })}
                               userRole={adminUser.role}
                               variant="compact"
                             />

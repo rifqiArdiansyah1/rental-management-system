@@ -4,6 +4,7 @@ import { prisma } from '@/utils/prisma'
 import { ReviewRowActions, ReviewFilterBar } from './ClientActions'
 import { Star, ShieldAlert, AlertTriangle, Building2, User } from 'lucide-react'
 import Link from 'next/link'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,7 +119,7 @@ export default async function AdminReviewsPage({
                     {/* Armada */}
                     <td className="px-5 py-4 whitespace-nowrap">
                       <span className="font-semibold text-zinc-900 block text-sm">
-                        {rev.vehicle.name || rev.vehicle.plateNumber}
+                        {getVehicleDisplayName(rev.vehicle, { mode: 'customer' })}
                       </span>
                       <span className="text-xs font-mono text-zinc-500">
                         {rev.vehicle.plateNumber}
@@ -199,7 +200,7 @@ export default async function AdminReviewsPage({
                         isFeatured={rev.isFeatured}
                         hasComment={Boolean(rev.comment && rev.comment.trim())}
                         isPusat={isPusat}
-                        vehicleName={rev.vehicle.name || rev.vehicle.plateNumber}
+                        vehicleName={getVehicleDisplayName(rev.vehicle, { mode: 'staff' })}
                         customerName={rev.customer.name}
                         currentReason={rev.hiddenReason}
                       />

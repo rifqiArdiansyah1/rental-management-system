@@ -1,4 +1,5 @@
 import { prisma } from '@/utils/prisma'
+import { getVehicleDisplayName } from './vehicleHelper'
 
 /**
  * Masking nama penyewa untuk kepatuhan UU PDP No. 27/2022.
@@ -108,6 +109,7 @@ export async function resolveActiveVehiclesForReviews(
       previousVehicleId: string | null
       relocatedTo: { id: string } | null
       branch: { name: string }
+      category: { name: string }
     }> = await prisma.vehicle.findMany({
       where: { id: { in: Array.from(idsToFetch) } },
       select: {
@@ -117,7 +119,8 @@ export async function resolveActiveVehiclesForReviews(
         isActive: true,
         previousVehicleId: true,
         relocatedTo: { select: { id: true } },
-        branch: { select: { name: true } }
+        branch: { select: { name: true } },
+        category: { select: { name: true } }
       }
     })
 
@@ -125,7 +128,7 @@ export async function resolveActiveVehiclesForReviews(
     for (const v of fetched) {
       const node: VehicleNode = {
         id: v.id,
-        name: v.name || v.plateNumber,
+        name: getVehicleDisplayName(v, { mode: 'customer' }),
         plateNumber: v.plateNumber,
         isActive: v.isActive,
         previousVehicleId: v.previousVehicleId,

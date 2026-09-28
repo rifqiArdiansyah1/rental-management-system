@@ -6,6 +6,7 @@ import PaymentClient from './PaymentClient'
 import BookingReviewCard from './BookingReviewCard'
 import PostPaymentKycSection from '@/components/booking/PostPaymentKycSection'
 import { syncPaymentStatus } from '@/actions/payment'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 import { getDictionary } from '@/lib/i18n/server'
 
 export const dynamic = 'force-dynamic'
@@ -78,7 +79,7 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
   const now = Date.now()
   const ageMinutes = (now - createdAt) / (1000 * 60)
 
-  const vehicleName = booking.vehicle.name || `${booking.vehicle.category.name} (${booking.vehicle.plateNumber})`
+  const vehicleName = getVehicleDisplayName(booking.vehicle, { mode: 'customer' })
 
   const docs = booking.customer.documents || []
   const rawKtp = docs.find(d => d.type.toLowerCase() === 'ktp')

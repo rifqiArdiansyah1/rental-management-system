@@ -6,6 +6,7 @@ import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle, u
 import { uploadVehiclePhoto } from '@/actions/vehiclePhoto'
 import { VehicleStatus, FuelType } from '@prisma/client'
 import { MIN_VEHICLE_DAILY_RATE, FUEL_TYPE_LABELS } from '@/lib/constants'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 // -- Filter Bar --
 export function VehicleFilterBar({ branches, categories, userRole }: { 
@@ -766,7 +767,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
           <div className="bg-white p-6 rounded-xl max-w-md w-full shadow-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-zinc-900 mb-1">Ubah Status</h3>
             <p className="text-xs text-zinc-500 mb-4">
-              Armada: <strong>{vehicle.name || vehicle.plateNumber}</strong> ({vehicle.plateNumber})
+              Armada: <strong>{getVehicleDisplayName(vehicle, { mode: 'staff' })}</strong>
             </p>
             
             <div className="space-y-4">
@@ -853,7 +854,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
               <h3 className="text-lg font-bold text-zinc-900">Mutasi Armada Antar Cabang</h3>
             </div>
             <p className="text-xs text-zinc-500 mb-4">
-              Armada: <strong>{vehicle.name || vehicle.plateNumber}</strong> ({vehicle.plateNumber}) • Cabang Asal: <strong>{branches.find(b => b.id === vehicle.branchId)?.name || 'Cabang Asal'}</strong>
+              Armada: <strong>{getVehicleDisplayName(vehicle, { mode: 'staff' })}</strong> • Cabang Asal: <strong>{branches.find(b => b.id === vehicle.branchId)?.name || 'Cabang Asal'}</strong>
             </p>
 
             <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-900 mb-4">
@@ -931,7 +932,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
           <div className="bg-white p-6 rounded-xl max-w-md w-full shadow-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-zinc-900 mb-1">Perbarui Estimasi Maintenance</h3>
             <p className="text-xs text-zinc-500 mb-4">
-              Armada: <strong>{vehicle.name || vehicle.plateNumber}</strong> ({vehicle.plateNumber})
+              Armada: <strong>{getVehicleDisplayName(vehicle, { mode: 'staff' })}</strong>
             </p>
 
             {estimateConflictWarning && (

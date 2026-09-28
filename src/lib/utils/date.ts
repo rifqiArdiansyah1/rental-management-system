@@ -26,3 +26,16 @@ export function calculateDaysDifference(startDate: Date | string, endDate: Date 
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   return Math.max(1, diffDays)
 }
+
+/**
+ * Checks if two half-open date intervals [aStart, aEnd) and [bStart, bEnd) overlap.
+ */
+export function checkIntervalOverlap(
+  aStart: Date,
+  aEnd: Date,
+  bStart: Date,
+  bEnd: Date
+): boolean {
+  return aStart < bEnd && aEnd > bStart
+}
+

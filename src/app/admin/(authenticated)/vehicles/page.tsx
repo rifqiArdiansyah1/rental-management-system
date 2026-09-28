@@ -5,6 +5,7 @@ import { VehicleFilterBar, CreateVehicleButton, VehicleRowActions } from './Clie
 import { Prisma, FuelType } from '@prisma/client'
 import { FUEL_TYPE_LABELS } from '@/lib/constants'
 import { Car } from 'lucide-react'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 export const dynamic = 'force-dynamic'
 
@@ -110,13 +111,13 @@ export default async function AdminVehiclesPage({
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-zinc-100 overflow-hidden flex-shrink-0 border border-zinc-200 flex items-center justify-center">
                     {coverImage ? (
-                      <img src={coverImage} alt={vehicle.name || vehicle.plateNumber} className="w-full h-full object-cover" />
+                      <img src={coverImage} alt={getVehicleDisplayName(vehicle, { mode: 'customer' })} className="w-full h-full object-cover" />
                     ) : (
                       <Car className="w-6 h-6 text-zinc-400" />
                     )}
                   </div>
                   <div>
-                    <div className="font-bold text-zinc-900 text-base">{vehicle.name || vehicle.plateNumber}</div>
+                    <div className="font-bold text-zinc-900 text-base">{getVehicleDisplayName(vehicle, { mode: 'customer' })}</div>
                     <div className="text-xs font-mono text-zinc-500 uppercase">{vehicle.plateNumber}</div>
                     {vehicle.previousVehicle && (
                       <div className="text-[10px] text-purple-700 font-medium">
@@ -227,13 +228,13 @@ export default async function AdminVehiclesPage({
                       <div className="flex items-center gap-3">
                         <div className="w-14 h-10 rounded-md bg-zinc-100 overflow-hidden flex-shrink-0 border border-zinc-200 shadow-sm flex items-center justify-center">
                           {coverImage ? (
-                            <img src={coverImage} alt={vehicle.name || vehicle.plateNumber} className="w-full h-full object-cover" />
+                            <img src={coverImage} alt={getVehicleDisplayName(vehicle, { mode: 'customer' })} className="w-full h-full object-cover" />
                           ) : (
                             <Car className="w-5 h-5 text-zinc-400" />
                           )}
                         </div>
                         <div>
-                          <div className="font-bold text-zinc-900">{vehicle.name || vehicle.plateNumber}</div>
+                          <div className="font-bold text-zinc-900">{getVehicleDisplayName(vehicle, { mode: 'customer' })}</div>
                           {vehicle.previousVehicle && (
                             <div className="text-[11px] text-purple-700 font-medium">
                               ↳ Mutasi dari {vehicle.previousVehicle.branch?.name}

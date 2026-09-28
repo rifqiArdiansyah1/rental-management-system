@@ -1,9 +1,10 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { getVehicleById } from '@/actions/vehicle'
+import { getVehicleById, getVehicleOccupiedRanges } from '@/actions/vehicle'
 import { getAllBranches } from '@/actions/branch'
 import { createClient } from '@/utils/supabase/server'
 import BookingForm from '@/components/BookingForm'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,9 +19,10 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const resolvedParams = await params
   const vehicleId = resolvedParams.id
   
-  const [vehicle, branches] = await Promise.all([
+  const [vehicle, branches, occupiedRanges] = await Promise.all([
     getVehicleById(vehicleId),
-    getAllBranches()
+    getAllBranches(),
+    getVehicleOccupiedRanges(vehicleId),
   ])
 
   if (!vehicle) {
@@ -28,7 +30,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   }
 
   const { category } = vehicle
-  const vehicleName = vehicle.name || `${category.name} (${vehicle.plateNumber})`
+  const vehicleName = getVehicleDisplayName(vehicle, { mode: 'customer' })
   const imageUrl = (vehicle.photos && vehicle.photos.length > 0) 
     ? vehicle.photos[0] 
     : (category.imageUrl || 'https://via.placeholder.com/1200x800?text=Vehicle')
@@ -110,6 +112,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             defaultBranchId={vehicle.branchId}
             vehicleBranch={vehicle.branch}
             maintenanceEndAt={vehicle.unavailabilities?.[0]?.estimatedEndAt ? new Date(vehicle.unavailabilities[0].estimatedEndAt).toISOString() : null}
+            vehicleStatus={vehicle.status}
+            occupiedRanges={occupiedRanges}
           />
         </section>
         

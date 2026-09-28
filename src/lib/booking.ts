@@ -1,18 +1,11 @@
 import { prisma } from '@/utils/prisma'
-import { calculateDaysDifference } from './utils/date'
+import { calculateDaysDifference, checkIntervalOverlap } from './utils/date'
 import { RentalType, BookingStatus } from '@prisma/client'
 import { TURNOVER_BUFFER_MS } from '@/lib/constants'
 
 import { calculateEstimatedPrice } from './pricing'
 
-export function checkIntervalOverlap(
-  aStart: Date,
-  aEnd: Date,
-  bStart: Date,
-  bEnd: Date
-): boolean {
-  return aStart < bEnd && aEnd > bStart
-}
+export { checkIntervalOverlap }
 
 export async function checkVehicleAvailability(
   vehicleId: string,

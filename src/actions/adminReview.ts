@@ -72,7 +72,7 @@ export async function getAdminReviews(options?: GetAdminReviewsOptions) {
       orderBy: { createdAt: 'desc' },
       include: {
         customer: { select: { id: true, name: true, email: true } },
-        vehicle: { select: { id: true, name: true, plateNumber: true, branchId: true } },
+        vehicle: { select: { id: true, name: true, plateNumber: true, branchId: true, category: { select: { name: true } } } },
         branch: { select: { id: true, name: true, city: true } },
         moderator: { select: { id: true, name: true, role: true } },
       }

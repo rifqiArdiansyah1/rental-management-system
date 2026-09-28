@@ -161,10 +161,12 @@ export function VerifyDocumentButton({ documentId, currentStatus }: { documentId
 
 export function StartRentalButton({ 
   bookingId, 
+  vehicleName,
   disabled = false, 
   disabledReason 
 }: { 
   bookingId: string
+  vehicleName?: string
   disabled?: boolean
   disabledReason?: string 
 }) {
@@ -218,6 +220,12 @@ export function StartRentalButton({
             <p className="text-sm text-zinc-600 mb-4">
               Apakah Anda yakin ingin menyerahkan armada dan kunci ke pelanggan sekarang? Status pesanan akan berganti menjadi <strong>ONGOING</strong>.
             </p>
+
+            {vehicleName && (
+              <p className="text-sm font-semibold text-zinc-800 mb-4 bg-zinc-50 p-2.5 rounded-lg border border-zinc-200">
+                Unit Armada: {vehicleName}
+              </p>
+            )}
             
             <div className="mb-4">
               <label className="block text-sm font-medium text-zinc-700 mb-1 flex items-center gap-1.5">

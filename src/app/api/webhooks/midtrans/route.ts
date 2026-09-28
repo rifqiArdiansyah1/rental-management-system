@@ -116,13 +116,14 @@ export async function POST(req: Request) {
           try {
             const { notifyBookingConfirmed } = await import('@/utils/notifications')
             const { formatCurrency, formatDate } = await import('@/lib/i18n/formatters')
+            const { getVehicleDisplayName } = await import('@/lib/vehicleHelper')
             const bookingLocale = (fullBooking.locale as any) || 'id'
             await notifyBookingConfirmed({
               bookingId: fullBooking.id,
               customerName: fullBooking.customer.name,
               customerEmail: fullBooking.customer.email,
               customerPhone: fullBooking.customer.phone,
-              vehicleName: fullBooking.vehicle.category.name,
+              vehicleName: getVehicleDisplayName(fullBooking.vehicle, { mode: 'customer' }),
               pickupBranchName: fullBooking.pickupBranch?.name || 'Cabang Prestige Motion',
               startDate: formatDate(fullBooking.startDate, bookingLocale),
               endDate: formatDate(fullBooking.endDate, bookingLocale),

@@ -20,6 +20,7 @@ import { calculateTripOdometer } from '@/lib/fuelEstimation'
 import { FUEL_TYPE_LABELS } from '@/lib/constants'
 import { FuelType } from '@prisma/client'
 import { formatLateDuration } from '@/lib/lateFee'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
 export const dynamic = 'force-dynamic'
 
@@ -195,7 +196,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
               <div>
                 <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Armada Kendaraan</p>
                 <p className="font-bold text-zinc-900 text-base mt-0.5">
-                  {booking.vehicle.name || `${booking.vehicle.category.name} (${booking.vehicle.plateNumber})`}
+                  {getVehicleDisplayName(booking.vehicle, { mode: 'staff' })}
                 </p>
                 <p className="text-xs font-mono text-zinc-500 mt-0.5">
                   {booking.vehicle.plateNumber} • {booking.vehicle.category.name}
@@ -596,6 +597,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                 {booking.status === 'confirmed' && (
                   <StartRentalButton 
                     bookingId={booking.id}
+                    vehicleName={getVehicleDisplayName(booking.vehicle, { mode: 'staff' })}
                     disabled={!isKycVerified || !isDriverReady}
                     disabledReason={startRentalDisabledReason}
                   />
@@ -606,7 +608,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                     bookingId={booking.id}
                     endDate={booking.endDate.toISOString()}
                     agreedDailyRate={agreedDailyRate}
-                    vehicleName={booking.vehicle.name || booking.vehicle.category.name}
+                    vehicleName={getVehicleDisplayName(booking.vehicle, { mode: 'staff' })}
                     userRole={adminUser.role}
                     odometerStart={booking.odometerStart}
                     fuelEfficiencyKmL={booking.vehicle.fuelEfficiencyKmL ? Number(booking.vehicle.fuelEfficiencyKmL) : null}
