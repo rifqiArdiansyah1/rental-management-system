@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { verifyDocument, assignDriver, adminCancelBooking, markPaymentRefunded, startRental, endRental } from '@/actions/admin'
+import { resolveIncidentAction } from '@/actions/incident'
 import { useRouter } from 'next/navigation'
 import { generateSignedDocumentUrl } from '@/actions/document'
 import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw, Play, AlertCircle, Clock, AlertTriangle, Gauge, X } from 'lucide-react'
@@ -936,5 +937,124 @@ export function MarkRefundedButton({ paymentId }: { paymentId: string }) {
       </button>
       {error && <span className="text-xs text-red-600">{error}</span>}
     </div>
+  )
+}
+
+export function ResolveIncidentButton({
+  incidentId,
+  currentStatus,
+}: {
+  incidentId: string
+  currentStatus: string
+}) {
+  const [isPending, startTransition] = useTransition()
+  const [isOpen, setIsOpen] = useState(false)
+  const [resolution, setResolution] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  if (currentStatus === 'resolved') {
+    return null
+  }
+
+  const handleResolve = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resolution.trim() || resolution.trim().length < 5) {
+      setError('Catatan resolusi penanganan minimal 5 karakter.')
+      return
+    }
+
+    startTransition(async () => {
+      setError(null)
+      const res = await resolveIncidentAction({
+        incidentId,
+        resolution: resolution.trim(),
+      })
+      if (!res.success) {
+        setError(res.error || 'Gagal menyelesaikan insiden.')
+      } else {
+        setIsOpen(false)
+        setResolution('')
+        router.refresh()
+      }
+    })
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setError(null)
+          setIsOpen(true)
+        }}
+        data-testid={`resolve-incident-btn-${incidentId}`}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+      >
+        <CheckCircle2 className="w-3.5 h-3.5" />
+        Selesaikan Insiden
+      </button>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-left border border-zinc-200">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <h3 className="font-bold text-base text-zinc-900 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" /> Selesaikan Laporan Insiden
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="text-zinc-400 hover:text-zinc-700 p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleResolve} className="space-y-4 pt-4">
+              {error && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-1.5">
+                  Tindakan & Solusi Penanganan Staf *
+                </label>
+                <textarea
+                  rows={4}
+                  value={resolution}
+                  onChange={(e) => setResolution(e.target.value)}
+                  placeholder="Catat tindakan penanganan (misal: pengiriman mobil pengganti, derek tol tiba, sopir pengganti dikirim)..."
+                  required
+                  minLength={5}
+                  data-testid="incident-resolution-input"
+                  className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-900"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="px-3 py-1.5 rounded-lg border border-zinc-300 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending || resolution.trim().length < 5}
+                  data-testid="confirm-resolve-incident-btn"
+                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-50 transition-colors shadow-sm cursor-pointer"
+                >
+                  {isPending ? 'Menyimpan...' : 'Konfirmasi Selesai'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import AdminSidebar from '@/components/ui/AdminSidebar'
+import { prisma } from '@/utils/prisma'
+import { getStaffScope, buildScopeWhere } from '@/lib/auth/scope'
 
 export default async function AdminLayout({
   children,
@@ -15,6 +17,21 @@ export default async function AdminLayout({
     redirect('/admin/login')
   }
 
+  // Query open emergency incidents count scoped to branch
+  let openIncidentsCount = 0
+  try {
+    const scope = await getStaffScope()
+    const scopeWhere = buildScopeWhere(scope, 'branchId')
+    openIncidentsCount = await prisma.incidentReport.count({
+      where: {
+        ...scopeWhere,
+        status: 'open',
+      },
+    })
+  } catch (err) {
+    // Graceful fallback if user record is not yet provisioned in db
+  }
+
   // Handle Logout via Server Action
   const handleLogout = async () => {
     'use server'
@@ -25,7 +42,11 @@ export default async function AdminLayout({
 
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-zinc-100 overflow-hidden">
-      <AdminSidebar userRole={user.app_metadata?.role || ''} handleLogout={handleLogout} />
+      <AdminSidebar
+        userRole={user.app_metadata?.role || ''}
+        handleLogout={handleLogout}
+        openIncidentsCount={openIncidentsCount}
+      />
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">

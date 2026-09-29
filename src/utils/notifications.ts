@@ -7,6 +7,7 @@ import {
   sendDocumentStatusEmail,
   sendDriverReassignedEmail,
   sendReturnReminderEmail,
+  sendEmergencyIncidentAlertEmail,
 } from './email'
 import {
   sendWhatsAppMessage,
@@ -19,6 +20,7 @@ import {
   buildDriverReassignedWAMessage,
   buildReturnReminderWAMessage,
   buildOverdueWAMessage,
+  buildEmergencyIncidentAlertWAMessage,
 } from './whatsapp'
 
 function getAppBaseUrl(): string {
@@ -459,4 +461,91 @@ export async function notifyReturnReminder(
         }
       : undefined
   )
+}
+
+// =========================================================================
+// 8. Emergency Incident Alert (Laporan Kendala Darurat Perjalanan)
+// =========================================================================
+export interface NotifyEmergencyIncidentParams {
+  incidentId: string
+  bookingId: string
+  customerId: string
+  customerName: string
+  customerPhone?: string | null
+  customerEmail?: string | null
+  branchId: string
+  branchName: string
+  branchPhone: string
+  branchStaffEmails?: string[]
+  vehicleName: string
+  plateNumber: string
+  category: string
+  description: string
+  location?: string | null
+  reportedAt: string
+  driverName?: string | null
+  driverPhone?: string | null
+  withDriver?: boolean
+  locale?: Locale
+}
+
+export async function notifyEmergencyIncident(
+  params: NotifyEmergencyIncidentParams
+): Promise<NotificationResult> {
+  const branchWaPhone = formatIndonesianPhoneNumber(params.branchPhone)
+  const driverWaPhone =
+    params.withDriver && params.category !== 'driver'
+      ? formatIndonesianPhoneNumber(params.driverPhone)
+      : null
+
+  const targetEmail =
+    (params.branchStaffEmails && params.branchStaffEmails.length > 0 && params.branchStaffEmails[0]) ||
+    params.customerEmail ||
+    'operations@prestigemotion.com'
+
+  const incidentWAMsg = buildEmergencyIncidentAlertWAMessage({
+    incidentId: params.incidentId,
+    bookingId: params.bookingId,
+    customerName: params.customerName,
+    customerPhone: params.customerPhone || '-',
+    vehicleName: params.vehicleName,
+    plateNumber: params.plateNumber,
+    category: params.category,
+    description: params.description,
+    location: params.location,
+    reportedAt: params.reportedAt,
+  })
+
+  // We dispatch alert to Branch Staff (Email + WhatsApp)
+  const mainResult = await dispatchDualChannel(
+    'emergency_incident_branch',
+    () =>
+      sendEmergencyIncidentAlertEmail({
+        toEmail: targetEmail,
+        incidentId: params.incidentId,
+        bookingId: params.bookingId,
+        customerName: params.customerName,
+        customerPhone: params.customerPhone,
+        vehicleName: params.vehicleName,
+        plateNumber: params.plateNumber,
+        category: params.category,
+        description: params.description,
+        location: params.location,
+        branchName: params.branchName,
+        reportedAt: params.reportedAt,
+        locale: params.locale,
+      }),
+    branchWaPhone ? () => sendWhatsAppMessage(branchWaPhone, incidentWAMsg) : undefined
+  )
+
+  // Driver notification (adaptive): only if with_driver and category !== 'driver'
+  if (driverWaPhone) {
+    try {
+      await sendWhatsAppMessage(driverWaPhone, incidentWAMsg)
+    } catch (driverErr) {
+      console.warn('[NOTIFICATION WARNING] Failed to notify driver of incident:', driverErr)
+    }
+  }
+
+  return mainResult
 }

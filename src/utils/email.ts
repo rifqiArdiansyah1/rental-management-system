@@ -1085,4 +1085,117 @@ export async function sendReturnReminderEmail(data: ReturnReminderEmailData) {
   })
 }
 
+export interface EmergencyIncidentAlertEmailData {
+  toEmail: string
+  incidentId: string
+  bookingId: string
+  customerName: string
+  customerPhone?: string | null
+  vehicleName: string
+  plateNumber: string
+  category: string
+  description: string
+  location?: string | null
+  branchName: string
+  reportedAt: string
+  locale?: Locale
+}
+
+export async function sendEmergencyIncidentAlertEmail(data: EmergencyIncidentAlertEmailData) {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.APP_URL?.includes('3001') ||
+    !process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_KEY.includes('dummy') ||
+    data.toEmail.endsWith('@test.com')
+  ) {
+    return { id: 'mock-test-incident-email-id' }
+  }
+
+  const shortId = data.bookingId.substring(0, 8).toUpperCase()
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const subject = `🚨 [URGENT] Incident Report - Booking #${shortId} (${data.category.toUpperCase()})`
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${subject}</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; margin: 0 auto; max-width: 600px; border-top: 6px solid #dc2626;">
+        <tr>
+          <td style="background-color: #7f1d1d; padding: 25px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 1px;">🚨 LAPORAN INSIDEN OPERASIONAL CABANG</h1>
+            <p style="color: #fecaca; margin: 5px 0 0 0; font-size: 13px;">Cabang ${data.branchName} • Perhatian Segera Diperlukan</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 30px;">
+            <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
+              <strong style="color: #991b1b; font-size: 16px; display: block; margin-bottom: 6px;">Kategori: ${data.category.toUpperCase()}</strong>
+              <p style="color: #7f1d1d; margin: 0; font-size: 14px; line-height: 1.5;">${data.description}</p>
+            </div>
+
+            <table width="100%" cellpadding="12" cellspacing="0" border="0" style="background-color: #f8f9fa; border-radius: 6px; margin-bottom: 25px;">
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">Nomor Pesanan</span><br>
+                  <strong style="color: #111827; font-size: 15px;">#${shortId}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">Armada / Kendaraan</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.vehicleName} (${data.plateNumber})</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">Kontak Pelanggan</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.customerName}</strong><br>
+                  <a href="tel:${data.customerPhone || ''}" style="color: #2563eb; font-size: 14px; text-decoration: none;">📞 ${data.customerPhone || 'Tidak ada nomor'}</a>
+                </td>
+              </tr>
+              ${data.location ? `
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">Lokasi / Koordinat GPS</span><br>
+                  <strong style="color: #111827; font-size: 14px;">${data.location}</strong>
+                </td>
+              </tr>` : ''}
+              <tr>
+                <td>
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">Waktu Dilaporkan</span><br>
+                  <span style="color: #374151; font-size: 14px;">${data.reportedAt}</span>
+                </td>
+              </tr>
+            </table>
+
+            <div style="text-align: center; margin-bottom: 10px;">
+              <a href="${appUrl}/admin/bookings/${data.bookingId}" style="background-color: #b91c1c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">
+                Buka Detail Pesanan di Portal Admin
+              </a>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  try {
+    return resend.emails.send({
+      from: `Prestige Motion Operations <${EMAIL_FROM}>`,
+      to: data.toEmail,
+      subject: subject,
+      html: htmlContent,
+    })
+  } catch (err) {
+    console.error('[Email Error] Failed to send incident alert email:', err)
+    return null
+  }
+}
+
 

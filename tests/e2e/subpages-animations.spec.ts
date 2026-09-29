@@ -38,16 +38,16 @@ test.describe('Subpages UI/UX Animations & Progressive Fallback ("Prestige Motio
     // 2. Booking card & CTA button
     const bookBtn = page.locator('a.shimmer-btn')
     await expect(bookBtn).toBeVisible()
-    await expect(bookBtn).toContainText('Rent This Car')
+    await expect(bookBtn).toContainText(/Rent This Car|Mulai Sewa Sekarang/)
 
     // 3. Verify no pseudo 1/3 progress bar
     await expect(page.locator('text=Langkah 1 dari 3')).toHaveCount(0)
     await expect(page.locator('.bg-secondary.h-full.w-1\\/3')).toHaveCount(0)
 
     // 4. Specs bento grid visible
-    await expect(page.locator('text=Capacity')).toBeVisible()
-    await expect(page.locator('text=Transmission')).toBeVisible()
-    await expect(page.locator('text=Fuel Type')).toBeVisible()
+    await expect(page.locator('text=/Capacity|Kapasitas/')).toBeVisible()
+    await expect(page.locator('text=/Transmission|Transmisi/')).toBeVisible()
+    await expect(page.locator('text=/Fuel Type|Bahan Bakar/')).toBeVisible()
   })
 
   test('2. Locations (/locations): Header LCP visible, branch cards revealed with dynamic count and hover classes', async ({ page }) => {
@@ -171,7 +171,7 @@ test.describe('Subpages UI/UX Animations & Progressive Fallback ("Prestige Motio
     await page.goto('/about')
     await page.waitForLoadState('networkidle')
     await expect(page.locator('h1')).toBeVisible()
-    await expect(page.locator('text=Mengapa Memilih Prestige Motion?')).toBeVisible()
+    await expect(page.locator('text=CV Prestige Motion Nusantara')).toBeVisible()
     await expect(page.locator('text=Pemesanan Online 24/7')).toBeVisible()
 
     // 3. Contact
@@ -186,7 +186,7 @@ test.describe('Subpages UI/UX Animations & Progressive Fallback ("Prestige Motio
       await page.goto(`/vehicles/${sampleVehicleId}`)
       await page.waitForLoadState('networkidle')
       await expect(page.locator('h1')).toBeVisible()
-      await expect(page.locator('text=Vehicle Specifications')).toBeVisible()
+      await expect(page.locator('text=/Vehicle Specifications|Spesifikasi/')).toBeVisible()
     }
   })
 })

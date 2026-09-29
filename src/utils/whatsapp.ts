@@ -346,3 +346,44 @@ Toleransi keterlambatan adalah *${LATE_RETURN_GRACE_MINUTES} menit*. Keterlambat
 Detail pesanan:
 ${data.appUrl}/booking/${data.bookingId}`
 }
+
+export function buildEmergencyIncidentAlertWAMessage(data: {
+  incidentId: string
+  bookingId: string
+  customerName: string
+  customerPhone: string
+  vehicleName: string
+  plateNumber: string
+  category: string
+  description: string
+  location?: string | null
+  reportedAt: string
+}): string {
+  const shortId = data.bookingId.substring(0, 8).toUpperCase()
+  const locText = data.location ? `\n• Lokasi/GPS: ${data.location}` : ''
+
+  return `🚨 *PERINGATAN DARURAT OPERASIONAL (INCIDENT REPORT)* 🚨
+
+Terdapat laporan kendala darurat dari pelanggan yang memerlukan respons cepat cabang:
+
+• ID Pesanan: *#${shortId}*
+• Kendaraan: *${data.vehicleName}* (${data.plateNumber})
+• Pelanggan: *${data.customerName}* (${data.customerPhone})
+• Kategori: *${data.category.toUpperCase()}*${locText}
+• Waktu Lapor: ${data.reportedAt}
+
+*Deskripsi Kendala:*
+"${data.description}"
+
+Segera hubungi pelanggan melalui kontak di atas untuk koordinasi penanganan darurat/evakuasi unit.`
+}
+
+export function buildPrefilledCustomerEmergencyWAMessage(data: {
+  bookingId: string
+  vehicleName: string
+  plateNumber: string
+  branchName: string
+}): string {
+  const shortId = data.bookingId.substring(0, 8).toUpperCase()
+  return `Halo ${data.branchName}, saya penyewa armada *${data.vehicleName}* (${data.plateNumber}), ID Pesanan: *#${shortId}*. Saya mengalami kendala darurat di jalan dan membutuhkan bantuan operasional cabang segera.`
+}

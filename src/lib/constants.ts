@@ -126,4 +126,18 @@ export const ROUTE_DISTANCE_PRESETS = [
   { label: 'Perjalanan Jauh', distanceKm: 300, description: 'Perjalanan antarkota lintas wilayah' },
 ] as const
 
+/**
+ * Kategori kendala darurat yang valid untuk pelaporan insiden operasional.
+ */
+export const VALID_INCIDENT_CATEGORIES = [
+  'accident',
+  'breakdown',
+  'tire',
+  'driver',
+  'medical',
+  'other',
+] as const
+
+export type IncidentCategory = (typeof VALID_INCIDENT_CATEGORIES)[number]
+
 

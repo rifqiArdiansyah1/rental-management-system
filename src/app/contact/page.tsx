@@ -4,18 +4,57 @@ import Link from 'next/link'
 import { MessageSquare, Mail, PhoneCall, Clock, ShieldAlert } from 'lucide-react'
 import ScrollReveal from '@/components/ui/ScrollReveal'
 import { getLocale, getDictionary } from '@/lib/i18n/server'
+import { prisma } from '@/utils/prisma'
+import { createClient } from '@/utils/supabase/server'
+import NationalEmergencyDialPad from '@/components/contact/NationalEmergencyDialPad'
+import ActiveRentalEmergencyDispatch from '@/components/contact/ActiveRentalEmergencyDispatch'
+import BranchEmergencyDirectory from '@/components/contact/BranchEmergencyDirectory'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Hubungi Kami & Layanan Pelanggan | Prestige Motion',
-  description: 'Informasi kontak resmi, layanan pelanggan, dan bantuan eskalasi darurat rental Prestige Motion.'
+  description: 'Informasi kontak resmi, layanan pelanggan, dan bantuan eskalasi darurat rental Prestige Motion.',
 }
 
 export default async function ContactPage() {
   const locale = await getLocale()
   const dict = await getDictionary(locale)
   const isEn = locale === 'en'
+
+  // Fetch logged in user & active ongoing booking if any
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  let ongoingBooking = null
+  if (user) {
+    ongoingBooking = await prisma.booking.findFirst({
+      where: {
+        customerId: user.id,
+        status: 'ongoing',
+      },
+      include: {
+        vehicle: {
+          include: { category: true },
+        },
+        pickupBranch: true,
+        returnBranch: true,
+        driver: true,
+        incidents: {
+          orderBy: { reportedAt: 'desc' },
+          take: 5,
+        },
+      },
+    })
+  }
+
+  // Fetch all active branches for emergency directory
+  const branches = await prisma.branch.findMany({
+    where: { isActive: true },
+    orderBy: { name: 'asc' },
+  })
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-on-surface">
@@ -70,7 +109,7 @@ export default async function ContactPage() {
                   <Mail className="w-6 h-6" />
                 </div>
                 <h3 className="font-headline-md text-xl text-white font-bold mb-2 group-hover:text-secondary-light transition-colors">
-                  {dict.contact.emailTitle}
+                  {dict.contact.emailTitle} <span className="text-zinc-500 font-normal text-sm">/ Email Resmi</span>
                 </h3>
                 <p className="text-sm text-zinc-400 leading-relaxed mb-4">
                   {dict.contact.emailDesc}
@@ -91,7 +130,7 @@ export default async function ContactPage() {
                   <PhoneCall className="w-6 h-6" />
                 </div>
                 <h3 className="font-headline-md text-xl text-white font-bold mb-2 group-hover:text-blue-300 transition-colors">
-                  {dict.contact.hotlineTitle}
+                  {dict.contact.hotlineTitle} <span className="text-zinc-500 font-normal text-sm">/ Hotline Operasional</span>
                 </h3>
                 <p className="text-sm text-zinc-400 leading-relaxed mb-4">
                   {dict.contact.hotlineDesc}
@@ -107,7 +146,7 @@ export default async function ContactPage() {
 
         {/* Emergency Escalation Section */}
         <ScrollReveal delay={150}>
-          <section id="emergency" className="max-w-5xl mx-auto bg-red-950/20 border border-red-900/40 hover:border-red-700/60 rounded-xl p-8 scroll-mt-20 transition-all duration-300 group">
+          <section id="emergency" className="max-w-5xl mx-auto bg-red-950/20 border border-red-900/40 hover:border-red-700/60 rounded-xl p-6 sm:p-8 scroll-mt-20 transition-all duration-300 group space-y-8">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
                 <ShieldAlert className="w-6 h-6" />
@@ -134,6 +173,24 @@ export default async function ContactPage() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* If customer has an ongoing rental, show the interactive dispatch card! */}
+            {ongoingBooking && (
+              <ActiveRentalEmergencyDispatch
+                booking={ongoingBooking}
+                isEn={isEn}
+              />
+            )}
+
+            {/* National Emergency Numbers Dial Pad (112, 110, 119, 14080, 115) */}
+            <div className="pt-4 border-t border-red-900/30">
+              <NationalEmergencyDialPad isEn={isEn} />
+            </div>
+
+            {/* Verified Branch Directory & Roadside SOP */}
+            <div className="pt-4 border-t border-red-900/30">
+              <BranchEmergencyDirectory branches={branches} isEn={isEn} />
             </div>
           </section>
         </ScrollReveal>

@@ -2,7 +2,7 @@ import { requireAdminSession } from '@/actions/admin'
 import { prisma } from '@/utils/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, FileText, CheckCircle2, AlertCircle, AlertTriangle, XCircle, CreditCard, Clock, Calendar, Car, User, ShieldCheck, Gauge } from 'lucide-react'
+import { ChevronLeft, FileText, CheckCircle2, AlertCircle, AlertTriangle, XCircle, CreditCard, Clock, Calendar, Car, User, ShieldCheck, Gauge, AlertOctagon, ExternalLink } from 'lucide-react'
 import { 
   VerifyDocumentButton, 
   AssignDriverForm, 
@@ -10,7 +10,8 @@ import {
   ViewDocumentButton, 
   MarkRefundedButton,
   StartRentalButton,
-  EndRentalButton
+  EndRentalButton,
+  ResolveIncidentButton
 } from './ClientActions'
 import { getEligibleDrivers } from '@/lib/driverEligibility'
 import { detectScheduleConflict } from '@/lib/scheduleConflict'
@@ -47,7 +48,10 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
         orderBy: { createdAt: 'desc' }
       },
       adminCanceler: true,
-      adminReassigner: true
+      adminReassigner: true,
+      incidents: {
+        orderBy: { reportedAt: 'desc' }
+      }
     }
   })
 
@@ -178,6 +182,104 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
             <p className="text-xs mt-0.5">
               Pesanan ini memiliki tagihan denda keterlambatan sebesar <strong>Rp {Number(booking.lateFeeAmount).toLocaleString('id-ID')}</strong> ({formatLateDuration(booking.lateMinutes)} keterlambatan) yang belum diselesaikan oleh pelanggan.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Incident Alert Panel */}
+      {booking.incidents && booking.incidents.length > 0 && (
+        <div className="bg-red-50 border-2 border-red-500 rounded-xl p-6 mb-6 shadow-sm">
+          <div className="flex items-center justify-between pb-3 border-b border-red-200 mb-4">
+            <div className="flex items-center gap-2">
+              <AlertOctagon className="w-6 h-6 text-red-600 animate-pulse" />
+              <h2 className="text-lg font-bold text-red-900">
+                🚨 Laporan Kendala Darurat Perjalanan ({booking.incidents.length})
+              </h2>
+            </div>
+            {booking.incidents.some(i => i.status === 'open') && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-600 text-white animate-pulse">
+                Butuh Penanganan Staf
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {booking.incidents.map((incident) => {
+              const isOpen = incident.status === 'open'
+              return (
+                <div
+                  key={incident.id}
+                  className={`p-4 rounded-lg border ${
+                    isOpen
+                      ? 'bg-white border-red-300 shadow-sm'
+                      : 'bg-zinc-50 border-zinc-200'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 mb-2 border-b border-zinc-100">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
+                          isOpen
+                            ? 'bg-red-100 text-red-800 border border-red-300'
+                            : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        }`}
+                      >
+                        {isOpen ? '🚨 Terbuka (Open)' : '✅ Terselesaikan (Resolved)'}
+                      </span>
+                      <span className="text-xs font-bold text-zinc-800 capitalize">
+                        Kategori: {incident.category}
+                      </span>
+                    </div>
+                    <span className="text-xs text-zinc-500 font-mono">
+                      Waktu Lapor: {formatWibDateTime(incident.reportedAt)}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-zinc-900 leading-relaxed font-medium mb-2">
+                    &ldquo;{incident.description}&rdquo;
+                  </p>
+
+                  {incident.location && (
+                    <div className="text-xs text-zinc-600 mb-3 flex items-center gap-1.5">
+                      <span className="font-semibold text-zinc-700">Lokasi / GPS:</span>
+                      {incident.location.startsWith('http') ? (
+                        <a
+                          href={incident.location}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline inline-flex items-center gap-1 font-mono font-medium"
+                        >
+                          Buka Google Maps <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <span className="font-mono">{incident.location}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {incident.resolution && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md text-xs text-emerald-900 mb-2">
+                      <p className="font-bold text-emerald-950 mb-0.5">Catatan Penanganan Staf:</p>
+                      <p>{incident.resolution}</p>
+                      {incident.resolvedAt && (
+                        <p className="text-[11px] text-emerald-700 font-mono mt-1">
+                          Diselesaikan pada: {formatWibDateTime(incident.resolvedAt)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {isOpen && (
+                    <div className="pt-2 flex justify-end">
+                      <ResolveIncidentButton
+                        incidentId={incident.id}
+                        currentStatus={incident.status}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

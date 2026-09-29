@@ -102,6 +102,7 @@ model Branch {
   pickups  Booking[] @relation("PickupBranch")
   returns  Booking[] @relation("ReturnBranch")
   reviews  Review[]
+  incidents IncidentReport[]
 
   @@index([city])
   @@index([isActive])
@@ -184,6 +185,7 @@ model Customer {
   bookings  Booking[]
   documents Document[]
   reviews   Review[]
+  incidents IncidentReport[]
 }
 
 model Driver {
@@ -283,6 +285,7 @@ model Booking {
   payments  Payment[]
   documents Document[]
   review    Review?
+  incidents IncidentReport[]
 
   // Dipakai untuk cek ketersediaan mobil per rentang tanggal
   @@index([vehicleId, startDate, endDate])
@@ -438,5 +441,27 @@ model Review {
   @@index([customerId])
   @@index([isPublished, createdAt])
   @@index([isFeatured, isPublished, featuredAt])
+}
+
+model IncidentReport {
+  id          String    @id @default(uuid())
+  bookingId   String
+  customerId  String
+  branchId    String    // Snapshot dari booking.pickupBranchId
+  category    String    // "accident" | "breakdown" | "tire" | "driver" | "medical" | "other"
+  description String
+  location    String?   // Alamat bebas atau koordinat GPS (Google Maps URL)
+  status      String    @default("open") // "open" | "acknowledged" | "resolved"
+  resolution  String?   // Catatan tindakan penanganan oleh staf
+  reportedAt  DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@index([branchId, status])
+  @@index([reportedAt])
 }
 

@@ -8,9 +8,10 @@ import { LayoutDashboard, CalendarRange, Car, LogOut, Users, Building2, UserCog,
 type AdminSidebarProps = {
   userRole: string;
   handleLogout: () => void;
+  openIncidentsCount?: number;
 }
 
-export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarProps) {
+export default function AdminSidebar({ userRole, handleLogout, openIncidentsCount }: AdminSidebarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
 
@@ -96,15 +97,29 @@ export default function AdminSidebar({ userRole, handleLogout }: AdminSidebarPro
         <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
           {navLinks.map((link) => {
             const isActive = pathname.startsWith(link.href)
+            const isBookingLink = link.href === '/admin/bookings'
+            const hasEmergency = isBookingLink && Boolean(openIncidentsCount && openIncidentsCount > 0)
+
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors min-h-[44px] ${isActive ? 'bg-zinc-800 text-white font-semibold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white font-medium'
-                  }`}
+                className={`flex items-center justify-between px-4 py-3 rounded-md transition-colors min-h-[44px] ${
+                  isActive ? 'bg-zinc-800 text-white font-semibold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white font-medium'
+                }`}
               >
-                <link.icon className={`w-5 h-5 ${isActive ? 'text-zinc-200' : 'text-zinc-400'}`} />
-                <span>{link.label}</span>
+                <div className="flex items-center gap-3">
+                  <link.icon className={`w-5 h-5 ${isActive ? 'text-zinc-200' : 'text-zinc-400'}`} />
+                  <span>{link.label}</span>
+                </div>
+                {hasEmergency && (
+                  <span
+                    data-testid="sidebar-emergency-incident-badge"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-600 text-white animate-pulse shadow-md shadow-red-900/50"
+                  >
+                    🚨 {openIncidentsCount} Darurat
+                  </span>
+                )}
               </Link>
             )
           })}
