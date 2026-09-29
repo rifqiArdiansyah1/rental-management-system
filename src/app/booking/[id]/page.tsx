@@ -9,6 +9,9 @@ import OngoingRentalCard from '@/components/booking/OngoingRentalCard'
 import { syncPaymentStatus } from '@/actions/payment'
 import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 import { getDictionary } from '@/lib/i18n/server'
+import { calculateDaysDifference } from '@/lib/utils/date'
+import { MIN_VEHICLE_DAILY_RATE } from '@/lib/constants'
+import { STANDARD_DRIVER_FEE } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -112,6 +115,23 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
     month: 'long',
     year: 'numeric'
   })
+
+  let agreedDailyRate: number = 0
+  if (booking.status === 'ongoing') {
+    if (booking.agreedDailyRate) {
+      agreedDailyRate = Number(booking.agreedDailyRate)
+    } else {
+      const rentalDays = Math.max(1, calculateDaysDifference(booking.startDate, booking.endDate))
+      if (booking.rentalType === 'with_driver') {
+        const driverTotal = STANDARD_DRIVER_FEE * rentalDays
+        const calculatedRate = (Number(booking.totalPrice) - driverTotal) / rentalDays
+        agreedDailyRate = calculatedRate >= MIN_VEHICLE_DAILY_RATE ? calculatedRate : Number(booking.vehicle.dailyRate)
+      } else {
+        const calculatedRate = Number(booking.totalPrice) / rentalDays
+        agreedDailyRate = calculatedRate >= MIN_VEHICLE_DAILY_RATE ? calculatedRate : Number(booking.vehicle.dailyRate)
+      }
+    }
+  }
 
   return (
     <div className="flex-grow flex flex-col items-center justify-center p-4 bg-background min-h-[calc(100vh-80px)]">
@@ -217,6 +237,8 @@ export default async function BookingPaymentPage({ params }: { params: Promise<{
             pickupBranch={booking.pickupBranch}
             driver={booking.driver}
             rentalType={booking.rentalType}
+            serverNow={Date.now()}
+            agreedDailyRate={agreedDailyRate}
           />
         ) : (
           <PostPaymentKycSection

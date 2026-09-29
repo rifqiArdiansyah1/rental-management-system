@@ -296,3 +296,53 @@ export function buildDriverReassignedWAMessage(data: {
 
 Pengemudi kami siap melayani perjalanan Anda sesuai jadwal yang telah ditentukan.`
 }
+
+export function buildReturnReminderWAMessage(data: {
+  customerName: string
+  bookingId: string
+  vehicleName: string
+  returnBranchName: string
+  returnBranchAddress: string
+  returnBranchPhone: string
+  endDate: string
+  appUrl: string
+}): string {
+  const shortId = data.bookingId.substring(0, 8).toUpperCase()
+  return `Halo ${data.customerName}, mengingatkan bahwa periode sewa Anda untuk pesanan *#${shortId}* (${data.vehicleName}) akan segera berakhir. ⏱️
+
+*Batas Waktu Pengembalian:*
+• Tanggal & Waktu: *${data.endDate}*
+• Cabang Pengembalian: *${data.returnBranchName}*
+• Alamat: ${data.returnBranchAddress}
+• Kontak Cabang: ${data.returnBranchPhone} (08:00–21:00 WIB)
+
+⏱️ *Ketentuan Toleransi:*
+Tersedia batas toleransi keterlambatan selama *${LATE_RETURN_GRACE_MINUTES} menit*.
+
+Butuh perpanjangan sewa? Segera hubungi nomor cabang di atas sebelum waktu sewa berakhir agar tim kami dapat memeriksa ketersediaan unit.
+
+Detail perjalanan dapat diakses di:
+${data.appUrl}/booking/${data.bookingId}
+
+Semoga perjalanan Anda menyenangkan!`
+}
+
+export function buildOverdueWAMessage(data: {
+  customerName: string
+  bookingId: string
+  vehicleName: string
+  returnBranchName: string
+  returnBranchPhone: string
+  endDate: string
+  appUrl: string
+}): string {
+  const shortId = data.bookingId.substring(0, 8).toUpperCase()
+  return `⚠️ *Pemberitahuan Waktu Pengembalian:* Halo ${data.customerName}, jadwal pengembalian armada untuk pesanan *#${shortId}* (${data.vehicleName}) telah terlewati (*${data.endDate}*).
+
+Mohon segera mengembalikan armada ke *${data.returnBranchName}* atau hubungi staf cabang di *${data.returnBranchPhone}* (08:00–21:00 WIB).
+
+Toleransi keterlambatan adalah *${LATE_RETURN_GRACE_MINUTES} menit*. Keterlambatan melebihi batas toleransi akan dikenakan denda overtime sesuai ketentuan berlaku.
+
+Detail pesanan:
+${data.appUrl}/booking/${data.bookingId}`
+}

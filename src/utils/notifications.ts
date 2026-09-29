@@ -6,6 +6,7 @@ import {
   sendRentalCompletedEmail,
   sendDocumentStatusEmail,
   sendDriverReassignedEmail,
+  sendReturnReminderEmail,
 } from './email'
 import {
   sendWhatsAppMessage,
@@ -16,6 +17,8 @@ import {
   buildRentalCompletedWAMessage,
   buildDocumentStatusWAMessage,
   buildDriverReassignedWAMessage,
+  buildReturnReminderWAMessage,
+  buildOverdueWAMessage,
 } from './whatsapp'
 
 function getAppBaseUrl(): string {
@@ -386,6 +389,72 @@ export async function notifyDriverReassigned(
             newDriverName: params.newDriverName,
             newDriverPhone: params.newDriverPhone,
           })
+          return sendWhatsAppMessage(validPhone, msg)
+        }
+      : undefined
+  )
+}
+
+// =========================================================================
+// 7. Return Reminder (Pengingat Pengembalian Sewa H-3 Jam / Overdue)
+// =========================================================================
+export interface NotifyReturnReminderParams {
+  bookingId: string
+  customerName: string
+  customerEmail: string
+  customerPhone?: string | null
+  vehicleName: string
+  returnBranchName: string
+  returnBranchAddress: string
+  returnBranchPhone: string
+  endDate: string
+  isOverdue?: boolean
+  locale?: Locale
+}
+
+export async function notifyReturnReminder(
+  params: NotifyReturnReminderParams
+): Promise<NotificationResult> {
+  const appUrl = getAppBaseUrl()
+  const validPhone = formatIndonesianPhoneNumber(params.customerPhone)
+
+  return dispatchDualChannel(
+    'return_reminder',
+    () =>
+      sendReturnReminderEmail({
+        toEmail: params.customerEmail,
+        customerName: params.customerName,
+        bookingId: params.bookingId,
+        vehicleName: params.vehicleName,
+        returnBranchName: params.returnBranchName,
+        returnBranchAddress: params.returnBranchAddress,
+        returnBranchPhone: params.returnBranchPhone,
+        endDate: params.endDate,
+        isOverdue: params.isOverdue,
+        locale: params.locale,
+      }),
+    validPhone
+      ? () => {
+          const msg = params.isOverdue
+            ? buildOverdueWAMessage({
+                customerName: params.customerName,
+                bookingId: params.bookingId,
+                vehicleName: params.vehicleName,
+                returnBranchName: params.returnBranchName,
+                returnBranchPhone: params.returnBranchPhone,
+                endDate: params.endDate,
+                appUrl,
+              })
+            : buildReturnReminderWAMessage({
+                customerName: params.customerName,
+                bookingId: params.bookingId,
+                vehicleName: params.vehicleName,
+                returnBranchName: params.returnBranchName,
+                returnBranchAddress: params.returnBranchAddress,
+                returnBranchPhone: params.returnBranchPhone,
+                endDate: params.endDate,
+                appUrl,
+              })
           return sendWhatsAppMessage(validPhone, msg)
         }
       : undefined

@@ -36,10 +36,15 @@ export default async function AdminDashboardPage() {
     }
   })
 
-  // 4. Observability: Cron Heartbeat (Global infrastructure telemetry)
-  const cronHeartbeat = await prisma.cronHeartbeat.findUnique({
-    where: { jobName: 'cancel-bookings' }
-  })
+  // 4. Observability: Cron Heartbeats (Global infrastructure telemetry)
+  const [cronHeartbeat, returnReminderHeartbeat] = await Promise.all([
+    prisma.cronHeartbeat.findUnique({
+      where: { jobName: 'cancel-bookings' }
+    }),
+    prisma.cronHeartbeat.findUnique({
+      where: { jobName: 'return-reminders' }
+    })
+  ])
 
   // 5. Observability: Oldest Pending Booking (Scoped by branch for staff_cabang, global for admin_pusat)
   const oldestPendingBooking = await prisma.booking.findFirst({
@@ -96,6 +101,7 @@ export default async function AdminDashboardPage() {
       {/* Widget Observabilitas Pembersihan Otomatis & Deteksi Anomali */}
       <CronHealthWidget
         cronHeartbeat={cronHeartbeat}
+        returnReminderHeartbeat={returnReminderHeartbeat}
         oldestPendingBooking={oldestPendingBooking}
         userScope={scope.scope}
         branchName={branchName}

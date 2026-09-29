@@ -6,6 +6,7 @@ import BookingList from './BookingList'
 import DocumentSection from './DocumentSection'
 import EditProfileModal from './EditProfileModal'
 import UrgentKycBanner from '@/components/dashboard/UrgentKycBanner'
+import ActiveRentalBanner from '@/components/dashboard/ActiveRentalBanner'
 import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -41,7 +42,10 @@ export default async function DashboardPage() {
             }
           },
           pickupBranch: {
-            select: { name: true }
+            select: { name: true, phone: true }
+          },
+          returnBranch: {
+            select: { name: true, phone: true, address: true }
           },
           driver: {
             select: { name: true, phone: true }
@@ -115,6 +119,11 @@ export default async function DashboardPage() {
   }) : ''
   const activeRejectionReason = ktpDoc?.rejectionReason || simDoc?.rejectionReason || null
 
+  const activeOngoingBooking = customer.bookings.find(b => b.status === 'ongoing')
+  const ongoingVehicleName = activeOngoingBooking ? getVehicleDisplayName(activeOngoingBooking.vehicle, { mode: 'customer' }) : ''
+  const ongoingBranchName = activeOngoingBooking?.returnBranch?.name || activeOngoingBooking?.pickupBranch?.name || 'Prestige Motion'
+  const ongoingBranchPhone = activeOngoingBooking?.returnBranch?.phone || activeOngoingBooking?.pickupBranch?.phone || '081234567890'
+
   // Serialize bookings (Dates and Decimals must be serializable for client components)
   const serializedBookings = customer.bookings.map(b => ({
     id: b.id,
@@ -162,6 +171,20 @@ export default async function DashboardPage() {
 
       <main className="flex-grow py-10 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full">
         <h1 className="text-2xl font-bold text-on-surface mb-8 tracking-tight">Dashboard Saya</h1>
+
+        {/* Proactive Active Rental Companion Banner */}
+        {activeOngoingBooking && (
+          <ActiveRentalBanner
+            bookingId={activeOngoingBooking.id}
+            vehicleName={ongoingVehicleName}
+            plateNumber={activeOngoingBooking.vehicle.plateNumber}
+            endDate={activeOngoingBooking.endDate}
+            returnBranchName={ongoingBranchName}
+            returnBranchPhone={ongoingBranchPhone}
+            rentalType={activeOngoingBooking.rentalType}
+            driverName={activeOngoingBooking.driver?.name}
+          />
+        )}
 
         {/* Proactive Urgent KYC Banner */}
         {showUrgentBanner && (

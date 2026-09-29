@@ -954,4 +954,135 @@ export async function sendRentalCompletedEmail(data: RentalCompletedEmailData) {
   })
 }
 
+export interface ReturnReminderEmailData {
+  toEmail: string
+  customerName: string
+  bookingId: string
+  vehicleName: string
+  endDate: string
+  returnBranchName: string
+  returnBranchAddress: string
+  returnBranchPhone: string
+  isOverdue?: boolean
+  locale?: Locale
+}
+
+export async function sendReturnReminderEmail(data: ReturnReminderEmailData) {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.APP_URL?.includes('3001') ||
+    !process.env.RESEND_API_KEY ||
+    process.env.RESEND_API_KEY.includes('dummy') ||
+    data.toEmail.endsWith('@test.com')
+  ) {
+    return { id: 'mock-test-email-id' }
+  }
+
+  const isEn = data.locale === 'en'
+  const shortId = data.bookingId.substring(0, 8).toUpperCase()
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+  const subject = data.isOverdue
+    ? (isEn ? `[Important] Vehicle Return Reminder - #${shortId}` : `[Penting] Pengingat Pengembalian Unit - #${shortId}`)
+    : (isEn ? `Upcoming Vehicle Return - #${shortId}` : `Pengingat Pengembalian Unit Sewa - #${shortId}`)
+
+  const greeting = isEn ? `Dear ${data.customerName},` : `Halo, ${data.customerName}`
+  const bodyIntro = data.isOverdue
+    ? (isEn
+      ? `This is a reminder that the rental period for your booking <strong>#${shortId}</strong> has reached its scheduled return time. Please return the vehicle promptly or contact our branch office if you need assistance.`
+      : `Mengingatkan bahwa periode sewa Anda untuk pesanan <strong>#${shortId}</strong> telah melewati jadwal pengembalian. Mohon segera mengembalikan unit ke cabang terkait atau hubungi staf kami jika membutuhkan bantuan.`)
+    : (isEn
+      ? `We hope you are enjoying your journey with Prestige Motion. This is a gentle reminder that your rental period for booking <strong>#${shortId}</strong> is scheduled to conclude soon.`
+      : `Semoga perjalanan Anda menyenangkan bersama Prestige Motion. Kami ingin mengingatkan bahwa periode sewa untuk pesanan <strong>#${shortId}</strong> akan segera berakhir.`)
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${subject}</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; margin: 0 auto; max-width: 600px;">
+        <tr>
+          <td style="background-color: #1a1a1a; padding: 30px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: normal; letter-spacing: 2px;">PRESTIGE MOTION</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 40px 30px;">
+            <h2 style="color: #1a1a1a; font-size: 20px; margin-top: 0;">${greeting}</h2>
+            <p style="color: #4a4a4a; line-height: 1.6; margin-bottom: 24px;">
+              ${bodyIntro}
+            </p>
+
+            <table width="100%" cellpadding="14" cellspacing="0" border="0" style="background-color: #f8f9fa; border-radius: 6px; margin-bottom: 25px;">
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Booking Reference' : 'Nomor Pesanan'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">#${shortId}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Vehicle' : 'Armada'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.vehicleName}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Return Deadline' : 'Batas Waktu Pengembalian'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.endDate}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Return Location' : 'Cabang Pengembalian'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.returnBranchName}</strong><br>
+                  <span style="color: #4b5563; font-size: 13px;">${data.returnBranchAddress}</span>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span style="color: #6b7280; font-size: 12px; text-transform: uppercase;">${isEn ? 'Branch Help Center' : 'Pusat Bantuan Cabang (08:00–21:00 WIB)'}</span><br>
+                  <strong style="color: #111827; font-size: 15px;">${data.returnBranchPhone}</strong>
+                </td>
+              </tr>
+            </table>
+
+            <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 18px; margin-bottom: 25px;">
+              <p style="color: #1e40af; font-size: 13px; line-height: 1.5; margin: 0;">
+                ℹ️ ${isEn
+                  ? `A grace period of <strong>${LATE_RETURN_GRACE_MINUTES} minutes</strong> is provided. After this window, standard late return fees will be applied.`
+                  : `Tersedia batas toleransi keterlambatan selama <strong>${LATE_RETURN_GRACE_MINUTES} menit</strong>. Setelah batas waktu tersebut, denda keterlambatan akan dihitung secara otomatis.`}
+              </p>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 20px;">
+              <a href="${appUrl}/booking/${data.bookingId}" style="background-color: #111827; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">
+                ${isEn ? 'View Rental Details' : 'Lihat Detail Sewa'}
+              </a>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 13px; margin: 0;">
+              © ${new Date().getFullYear()} Prestige Motion. All rights reserved.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+
+  return resend.emails.send({
+    from: `Prestige Motion <${EMAIL_FROM}>`,
+    to: data.toEmail,
+    subject: subject,
+    html: htmlContent,
+  })
+}
+
 

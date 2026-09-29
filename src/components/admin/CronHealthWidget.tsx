@@ -16,6 +16,13 @@ export interface CronHealthWidgetProps {
   userScope: 'all' | 'branch'
   branchName?: string
   expectedIntervalMinutes?: number
+  returnReminderHeartbeat?: {
+    lastRunAt: Date
+    bookingsCancelled: number
+    status: string
+    lastError: string | null
+    executionTimeMs: number | null
+  } | null
 }
 
 export function CronHealthWidget({
@@ -23,11 +30,16 @@ export function CronHealthWidget({
   oldestPendingBooking,
   userScope,
   branchName,
-  expectedIntervalMinutes = 15
+  expectedIntervalMinutes = 15,
+  returnReminderHeartbeat,
 }: CronHealthWidgetProps) {
-  const staleThresholdMinutes = expectedIntervalMinutes * 2 // 2x interval (default: 30 menit)
+  // Batas toleransi individual:
+  // - cancel-bookings (cleanup): 2x expectedIntervalMinutes (default: 30 menit)
+  // - return-reminders: 45 menit
+  const staleThresholdMinutes = expectedIntervalMinutes * 2 // default 30m
+  const returnReminderThresholdMinutes = 45
 
-  // 1. Hitung status Heartbeat Scheduler
+  // 1. Hitung status Heartbeat Scheduler Pembersihan Otomatis
   let schedulerStatus: 'healthy' | 'stale' | 'failed' | 'empty' = 'empty'
   let schedulerDiffMinutes = 0
 
@@ -39,6 +51,21 @@ export function CronHealthWidget({
       schedulerStatus = 'stale'
     } else {
       schedulerStatus = 'healthy'
+    }
+  }
+
+  // 1b. Hitung status Heartbeat Scheduler Return Reminder
+  let returnReminderStatus: 'healthy' | 'stale' | 'failed' | 'empty' = 'empty'
+  let returnReminderDiffMinutes = 0
+
+  if (returnReminderHeartbeat) {
+    returnReminderDiffMinutes = Math.max(0, Math.floor((Date.now() - new Date(returnReminderHeartbeat.lastRunAt).getTime()) / 60000))
+    if (returnReminderHeartbeat.status === 'failed') {
+      returnReminderStatus = 'failed'
+    } else if (returnReminderDiffMinutes > returnReminderThresholdMinutes) {
+      returnReminderStatus = 'stale'
+    } else {
+      returnReminderStatus = 'healthy'
     }
   }
 
@@ -153,6 +180,31 @@ export function CronHealthWidget({
           <p className="text-xs text-zinc-500">
             Belum ada eksekusi pembersihan otomatis yang tercatat. Sistem akan mulai mencatat saat scheduler pertama kali memicu endpoint.
           </p>
+        )}
+
+        {/* Telemetri Return Reminder */}
+        {returnReminderHeartbeat && (
+          <div className="mt-3 pt-3 border-t border-zinc-200/80 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${
+                returnReminderStatus === 'healthy' ? 'bg-emerald-500' :
+                returnReminderStatus === 'stale' || returnReminderStatus === 'failed' ? 'bg-red-500 animate-pulse' : 'bg-zinc-400'
+              }`} />
+              <span className="font-semibold text-zinc-800">Pengingat Kembali:</span>
+              <span className="text-zinc-600">
+                {returnReminderDiffMinutes === 0 ? 'Baru saja' : `${returnReminderDiffMinutes}m lalu`}
+              </span>
+            </div>
+            <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+              returnReminderStatus === 'healthy' ? 'bg-emerald-100 text-emerald-800' :
+              returnReminderStatus === 'stale' ? 'bg-red-100 text-red-800' :
+              returnReminderStatus === 'failed' ? 'bg-red-100 text-red-800' : 'bg-zinc-100 text-zinc-600'
+            }`}>
+              {returnReminderStatus === 'healthy' ? 'Normal (45m max)' :
+               returnReminderStatus === 'stale' ? 'Stale (>45m)' :
+               returnReminderStatus === 'failed' ? 'Gagal' : 'Idle'}
+            </span>
+          </div>
         )}
       </div>
 

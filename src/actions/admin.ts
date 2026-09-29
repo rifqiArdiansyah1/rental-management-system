@@ -182,8 +182,8 @@ export async function startRental(bookingId: string, options?: { odometerStart?:
 
 import { calculateLateFee } from '@/lib/lateFee'
 import { STANDARD_DRIVER_FEE } from '@/lib/pricing'
-import { calculateDaysDifference } from '@/lib/utils/date'
-import { MIN_VEHICLE_DAILY_RATE } from '@/lib/constants'
+import { calculateDaysDifference, checkIntervalOverlap } from '@/lib/utils/date'
+import { MIN_VEHICLE_DAILY_RATE, TURNOVER_BUFFER_MS } from '@/lib/constants'
 
 export interface EndRentalOptions {
   actualReturnAt?: Date | string
@@ -893,6 +893,167 @@ export async function markPaymentRefunded(paymentId: string) {
     return { success: true }
   } catch (error: any) {
     return { error: error.message || 'Terjadi kesalahan saat memproses refund.' }
+  }
+}
+
+export interface ExtendRentalOptions {
+  reason?: string
+  waivedExtraCharge?: boolean
+}
+
+export async function extendRentalAction(
+  bookingId: string,
+  newEndDate: Date | string,
+  options?: ExtendRentalOptions
+) {
+  try {
+    const adminUser = await requireAdminSession()
+    const scope = await getStaffScope()
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        vehicle: { include: { category: true } },
+        customer: true,
+      }
+    })
+
+    if (!booking) {
+      return { error: 'Pesanan tidak ditemukan.' }
+    }
+
+    try {
+      assertInScope([booking.pickupBranchId], scope)
+    } catch (err: any) {
+      return { error: err.message }
+    }
+
+    if (booking.status !== 'ongoing') {
+      return { error: 'Hanya pesanan yang sedang berjalan (ongoing) yang dapat diperpanjang.' }
+    }
+
+    const parsedNewEndDate = new Date(newEndDate)
+    if (isNaN(parsedNewEndDate.getTime())) {
+      return { error: 'Format tanggal perpanjangan tidak valid.' }
+    }
+
+    const currentEndDate = new Date(booking.endDate)
+    if (parsedNewEndDate.getTime() <= currentEndDate.getTime()) {
+      return { error: 'Waktu perpanjangan harus lebih lama dari jadwal pengembalian saat ini.' }
+    }
+
+    // Overlap conflict check:
+    // Any other booking for this vehicle that overlaps with [booking.startDate, parsedNewEndDate + 3 hours)
+    const newEndWithBuffer = new Date(parsedNewEndDate.getTime() + TURNOVER_BUFFER_MS)
+    const conflictingBooking = await prisma.booking.findFirst({
+      where: {
+        vehicleId: booking.vehicleId,
+        id: { not: booking.id },
+        status: { in: ['pending_payment', 'confirmed', 'ongoing'] },
+        startDate: { lt: newEndWithBuffer },
+        endDate: { gt: currentEndDate }
+      },
+      select: { id: true, startDate: true, endDate: true }
+    })
+
+    if (conflictingBooking) {
+      return { error: 'Armada telah memiliki jadwal pesanan lain yang bertabrakan dengan periode perpanjangan ini.' }
+    }
+
+    // Vehicle Unavailability / Maintenance check
+    const activeUnavail = await prisma.vehicleUnavailability.findFirst({
+      where: {
+        vehicleId: booking.vehicleId,
+        actualEndAt: null,
+      }
+    })
+
+    if (activeUnavail) {
+      if (!activeUnavail.estimatedEndAt) {
+        return { error: 'Armada memiliki jadwal pemeliharaan tanpa estimasi selesai, tidak dapat diperpanjang.' }
+      }
+      const unavailEndWithBuffer = new Date(activeUnavail.estimatedEndAt.getTime() + TURNOVER_BUFFER_MS)
+      if (checkIntervalOverlap(currentEndDate, newEndWithBuffer, activeUnavail.startAt, unavailEndWithBuffer)) {
+        return { error: 'Periode perpanjangan bertabrakan dengan jadwal servis/pemeliharaan armada.' }
+      }
+    }
+
+    // Calculate rate and extra cost
+    let agreedDailyRate: number
+    if (booking.agreedDailyRate) {
+      agreedDailyRate = Number(booking.agreedDailyRate)
+    } else {
+      const rentalDays = Math.max(1, calculateDaysDifference(booking.startDate, booking.endDate))
+      if (booking.rentalType === 'with_driver') {
+        const driverTotal = STANDARD_DRIVER_FEE * rentalDays
+        const calculatedRate = (Number(booking.totalPrice) - driverTotal) / rentalDays
+        agreedDailyRate = calculatedRate >= MIN_VEHICLE_DAILY_RATE ? calculatedRate : Number(booking.vehicle.dailyRate)
+      } else {
+        const calculatedRate = Number(booking.totalPrice) / rentalDays
+        agreedDailyRate = calculatedRate >= MIN_VEHICLE_DAILY_RATE ? calculatedRate : Number(booking.vehicle.dailyRate)
+      }
+    }
+
+    const oldDays = calculateDaysDifference(booking.startDate, booking.endDate)
+    const newDays = calculateDaysDifference(booking.startDate, parsedNewEndDate)
+    const additionalDays = Math.max(0, newDays - oldDays)
+
+    const dailyRateWithDriver = agreedDailyRate + (booking.rentalType === 'with_driver' ? STANDARD_DRIVER_FEE : 0)
+    const additionalAmount = options?.waivedExtraCharge ? 0 : (additionalDays * dailyRateWithDriver)
+
+    // Atomic update with status guard
+    await prisma.$transaction(async (tx) => {
+      const res = await tx.booking.updateMany({
+        where: {
+          id: booking.id,
+          status: 'ongoing',
+        },
+        data: {
+          endDate: parsedNewEndDate,
+          totalPrice: {
+            increment: additionalAmount,
+          },
+          returnReminderSentAt: null, // Reset reminder flag so cron can notify again for new endDate
+        }
+      })
+
+      if (res.count === 0) {
+        throw new Error('Pesanan telah berubah status atau sedang diproses oleh staf lain.')
+      }
+    })
+
+    // Resilient Audit Log
+    await logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: booking.pickupBranchId,
+      action: 'rental.extend',
+      entityType: 'Booking',
+      entityId: booking.id,
+      metadata: {
+        oldEndDate: currentEndDate.toISOString(),
+        newEndDate: parsedNewEndDate.toISOString(),
+        additionalDays,
+        additionalAmount,
+        agreedDailyRate,
+        waived: Boolean(options?.waivedExtraCharge),
+        reason: options?.reason?.trim() || null,
+      }
+    })
+
+    revalidatePath('/admin/bookings')
+    revalidatePath(`/admin/bookings/${bookingId}`)
+    revalidatePath('/dashboard')
+    revalidatePath(`/booking/${bookingId}`)
+
+    return {
+      success: true,
+      newEndDate: parsedNewEndDate,
+      additionalAmount,
+      additionalDays,
+    }
+  } catch (error: any) {
+    return { error: error.message || 'Terjadi kesalahan saat memproses perpanjangan sewa.' }
   }
 }
 
