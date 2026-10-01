@@ -1,10 +1,12 @@
-import { Prisma, BookingStatus, RentalType } from '@prisma/client'
+import { Prisma, BookingStatus, RentalType, BookingChannel, WalkInReviewStatus } from '@prisma/client'
 import { StaffScope } from '@/lib/auth/scope'
+import { WALK_IN_REVIEW_AGING_MS } from '@/lib/constants'
 
 export interface BookingFilterParams {
   tab?: string // 'action_required' | 'handover_today' | 'ongoing' | 'all'
   q?: string
   status?: string // 'all' | 'active' | BookingStatus
+  channel?: string // 'all' | 'online' | 'walk_in'
   rentalType?: string // 'all' | 'self_drive' | 'with_driver'
   driverId?: string // 'all' | 'unassigned' | string
   branchId?: string // 'all' | string
@@ -80,6 +82,7 @@ export function buildBookingWhereClause(
   const now = new Date()
   const todayWibStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now)
   const endOfTodayWib = parseWibDateBoundary(todayWibStr, true)
+  const twentyFourHoursAgo = new Date(now.getTime() - WALK_IN_REVIEW_AGING_MS)
 
   // 2. Preset Action Tabs
   const currentTab = params.tab || 'action_required'
@@ -127,7 +130,18 @@ export function buildBookingWhereClause(
         // g. Booking yang berisiko bentrok jadwal armada
         ...(conflictRiskBookingIds.length > 0
           ? [{ id: { in: conflictRiskBookingIds } }]
-          : [])
+          : []),
+        // h. Booking walk-in yang belum direview melewati ambang 24 jam (kas belum direkonsiliasi)
+        {
+          bookingChannel: BookingChannel.walk_in,
+          walkInReviewStatus: WalkInReviewStatus.pending_review,
+          createdAt: { lte: twentyFourHoursAgo }
+        },
+        // i. Booking walk-in yang di-flag (perlu eskalasi/investigasi pusat)
+        {
+          bookingChannel: BookingChannel.walk_in,
+          walkInReviewStatus: WalkInReviewStatus.flagged
+        }
       ]
     })
   } else if (currentTab === 'handover_today') {
@@ -151,6 +165,15 @@ export function buildBookingWhereClause(
     } else if (Object.values(BookingStatus).includes(params.status as BookingStatus)) {
       andConditions.push({
         status: params.status as BookingStatus
+      })
+    }
+  }
+
+  // 3b. Channel Filter (online vs walk_in)
+  if (params.channel && params.channel !== 'all') {
+    if (params.channel === 'online' || params.channel === 'walk_in') {
+      andConditions.push({
+        bookingChannel: params.channel as BookingChannel
       })
     }
   }

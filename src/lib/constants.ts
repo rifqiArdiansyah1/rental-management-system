@@ -140,4 +140,11 @@ export const VALID_INCIDENT_CATEGORIES = [
 
 export type IncidentCategory = (typeof VALID_INCIDENT_CATEGORIES)[number]
 
+/**
+ * Ambang batas waktu (jam) peninjauan transaksi tunai walk-in oleh Admin Cabang
+ * sebelum dimasukkan ke dalam tab peringatan "Perlu Tindakan" (24 jam = 1 siklus buku kas penuh).
+ */
+export const WALK_IN_REVIEW_AGING_HOURS = 24
+export const WALK_IN_REVIEW_AGING_MS = WALK_IN_REVIEW_AGING_HOURS * 60 * 60 * 1000
+
 

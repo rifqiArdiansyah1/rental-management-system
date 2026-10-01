@@ -11,7 +11,9 @@ import {
   MarkRefundedButton,
   StartRentalButton,
   EndRentalButton,
-  ResolveIncidentButton
+  ResolveIncidentButton,
+  ReviewWalkInBookingButton,
+  ResolveFlaggedWalkInButton
 } from './ClientActions'
 import { getEligibleDrivers } from '@/lib/driverEligibility'
 import { detectScheduleConflict } from '@/lib/scheduleConflict'
@@ -49,6 +51,9 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
       },
       adminCanceler: true,
       adminReassigner: true,
+      createdByStaff: true,
+      walkInReviewer: true,
+      discountApplier: true,
       incidents: {
         orderBy: { reportedAt: 'desc' }
       }
@@ -288,6 +293,97 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
         
         {/* Left Column: Details */}
         <div className="lg:col-span-2 space-y-6">
+
+          {/* Walk-in & Cash Reconciliation Card */}
+          {booking.bookingChannel === 'walk_in' && (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-purple-200 bg-purple-50/20" data-testid="walkin-reconciliation-panel">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-purple-100 gap-2 mb-4">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-purple-600" />
+                  <h2 className="text-lg font-bold text-zinc-900">
+                    Pemesanan Walk-In & Rekonsiliasi Kas
+                  </h2>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                    Metode: Tunai di Meja Kasir
+                  </span>
+                  {booking.walkInReviewStatus === 'pending_review' && (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                      Menunggu Review Kas
+                    </span>
+                  )}
+                  {booking.walkInReviewStatus === 'flagged' && (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                      🚨 Di-Flag (Eskalasi Pusat)
+                    </span>
+                  )}
+                  {booking.walkInReviewStatus === 'confirmed' && (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Kas Terkonfirmasi
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-4">
+                <div>
+                  <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Petugas Kasir / Pembuat</p>
+                  <p className="font-semibold text-zinc-900 mt-0.5">{booking.createdByStaff?.name || 'Staf Operasional'}</p>
+                  <p className="text-xs text-zinc-500 font-mono">{booking.createdByStaff?.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Nominal Uang Tunai Diterima</p>
+                  <p className="font-bold text-blue-700 text-base font-mono mt-0.5">
+                    Rp {Number(booking.totalPrice).toLocaleString('id-ID')}
+                  </p>
+                </div>
+                {booking.discountAmount && Number(booking.discountAmount) > 0 && (
+                  <div className="col-span-full p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
+                    <p className="font-bold text-blue-900">
+                      Diskon Diberikan: Rp {Number(booking.discountAmount).toLocaleString('id-ID')}
+                    </p>
+                    <p className="text-blue-800 mt-0.5">
+                      Diberikan oleh: <span className="font-semibold">{booking.discountApplier?.name || 'Admin'}</span>
+                    </p>
+                    <p className="text-blue-700 italic mt-0.5">
+                      Alasan Diskon: "{booking.discountReason}"
+                    </p>
+                  </div>
+                )}
+                {booking.walkInReviewNote && (
+                  <div className="col-span-full p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs">
+                    <p className="font-bold text-zinc-900 mb-0.5">Catatan Peninjauan Kas:</p>
+                    <p className="text-zinc-700 whitespace-pre-line">{booking.walkInReviewNote}</p>
+                    {booking.walkInReviewedAt && (
+                      <p className="text-[11px] text-zinc-500 font-mono mt-1">
+                        Ditinjau oleh {booking.walkInReviewer?.name || 'Admin'} pada {formatWibDateTime(booking.walkInReviewedAt)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              {booking.walkInReviewStatus === 'pending_review' && (adminUser.role === 'admin_cabang' || adminUser.role === 'admin_pusat') && (
+                <div className="pt-3 border-t border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <p className="text-xs text-zinc-600">
+                    Lakukan rekonsiliasi kas fisik sebelum menutup shift operasional.
+                  </p>
+                  <ReviewWalkInBookingButton bookingId={booking.id} />
+                </div>
+              )}
+
+              {booking.walkInReviewStatus === 'flagged' && adminUser.role === 'admin_pusat' && (
+                <div className="pt-3 border-t border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <p className="text-xs text-rose-800 font-semibold">
+                    Eskalasi Pusat: Transaksi ini ditandai anomali dan memerlukan penyelesaian independen.
+                  </p>
+                  <ResolveFlaggedWalkInButton bookingId={booking.id} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 1. Informasi Kendaraan & Jadwal */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-200">

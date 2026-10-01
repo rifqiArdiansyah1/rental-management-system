@@ -29,9 +29,11 @@ import {
   XCircle,
   RotateCcw,
   ChevronRight,
-  DollarSign
+  DollarSign,
+  Plus
 } from 'lucide-react'
 import { findConflictRiskBookingIds, getConflictRiskMap } from '@/lib/scheduleConflict'
+import { WALK_IN_REVIEW_AGING_MS } from '@/lib/constants'
 
 export default async function AdminBookingsPage({
   searchParams
@@ -104,11 +106,20 @@ export default async function AdminBookingsPage({
   return (
     <div className="p-4 md:p-8">
       {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-zinc-900">Manajemen Pesanan</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Antrian kerja operasional, penugasan sopir, verifikasi dokumen, dan pemantauan status rental.
-        </p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-zinc-900">Manajemen Pesanan</h1>
+          <p className="text-sm text-zinc-500 mt-1">
+            Antrian kerja operasional, penugasan sopir, verifikasi dokumen, dan pemantauan status rental.
+          </p>
+        </div>
+        <Link
+          href="/admin/bookings/new"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors self-start sm:self-auto cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Buat Booking Walk-In</span>
+        </Link>
       </div>
 
       {/* Preset Action Tabs */}
@@ -242,6 +253,33 @@ export default async function AdminBookingsPage({
                     {isUpcomingThreat && (
                       <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-full font-bold">
                         <AlertTriangle className="w-3 h-3 text-rose-700" /> ⚠️ Unit Terancam Terlambat
+                      </span>
+                    )}
+                    {/* Walk-in Badges */}
+                    {booking.bookingChannel === 'walk_in' && (
+                      <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-full font-bold">
+                        Walk-In / Tunai
+                      </span>
+                    )}
+                    {booking.bookingChannel === 'walk_in' && booking.walkInReviewStatus === 'pending_review' && (
+                      new Date(booking.createdAt).getTime() <= now.getTime() - WALK_IN_REVIEW_AGING_MS ? (
+                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-bold animate-pulse">
+                          <AlertTriangle className="w-3 h-3 text-amber-700" /> Review Kas Terlambat (&gt;24 Jam)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 border border-zinc-200 px-2 py-0.5 rounded-full font-medium">
+                          <Clock className="w-3 h-3 text-zinc-500" /> Menunggu Review Kas
+                        </span>
+                      )
+                    )}
+                    {booking.bookingChannel === 'walk_in' && booking.walkInReviewStatus === 'flagged' && (
+                      <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full font-bold">
+                        <AlertCircle className="w-3 h-3 text-rose-700" /> 🚨 Di-Flag (Eskalasi Pusat)
+                      </span>
+                    )}
+                    {booking.bookingChannel === 'walk_in' && booking.walkInReviewStatus === 'confirmed' && (
+                      <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Kas Terkonfirmasi
                       </span>
                     )}
                   </div>
@@ -468,6 +506,33 @@ export default async function AdminBookingsPage({
                           {isUpcomingThreat && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                               <AlertTriangle className="w-3 h-3 text-rose-700" /> ⚠️ Unit Terancam Terlambat
+                            </span>
+                          )}
+                          {/* Walk-in Badges */}
+                          {booking.bookingChannel === 'walk_in' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                              Walk-In / Tunai
+                            </span>
+                          )}
+                          {booking.bookingChannel === 'walk_in' && booking.walkInReviewStatus === 'pending_review' && (
+                            new Date(booking.createdAt).getTime() <= now.getTime() - WALK_IN_REVIEW_AGING_MS ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                                <AlertTriangle className="w-3 h-3 text-amber-700" /> Review Kas Terlambat (&gt;24 Jam)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
+                                <Clock className="w-3 h-3 text-zinc-500" /> Menunggu Review Kas
+                              </span>
+                            )
+                          )}
+                          {booking.bookingChannel === 'walk_in' && booking.walkInReviewStatus === 'flagged' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                              <AlertCircle className="w-3 h-3 text-rose-700" /> 🚨 Di-Flag (Eskalasi Pusat)
+                            </span>
+                          )}
+                          {booking.bookingChannel === 'walk_in' && booking.walkInReviewStatus === 'confirmed' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Kas Terkonfirmasi
                             </span>
                           )}
                         </div>

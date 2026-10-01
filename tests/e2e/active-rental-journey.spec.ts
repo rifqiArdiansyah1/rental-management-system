@@ -398,8 +398,8 @@ test.describe('Active Rental Journey & Proactive Care (Customer Flow)', () => {
     expect(audit?.actorRole).toBe('admin_pusat')
 
     // 4. Overlap collision check:
-    // Create another booking for the same vehicle starting 2 hours after newEndDate
-    const nextBookingStart = new Date(newEndDate.getTime() + 2 * 60 * 60 * 1000)
+    // Create another booking for the same vehicle starting 4 hours after newEndDate (outside initial 3h buffer)
+    const nextBookingStart = new Date(newEndDate.getTime() + 4 * 60 * 60 * 1000)
     const nextBookingEnd = new Date(nextBookingStart.getTime() + 24 * 60 * 60 * 1000)
     const collisionBooking = await prisma.booking.create({
       data: {

@@ -159,3 +159,106 @@ export async function createDraftBookingCore(payload: CreateDraftBookingPayload)
     throw error
   }
 }
+
+export type CreateWalkInBookingCorePayload = {
+  customerId: string
+  vehicleId: string
+  pickupBranchId: string
+  returnBranchId: string
+  startDate: Date
+  endDate: Date
+  rentalType: RentalType
+  locale?: 'id' | 'en'
+  createdByStaffId: string
+  discountAmount?: number | null
+  discountReason?: string | null
+  discountAppliedBy?: string | null
+}
+
+export async function createWalkInBookingCore(payload: CreateWalkInBookingCorePayload) {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Row lock on Vehicle to eliminate TOCTOU race with maintenance transition or concurrent bookings
+      await tx.$queryRawUnsafe('SELECT id FROM "Vehicle" WHERE id = $1 FOR UPDATE', payload.vehicleId)
+
+      const vehicle = await tx.vehicle.findUnique({
+        where: { id: payload.vehicleId },
+        select: {
+          dailyRate: true,
+          isActive: true,
+          branchId: true,
+          branch: {
+            select: { name: true }
+          }
+        }
+      })
+
+      if (!vehicle || !vehicle.isActive) {
+        throw new Error('Vehicle not found or inactive')
+      }
+
+      if (vehicle.branchId !== payload.pickupBranchId) {
+        throw new Error(`Armada hanya tersedia di cabang ${vehicle.branch?.name || 'asalnya'}.`)
+      }
+
+      // Check availability inside the locked transaction
+      const isAvailable = await checkVehicleAvailability(payload.vehicleId, payload.startDate, payload.endDate, tx)
+      if (!isAvailable) {
+        throw new Error('Mobil tidak tersedia pada rentang tanggal tersebut.')
+      }
+
+      // Calculate price purely on the server
+      const pricing = calculateEstimatedPrice(
+        Number(vehicle.dailyRate),
+        payload.startDate,
+        payload.endDate,
+        payload.rentalType
+      )
+
+      const discount = payload.discountAmount && payload.discountAmount > 0 ? Number(payload.discountAmount) : 0
+      if (discount >= pricing.grandTotal) {
+        throw new Error('Nilai diskon tidak boleh melebihi atau menyamai total biaya sewa.')
+      }
+      const finalPrice = Math.max(0, pricing.grandTotal - discount)
+
+      const booking = await tx.booking.create({
+        data: {
+          customerId: payload.customerId,
+          vehicleId: payload.vehicleId,
+          pickupBranchId: payload.pickupBranchId,
+          returnBranchId: payload.returnBranchId,
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+          rentalType: payload.rentalType,
+          totalPrice: finalPrice,
+          agreedDailyRate: vehicle.dailyRate,
+          status: BookingStatus.confirmed,
+          bookingChannel: 'walk_in',
+          createdByStaffId: payload.createdByStaffId,
+          walkInReviewStatus: 'pending_review',
+          discountAmount: discount > 0 ? discount : null,
+          discountReason: discount > 0 ? payload.discountReason : null,
+          discountAppliedBy: discount > 0 ? payload.discountAppliedBy : null,
+          locale: (payload.locale as any) || 'id',
+        }
+      })
+
+      await tx.payment.create({
+        data: {
+          bookingId: booking.id,
+          method: 'cash_booking',
+          amount: finalPrice,
+          status: 'success',
+          gatewayReference: `CASH-WALKIN-${booking.id}-${Date.now()}`,
+        }
+      })
+
+      return booking
+    })
+  } catch (error: any) {
+    if (error?.message && typeof error.message === 'string' && error.message.includes('booking_vehicle_no_overlap')) {
+      throw new Error('Mobil sudah dipesan di rentang tanggal tersebut. Silakan pilih tanggal lain.')
+    }
+    throw error
+  }
+}

@@ -3,9 +3,10 @@
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { verifyDocument, assignDriver, adminCancelBooking, markPaymentRefunded, startRental, endRental } from '@/actions/admin'
 import { resolveIncidentAction } from '@/actions/incident'
+import { reviewWalkInBookingAction, resolveFlaggedWalkInAction } from '@/actions/walkInBooking'
 import { useRouter } from 'next/navigation'
 import { generateSignedDocumentUrl } from '@/actions/document'
-import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw, Play, AlertCircle, Clock, AlertTriangle, Gauge, X } from 'lucide-react'
+import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw, Play, AlertCircle, Clock, AlertTriangle, Gauge, X, ShieldCheck } from 'lucide-react'
 import { calculateLateFee } from '@/lib/lateFee'
 import { formatWibDateTime } from '@/lib/bookingFilters'
 
@@ -1049,6 +1050,261 @@ export function ResolveIncidentButton({
                   className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-50 transition-colors shadow-sm cursor-pointer"
                 >
                   {isPending ? 'Menyimpan...' : 'Konfirmasi Selesai'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+export function ReviewWalkInBookingButton({ bookingId }: { bookingId: string }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [decision, setDecision] = useState<'confirmed' | 'flagged'>('confirmed')
+  const [note, setNote] = useState('')
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  const handleOpen = (targetDecision: 'confirmed' | 'flagged') => {
+    setDecision(targetDecision)
+    setNote('')
+    setError(null)
+    setIsOpen(true)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (decision === 'flagged' && (!note.trim() || note.trim().length < 5)) {
+      setError('Catatan alasan wajib diisi minimal 5 karakter jika menandai anomali (flag).')
+      return
+    }
+
+    startTransition(async () => {
+      setError(null)
+      const res = await reviewWalkInBookingAction(bookingId, decision, note.trim() || undefined)
+      if (res.error) {
+        setError(res.error)
+      } else {
+        setIsOpen(false)
+        router.refresh()
+      }
+    })
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => handleOpen('confirmed')}
+          data-testid="confirm-walkin-cash-btn"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          Konfirmasi Kas Masuk
+        </button>
+        <button
+          type="button"
+          onClick={() => handleOpen('flagged')}
+          data-testid="flag-walkin-btn"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+        >
+          <AlertCircle className="w-3.5 h-3.5" />
+          Tandai Anomali (Flag)
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-left border border-zinc-200">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <h3 className="font-bold text-base text-zinc-900 flex items-center gap-2">
+                {decision === 'confirmed' ? (
+                  <>
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    Konfirmasi Penerimaan Kas Fisik
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-5 h-5 text-rose-600" />
+                    Tandai Transaksi Anomali / Eskalasi Pusat
+                  </>
+                )}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="text-zinc-400 hover:text-zinc-700 p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+              {error && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <p className="text-xs text-zinc-600">
+                {decision === 'confirmed'
+                  ? 'Konfirmasi bahwa uang kas tunai dari transaksi walk-in ini telah Anda terima dan cocok dengan pembukuan kasir cabang.'
+                  : 'Menandai transaksi ini akan mencatat status "Flagged" dan secara otomatis mengekskalasi rekonsiliasi ini ke Admin Pusat untuk audit independen.'}
+              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-1.5">
+                  Catatan Peninjauan {decision === 'flagged' ? '*' : '(Opsional)'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder={
+                    decision === 'confirmed'
+                      ? 'Catatan kasir (opsional, misal: kas disetor ke rekening operasional)...'
+                      : 'Jelaskan ketidaksesuaian atau indikasi anomali kas (wajib minimal 5 karakter)...'
+                  }
+                  required={decision === 'flagged'}
+                  data-testid="walkin-review-note-input"
+                  className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-900"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="px-3 py-1.5 rounded-lg border border-zinc-300 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending || (decision === 'flagged' && note.trim().length < 5)}
+                  data-testid="submit-walkin-review-btn"
+                  className={`px-4 py-1.5 rounded-lg text-white text-xs font-bold disabled:opacity-50 transition-colors shadow-sm cursor-pointer ${
+                    decision === 'confirmed'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-rose-600 hover:bg-rose-700'
+                  }`}
+                >
+                  {isPending ? 'Menyimpan...' : decision === 'confirmed' ? 'Konfirmasi Kas Cocok' : 'Eskalasi ke Pusat'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+export function ResolveFlaggedWalkInButton({ bookingId }: { bookingId: string }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [resolutionNote, setResolutionNote] = useState('')
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resolutionNote.trim() || resolutionNote.trim().length < 5) {
+      setError('Catatan resolusi wajib diisi minimal 5 karakter.')
+      return
+    }
+
+    startTransition(async () => {
+      setError(null)
+      const res = await resolveFlaggedWalkInAction(bookingId, resolutionNote.trim())
+      if (res.error) {
+        setError(res.error)
+      } else {
+        setIsOpen(false)
+        router.refresh()
+      }
+    })
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setResolutionNote('')
+          setError(null)
+          setIsOpen(true)
+        }}
+        data-testid="resolve-flagged-walkin-btn"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+      >
+        <ShieldCheck className="w-3.5 h-3.5" />
+        Selesaikan Investigasi Pusat
+      </button>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-left border border-zinc-200">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <h3 className="font-bold text-base text-zinc-900 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-blue-600" />
+                Resolusi Investigasi Transaksi Pusat
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="text-zinc-400 hover:text-zinc-700 p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+              {error && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <p className="text-xs text-zinc-600">
+                Sebagai Admin Pusat, masukkan hasil audit dan tindakan penyelesaian untuk transaksi walk-in yang di-flag ini. Status akan diperbarui menjadi terkonfirmasi dengan catatan investigasi resmi.
+              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-1.5">
+                  Catatan Resolusi Investigasi *
+                </label>
+                <textarea
+                  rows={4}
+                  value={resolutionNote}
+                  onChange={(e) => setResolutionNote(e.target.value)}
+                  placeholder="Contoh: Selisih kas telah disetorkan oleh cabang, teguran lisan diberikan kepada staf kasir..."
+                  required
+                  minLength={5}
+                  data-testid="resolve-flag-note-input"
+                  className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-900"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="px-3 py-1.5 rounded-lg border border-zinc-300 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending || resolutionNote.trim().length < 5}
+                  data-testid="submit-resolve-flag-btn"
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50 transition-colors shadow-sm cursor-pointer"
+                >
+                  {isPending ? 'Menyimpan...' : 'Simpan Resolusi Pusat'}
                 </button>
               </div>
             </form>
