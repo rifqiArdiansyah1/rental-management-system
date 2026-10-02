@@ -370,7 +370,10 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                   <p className="text-xs text-zinc-600">
                     Lakukan rekonsiliasi kas fisik sebelum menutup shift operasional.
                   </p>
-                  <ReviewWalkInBookingButton bookingId={booking.id} />
+                  <ReviewWalkInBookingButton
+                    bookingId={booking.id}
+                    isCreator={booking.createdByStaffId === adminUser.id}
+                  />
                 </div>
               )}
 
@@ -379,7 +382,10 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                   <p className="text-xs text-rose-800 font-semibold">
                     Eskalasi Pusat: Transaksi ini ditandai anomali dan memerlukan penyelesaian independen.
                   </p>
-                  <ResolveFlaggedWalkInButton bookingId={booking.id} />
+                  <ResolveFlaggedWalkInButton
+                    bookingId={booking.id}
+                    bookingStatus={booking.status}
+                  />
                 </div>
               )}
             </div>

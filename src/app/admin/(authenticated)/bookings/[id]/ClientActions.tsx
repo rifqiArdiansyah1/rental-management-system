@@ -6,7 +6,7 @@ import { resolveIncidentAction } from '@/actions/incident'
 import { reviewWalkInBookingAction, resolveFlaggedWalkInAction } from '@/actions/walkInBooking'
 import { useRouter } from 'next/navigation'
 import { generateSignedDocumentUrl } from '@/actions/document'
-import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw, Play, AlertCircle, Clock, AlertTriangle, Gauge, X, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, XCircle, UserCheck, XOctagon, ExternalLink, RefreshCw, Play, AlertCircle, Clock, AlertTriangle, Gauge, X, ShieldCheck, Info } from 'lucide-react'
 import { calculateLateFee } from '@/lib/lateFee'
 import { formatWibDateTime } from '@/lib/bookingFilters'
 
@@ -1060,13 +1060,32 @@ export function ResolveIncidentButton({
   )
 }
 
-export function ReviewWalkInBookingButton({ bookingId }: { bookingId: string }) {
+export function ReviewWalkInBookingButton({
+  bookingId,
+  isCreator = false
+}: {
+  bookingId: string
+  isCreator?: boolean
+}) {
   const [isOpen, setIsOpen] = useState(false)
   const [decision, setDecision] = useState<'confirmed' | 'flagged'>('confirmed')
   const [note, setNote] = useState('')
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  if (isCreator) {
+    return (
+      <div className="p-2.5 bg-zinc-100 border border-zinc-300 rounded-lg text-xs text-zinc-600 flex items-start gap-2">
+        <Info className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+        <div>
+          <span className="font-semibold text-zinc-800">Menunggu Review Kas Pihak Kedua:</span> Anda
+          adalah staf/admin yang membuat transaksi ini. Sesuai prinsip pemisahan wewenang (four-eyes
+          principle), rekonsiliasi kas fisik harus diperiksa oleh Admin lain atau Admin Pusat.
+        </div>
+      </div>
+    )
+  }
 
   const handleOpen = (targetDecision: 'confirmed' | 'flagged') => {
     setDecision(targetDecision)
@@ -1204,12 +1223,21 @@ export function ReviewWalkInBookingButton({ bookingId }: { bookingId: string }) 
   )
 }
 
-export function ResolveFlaggedWalkInButton({ bookingId }: { bookingId: string }) {
+export function ResolveFlaggedWalkInButton({
+  bookingId,
+  bookingStatus
+}: {
+  bookingId: string
+  bookingStatus?: string
+}) {
   const [isOpen, setIsOpen] = useState(false)
+  const [resolutionAction, setResolutionAction] = useState<'confirm_cash' | 'cancel_booking'>('confirm_cash')
   const [resolutionNote, setResolutionNote] = useState('')
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  const canCancel = bookingStatus === 'confirmed' || bookingStatus === 'pending_payment'
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -1220,7 +1248,7 @@ export function ResolveFlaggedWalkInButton({ bookingId }: { bookingId: string })
 
     startTransition(async () => {
       setError(null)
-      const res = await resolveFlaggedWalkInAction(bookingId, resolutionNote.trim())
+      const res = await resolveFlaggedWalkInAction(bookingId, resolutionNote.trim(), resolutionAction)
       if (res.error) {
         setError(res.error)
       } else {
@@ -1235,6 +1263,7 @@ export function ResolveFlaggedWalkInButton({ bookingId }: { bookingId: string })
       <button
         type="button"
         onClick={() => {
+          setResolutionAction('confirm_cash')
           setResolutionNote('')
           setError(null)
           setIsOpen(true)
@@ -1271,12 +1300,33 @@ export function ResolveFlaggedWalkInButton({ bookingId }: { bookingId: string })
               )}
 
               <p className="text-xs text-zinc-600">
-                Sebagai Admin Pusat, masukkan hasil audit dan tindakan penyelesaian untuk transaksi walk-in yang di-flag ini. Status akan diperbarui menjadi terkonfirmasi dengan catatan investigasi resmi.
+                Sebagai Admin Pusat, masukkan hasil audit dan tindakan penyelesaian untuk transaksi walk-in yang di-flag ini.
               </p>
+
+              {/* Action Selector */}
+              {canCancel ? (
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-1.5">
+                    Tindakan Resolusi *
+                  </label>
+                  <select
+                    value={resolutionAction}
+                    onChange={(e) => setResolutionAction(e.target.value as any)}
+                    className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg bg-white"
+                  >
+                    <option value="confirm_cash">Konfirmasi Kas Diterima (Disetorkan Susulan)</option>
+                    <option value="cancel_booking">Batalkan Pesanan (Fraud / Booking Fiktif)</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="p-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-600">
+                  ℹ️ Unit sedang/sudah disewakan (Status: <strong>{bookingStatus}</strong>). Sistem tidak membatalkan rental fisik yang sedang/sudah berjalan; catatan fraud dan tindakan administratif staf akan dicatat permanen di audit trail.
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-1.5">
-                  Catatan Resolusi Investigasi *
+                  Catatan Berita Acara Resolusi *
                 </label>
                 <textarea
                   rows={4}

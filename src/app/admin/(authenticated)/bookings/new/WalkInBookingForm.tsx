@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import {
   searchCustomerForWalkIn,
   resolveOrCreateWalkInCustomer,
+  uploadWalkInDocumentsAction,
   createWalkInBookingAction
 } from '@/actions/walkInBooking'
 import { calculateEstimatedPrice } from '@/lib/pricing'
 import { formatIndonesianPhoneNumber } from '@/utils/whatsapp'
+import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 import {
   User,
   Car,
@@ -17,7 +19,7 @@ import {
   Search,
   CheckCircle2,
   AlertCircle,
-  Clock,
+  FileText,
   ShieldCheck,
   Percent,
   MapPin,
@@ -69,7 +71,7 @@ export default function WalkInBookingForm({
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null)
 
-  // New Customer Form State (if not selecting existing)
+  // New Customer Form State
   const [newCustomer, setNewCustomer] = useState({
     name: '',
     email: '',
@@ -86,11 +88,10 @@ export default function WalkInBookingForm({
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('')
   const [rentalType, setRentalType] = useState<RentalType>('self_drive')
 
-  // Tanggal & Jam (Default: hari ini + 3 jam, jam berikutnya yang bulat)
+  // Tanggal & Jam (Default: hari ini + 3.5 jam)
   const defaultStartDate = useMemo(() => {
     const d = new Date(Date.now() + 3.5 * 60 * 60 * 1000)
     d.setMinutes(0, 0, 0)
-    // Format YYYY-MM-DDTHH:mm
     const year = d.getFullYear()
     const month = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
@@ -117,8 +118,11 @@ export default function WalkInBookingForm({
   const [discountAmount, setDiscountAmount] = useState<string>('')
   const [discountReason, setDiscountReason] = useState<string>('')
 
-  // 4. KYC State
-  const [verifyOnTheSpot, setVerifyOnTheSpot] = useState(true)
+  // 4. KYC File Upload State (Wajib Bukti Fisik)
+  const [ktpFile, setKtpFile] = useState<File | null>(null)
+  const [simFile, setSimFile] = useState<File | null>(null)
+  const [manualKtpNumber, setManualKtpNumber] = useState('')
+  const [manualSimNumber, setManualSimNumber] = useState('')
 
   // Filter vehicles by selected branch
   const availableVehicles = useMemo(() => {
@@ -159,6 +163,7 @@ export default function WalkInBookingForm({
   }, [selectedVehicle, startDateStr, endDateStr, rentalType, discountAmount])
 
   const isDiscountAuthorized = userRole === 'admin_cabang' || userRole === 'admin_pusat'
+  const maxAllowedDiscount = Math.floor(priceBreakdown.vehicleTotal * 0.3)
 
   // Handle Search Customer
   const handleSearchCustomer = async () => {
@@ -221,17 +226,23 @@ export default function WalkInBookingForm({
 
     // Validasi Diskon
     const discNum = Number(discountAmount) || 0
+    if (discNum < 0) {
+      setError('Nominal diskon tidak boleh bernilai negatif.')
+      return
+    }
     if (discNum > 0) {
       if (!isDiscountAuthorized) {
         setError('Akses ditolak: Staf Cabang tidak berwenang memberikan diskon sewa.')
         return
       }
-      if (!discountReason || discountReason.trim().length < 5) {
-        setError('Alasan diskon wajib diisi minimal 5 karakter.')
+      if (!discountReason || discountReason.trim().length < 10) {
+        setError('Alasan diskon wajib diisi minimal 10 karakter dengan konteks manajerial yang jelas.')
         return
       }
-      if (discNum >= priceBreakdown.grandTotal) {
-        setError('Nilai diskon tidak boleh melebihi atau menyamai total biaya sewa.')
+      if (discNum > maxAllowedDiscount) {
+        setError(
+          `Nilai diskon melebihi batas maksimum 30% dari tarif sewa mobil (Maksimal: Rp ${maxAllowedDiscount.toLocaleString('id-ID')}).`
+        )
         return
       }
     }
@@ -246,8 +257,8 @@ export default function WalkInBookingForm({
             name: newCustomer.name,
             email: newCustomer.email,
             phone: newCustomer.phone,
-            ktpNumber: newCustomer.ktpNumber || null,
-            simNumber: newCustomer.simNumber || null
+            ktpNumber: newCustomer.ktpNumber || manualKtpNumber || null,
+            simNumber: newCustomer.simNumber || manualSimNumber || null
           })
 
           if (custRes.error || !custRes.customer) {
@@ -257,7 +268,31 @@ export default function WalkInBookingForm({
           activeCustomerId = custRes.customer.id
         }
 
-        // 2. Create Walk-in Booking Action
+        // 2. Upload Dokumen Fisik jika disediakan (Bukti Foto Wajib)
+        if (ktpFile || simFile) {
+          const docFormData = new FormData()
+          docFormData.append('customerId', activeCustomerId)
+          if (ktpFile) {
+            docFormData.append('ktpFile', ktpFile)
+            if (manualKtpNumber || newCustomer.ktpNumber) {
+              docFormData.append('ktpNumber', manualKtpNumber || newCustomer.ktpNumber)
+            }
+          }
+          if (simFile) {
+            docFormData.append('simFile', simFile)
+            if (manualSimNumber || newCustomer.simNumber) {
+              docFormData.append('simNumber', manualSimNumber || newCustomer.simNumber)
+            }
+          }
+
+          const uploadRes = await uploadWalkInDocumentsAction(docFormData)
+          if (uploadRes.error) {
+            setError(uploadRes.error)
+            return
+          }
+        }
+
+        // 3. Create Walk-in Booking Action (Strict Pricing + Cash Payment)
         const bookingRes = await createWalkInBookingAction({
           customerId: activeCustomerId,
           vehicleId: selectedVehicleId,
@@ -266,8 +301,7 @@ export default function WalkInBookingForm({
           endDate: end,
           rentalType,
           discountAmount: discNum > 0 ? discNum : null,
-          discountReason: discNum > 0 ? discountReason.trim() : null,
-          verifyDocumentsOnTheSpot: verifyOnTheSpot
+          discountReason: discNum > 0 ? discountReason.trim() : null
         })
 
         if (bookingRes.error || !bookingRes.bookingId) {
@@ -282,6 +316,8 @@ export default function WalkInBookingForm({
       }
     })
   }
+
+  const isCustomerVerified = selectedCustomer?.verificationStatus === 'verified'
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -358,7 +394,7 @@ export default function WalkInBookingForm({
                 <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
                 <input
                   type="text"
-                  placeholder="Cari nomor HP, email, atau nama pelanggan..."
+                  placeholder="Cari pelanggan terdaftar via Nama, No HP (08...), atau Email..."
                   value={customerSearchQuery}
                   onChange={(e) => setCustomerSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -367,22 +403,35 @@ export default function WalkInBookingForm({
                       handleSearchCustomer()
                     }
                   }}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-9 pr-4 py-2 border border-zinc-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <button
                 type="button"
                 onClick={handleSearchCustomer}
                 disabled={isSearchingCustomer}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-zinc-900 text-white rounded-lg text-sm font-semibold hover:bg-zinc-800 disabled:opacity-50"
               >
                 {isSearchingCustomer ? 'Mencari...' : 'Cari'}
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingNewCustomer(true)
+                  setSearchResults([])
+                }}
+                className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-semibold hover:bg-blue-100"
+              >
+                + Pelanggan Baru
+              </button>
             </div>
 
-            {/* Search Results Dropdown/List */}
-            {searchResults.length > 0 && (
-              <div className="border border-zinc-200 rounded-lg divide-y divide-zinc-100 max-h-56 overflow-y-auto">
+            {/* Search Results List */}
+            {searchResults.length > 0 && !selectedCustomer && (
+              <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
+                <p className="p-2.5 bg-zinc-50 text-xs font-semibold text-zinc-600">
+                  Hasil Pencarian ({searchResults.length}):
+                </p>
                 {searchResults.map((cust) => (
                   <div
                     key={cust.id}
@@ -391,141 +440,140 @@ export default function WalkInBookingForm({
                       setIsCreatingNewCustomer(false)
                       setSearchResults([])
                     }}
-                    className="p-3 hover:bg-zinc-50 cursor-pointer flex justify-between items-center transition-colors text-sm"
+                    className="p-3 hover:bg-blue-50/50 cursor-pointer flex justify-between items-center transition-colors"
                   >
                     <div>
-                      <div className="font-semibold text-zinc-900">{cust.name}</div>
-                      <div className="text-xs text-zinc-500 font-mono">
+                      <span className="font-semibold text-sm text-zinc-900">{cust.name}</span>
+                      <span className="ml-2 text-xs text-zinc-500 font-mono">
                         {cust.phone} • {cust.email}
-                      </div>
+                      </span>
                     </div>
-                    <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                      Pilih
+                    <span
+                      className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                        cust.verificationStatus === 'verified'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-zinc-100 text-zinc-700'
+                      }`}
+                    >
+                      {cust.verificationStatus}
                     </span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Toggle New Customer Button */}
-            <div className="pt-2">
-              {!isCreatingNewCustomer ? (
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingNewCustomer(true)}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                >
-                  + Pelanggan baru belum terdaftar? Input data baru di sini
-                </button>
-              ) : (
-                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-700">
-                      Formulir Pelanggan Baru
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsCreatingNewCustomer(false)}
-                      className="text-xs text-zinc-500 hover:text-zinc-700 underline"
-                    >
-                      Batal
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-600 mb-1">
-                        Nama Lengkap *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newCustomer.name}
-                        onChange={(e) =>
-                          setNewCustomer({ ...newCustomer, name: e.target.value })
-                        }
-                        placeholder="Nama sesuai KTP"
-                        className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-600 mb-1">
-                        Nomor WhatsApp / HP *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newCustomer.phone}
-                        onChange={(e) =>
-                          setNewCustomer({ ...newCustomer, phone: e.target.value })
-                        }
-                        placeholder="Contoh: 08123456789"
-                        className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-600 mb-1">Email *</label>
-                      <input
-                        type="email"
-                        required
-                        value={newCustomer.email}
-                        onChange={(e) =>
-                          setNewCustomer({ ...newCustomer, email: e.target.value })
-                        }
-                        placeholder="email@example.com"
-                        className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-600 mb-1">
-                        Nomor KTP (Opsional)
-                      </label>
-                      <input
-                        type="text"
-                        value={newCustomer.ktpNumber}
-                        onChange={(e) =>
-                          setNewCustomer({ ...newCustomer, ktpNumber: e.target.value })
-                        }
-                        placeholder="16 digit NIK"
-                        className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-medium text-zinc-600 mb-1">
-                        Nomor SIM A (Opsional)
-                      </label>
-                      <input
-                        type="text"
-                        value={newCustomer.simNumber}
-                        onChange={(e) =>
-                          setNewCustomer({ ...newCustomer, simNumber: e.target.value })
-                        }
-                        placeholder="Nomor SIM pengemudi"
-                        className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-zinc-500 italic">
-                    * Akun autentikasi aman akan dibuatkan otomatis. Pelanggan dapat mengatur kata
-                    sandi mandiri via tautan email pemulihan.
-                  </p>
+            {/* New Customer Inline Form */}
+            {isCreatingNewCustomer && (
+              <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700">
+                    Input Data Pelanggan Baru di Tempat
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingNewCustomer(false)}
+                    className="text-xs text-zinc-500 hover:text-zinc-700"
+                  >
+                    Batal
+                  </button>
                 </div>
-              )}
-            </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">
+                      Nama Lengkap (Sesuai KTP) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: Budi Santoso"
+                      value={newCustomer.name}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">
+                      Nomor Handphone (WhatsApp) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: 08123456789"
+                      value={newCustomer.phone}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">
+                      Email Pelanggan *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="Contoh: budi@gmail.com"
+                      value={newCustomer.email}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm pt-2 border-t border-zinc-200">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">
+                      Nomor KTP (Opsional jika upload foto)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="16 digit NIK"
+                      value={newCustomer.ktpNumber}
+                      onChange={(e) =>
+                        setNewCustomer({ ...newCustomer, ktpNumber: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">
+                      Nomor SIM (Opsional jika upload foto)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Nomor SIM aktif"
+                      value={newCustomer.simNumber}
+                      onChange={(e) =>
+                        setNewCustomer({ ...newCustomer, simNumber: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-zinc-500">
+                  Akun akan dibuatkan otomatis dengan kredensial acak aman. Link atur password
+                  mandiri akan dikirimkan ke email pelanggan.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* SECTION 2: ARMADA & CABANG */}
+      {/* SECTION 2: CABANG & ARMADA */}
       <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-6">
         <div className="flex items-center gap-2 mb-4 border-b border-zinc-100 pb-3">
           <Car className="w-5 h-5 text-blue-600" />
-          <h2 className="text-lg font-bold text-zinc-900">2. Pilihan Cabang & Armada</h2>
+          <h2 className="text-lg font-bold text-zinc-900">2. Pilihan Armada & Layanan</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           {/* Cabang */}
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Cabang Layanan *</label>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">
+              Cabang Operasional *
+            </label>
             <select
               value={selectedBranchId}
               onChange={(e) => {
@@ -545,7 +593,9 @@ export default function WalkInBookingForm({
 
           {/* Tipe Rental */}
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Jenis Layanan *</label>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">
+              Jenis Layanan Sewa *
+            </label>
             <select
               value={rentalType}
               onChange={(e) => setRentalType(e.target.value as RentalType)}
@@ -558,7 +608,9 @@ export default function WalkInBookingForm({
 
           {/* Unit Kendaraan */}
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Pilih Kendaraan Tersedia *</label>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">
+              Pilih Kendaraan Tersedia *
+            </label>
             {availableVehicles.length === 0 ? (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                 Tidak ada unit armada yang berstatus tersedia di cabang ini saat ini.
@@ -573,7 +625,7 @@ export default function WalkInBookingForm({
                 <option value="">-- Pilih Unit Armada --</option>
                 {availableVehicles.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name} ({v.plateNumber}) • {v.category.name} — Rp{' '}
+                    {getVehicleDisplayName(v, { mode: 'staff' })} • {v.category.name} — Rp{' '}
                     {v.dailyRate.toLocaleString('id-ID')} / hari
                   </option>
                 ))}
@@ -695,12 +747,12 @@ export default function WalkInBookingForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-3">
               <div>
                 <label className="block text-xs font-medium text-zinc-700 mb-1">
-                  Nominal Diskon (Rp)
+                  Nominal Diskon (Rp) — Maks. 30% (Rp {maxAllowedDiscount.toLocaleString('id-ID')})
                 </label>
                 <input
                   type="number"
                   min="0"
-                  max={Math.max(0, priceBreakdown.grandTotal - 1)}
+                  max={maxAllowedDiscount}
                   placeholder="Contoh: 50000"
                   value={discountAmount}
                   onChange={(e) => setDiscountAmount(e.target.value)}
@@ -709,11 +761,11 @@ export default function WalkInBookingForm({
               </div>
               <div>
                 <label className="block text-xs font-medium text-zinc-700 mb-1">
-                  Alasan Diskon (Wajib min. 5 karakter jika ada diskon)
+                  Alasan Diskon (Wajib min. 10 karakter jika ada diskon)
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Promo negosiasi walk-in akhir pekan"
+                  placeholder="Contoh: Diskon loyalitas pelanggan korporat"
                   value={discountReason}
                   onChange={(e) => setDiscountReason(e.target.value)}
                   className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
@@ -724,29 +776,103 @@ export default function WalkInBookingForm({
         </div>
       </div>
 
-      {/* SECTION 5: VERIFIKASI FISIK & SERAH TERIMA */}
+      {/* SECTION 5: DOKUMENTASI FISIK KTP & SIM (WAJIB BUKTI FOTO) */}
       <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-6">
         <div className="flex items-center gap-2 mb-4 border-b border-zinc-100 pb-3">
           <ShieldCheck className="w-5 h-5 text-emerald-600" />
-          <h2 className="text-lg font-bold text-zinc-900">5. Verifikasi Fisik & SOP Kasir</h2>
+          <h2 className="text-lg font-bold text-zinc-900">
+            5. Dokumentasi Fisik KTP & SIM (Wajib Bukti Foto)
+          </h2>
         </div>
 
-        <label className="flex items-start gap-3 p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl cursor-pointer">
-          <input
-            type="checkbox"
-            checked={verifyOnTheSpot}
-            onChange={(e) => setVerifyOnTheSpot(e.target.checked)}
-            className="w-4 h-4 text-emerald-600 rounded mt-0.5"
-          />
-          <div className="text-xs text-zinc-700">
-            <span className="font-semibold text-zinc-900 block mb-0.5">
-              Verifikasi Fisik KTP & SIM Asli di Tempat
-            </span>
-            Staf telah memeriksa keaslian KTP dan SIM pelanggan secara langsung di meja kasir.
-            Status KYC pelanggan akan otomatis ditandai sebagai <strong>Verified</strong> agar unit
-            dapat segera diserahterimakan (Start Rental).
+        {isCustomerVerified ? (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-emerald-900">
+              <p className="font-bold">Identitas & Dokumen Terverifikasi Lengkap (KYC Verified)</p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                Pelanggan telah memiliki foto fisik KTP & SIM yang sah di sistem. Kunci unit siap
+                diserahterimakan segera setelah pembayaran kas dicatat.
+              </p>
+            </div>
           </div>
-        </label>
+        ) : (
+          <div className="space-y-4">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold">Wajib Foto Dokumen Fisik:</span> Sesuai regulasi
+                keamanan & mitigasi sengketa sewa, staf kasir wajib memfoto dan mengunggah fisik KTP
+                dan SIM asli pelanggan. Kunci unit mobil tidak dapat diserahterimakan (Start Rental)
+                jika status verifikasi dokumen belum lengkap.
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* KTP Card */}
+              <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50/50">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-zinc-900 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    Foto KTP Asli Fisik
+                  </label>
+                  {selectedCustomer?.ktpNumber && (
+                    <span className="text-[11px] text-zinc-500 font-mono">
+                      No: {selectedCustomer.ktpNumber}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,application/pdf"
+                  capture="environment"
+                  onChange={(e) => setKtpFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-zinc-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {!selectedCustomer?.ktpNumber && (
+                  <input
+                    type="text"
+                    placeholder="Nomor KTP (16 digit)"
+                    value={manualKtpNumber}
+                    onChange={(e) => setManualKtpNumber(e.target.value)}
+                    className="w-full mt-2 px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white"
+                  />
+                )}
+              </div>
+
+              {/* SIM Card */}
+              <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50/50">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-zinc-900 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    Foto SIM Asli Fisik
+                  </label>
+                  {selectedCustomer?.simNumber && (
+                    <span className="text-[11px] text-zinc-500 font-mono">
+                      No: {selectedCustomer.simNumber}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,application/pdf"
+                  capture="environment"
+                  onChange={(e) => setSimFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-zinc-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {!selectedCustomer?.simNumber && (
+                  <input
+                    type="text"
+                    placeholder="Nomor SIM"
+                    value={manualSimNumber}
+                    onChange={(e) => setManualSimNumber(e.target.value)}
+                    className="w-full mt-2 px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* SUBMIT BUTTON */}

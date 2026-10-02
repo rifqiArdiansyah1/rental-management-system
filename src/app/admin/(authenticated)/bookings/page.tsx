@@ -30,7 +30,8 @@ import {
   RotateCcw,
   ChevronRight,
   DollarSign,
-  Plus
+  Plus,
+  Percent
 } from 'lucide-react'
 import { findConflictRiskBookingIds, getConflictRiskMap } from '@/lib/scheduleConflict'
 import { WALK_IN_REVIEW_AGING_MS } from '@/lib/constants'
@@ -280,6 +281,11 @@ export default async function AdminBookingsPage({
                     {booking.bookingChannel === 'walk_in' && booking.walkInReviewStatus === 'confirmed' && (
                       <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Kas Terkonfirmasi
+                      </span>
+                    )}
+                    {booking.discountAmount && Number(booking.discountAmount) > 0 && (
+                      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                        <Percent className="w-3 h-3 text-emerald-600" /> Diskon Rp {Number(booking.discountAmount).toLocaleString('id-ID')}
                       </span>
                     )}
                   </div>
@@ -533,6 +539,11 @@ export default async function AdminBookingsPage({
                           {booking.bookingChannel === 'walk_in' && booking.walkInReviewStatus === 'confirmed' && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Kas Terkonfirmasi
+                            </span>
+                          )}
+                          {booking.discountAmount && Number(booking.discountAmount) > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <Percent className="w-3 h-3 text-emerald-600" /> Diskon Rp {Number(booking.discountAmount).toLocaleString('id-ID')}
                             </span>
                           )}
                         </div>

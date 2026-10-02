@@ -215,7 +215,16 @@ export async function createWalkInBookingCore(payload: CreateWalkInBookingCorePa
         payload.rentalType
       )
 
-      const discount = payload.discountAmount && payload.discountAmount > 0 ? Number(payload.discountAmount) : 0
+      if (payload.discountAmount !== undefined && payload.discountAmount !== null) {
+        if (Number(payload.discountAmount) < 0) {
+          throw new Error('Nilai diskon tidak boleh bernilai negatif.')
+        }
+      }
+      const discount = payload.discountAmount && Number(payload.discountAmount) > 0 ? Number(payload.discountAmount) : 0
+      const maxAllowedDiscount = Math.floor(pricing.vehicleTotal * 0.3)
+      if (discount > maxAllowedDiscount) {
+        throw new Error(`Nilai diskon melebihi batas maksimum 30% dari tarif sewa kendaraan (Maksimal: Rp ${maxAllowedDiscount.toLocaleString('id-ID')}).`)
+      }
       if (discount >= pricing.grandTotal) {
         throw new Error('Nilai diskon tidak boleh melebihi atau menyamai total biaya sewa.')
       }

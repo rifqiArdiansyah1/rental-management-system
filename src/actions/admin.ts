@@ -12,6 +12,7 @@ import {
   notifyDriverReassigned,
 } from '@/utils/notifications'
 import { getVehicleDisplayName } from '@/lib/vehicleHelper'
+import { syncCustomerVerificationStatus } from '@/lib/kyc'
 
 // Valid roles
 const VALID_ROLES = ['staff_cabang', 'admin_cabang', 'admin_pusat']
@@ -494,24 +495,7 @@ export async function verifyDocument(documentId: string, status: 'verified' | 'r
         })
       }
       
-      const allCustomerDocs = await tx.document.findMany({
-        where: { customerId }
-      })
-      
-      const hasVerifiedKTP = allCustomerDocs.some(d => d.type.toLowerCase() === 'ktp' && d.verifiedAt !== null)
-      const hasVerifiedSIM = allCustomerDocs.some(d => d.type.toLowerCase() === 'sim' && d.verifiedAt !== null)
-      
-      if (hasVerifiedKTP && hasVerifiedSIM) {
-        await tx.customer.update({
-          where: { id: customerId },
-          data: { verificationStatus: 'verified' }
-        })
-      } else {
-        await tx.customer.update({
-          where: { id: customerId },
-          data: { verificationStatus: status === 'rejected' ? 'rejected' : 'pending' }
-        })
-      }
+      await syncCustomerVerificationStatus(customerId, tx, status)
     })
     
     const adminUser = await requireAdminSession()
