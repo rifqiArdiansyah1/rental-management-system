@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   searchCustomerForWalkIn,
@@ -64,6 +64,39 @@ export default function WalkInBookingForm({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Refs untuk auto-scroll otomatis ke atas saat terjadi error validasi
+  const errorAlertRef = useRef<HTMLDivElement>(null)
+  const formTopRef = useRef<HTMLDivElement>(null)
+
+  const scrollToTopOrError = () => {
+    setTimeout(() => {
+      if (errorAlertRef.current) {
+        errorAlertRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        try {
+          errorAlertRef.current.focus({ preventScroll: true })
+        } catch {}
+      } else if (formTopRef.current) {
+        formTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else {
+        const mainEl = document.querySelector('main')
+        if (mainEl) {
+          mainEl.scrollTo({ top: 0, behavior: 'smooth' })
+        }
+      }
+    }, 50)
+  }
+
+  const showError = (msg: string) => {
+    setError(msg)
+    scrollToTopOrError()
+  }
+
+  useEffect(() => {
+    if (error) {
+      scrollToTopOrError()
+    }
+  }, [error])
 
   // 1. Customer State
   const [customerSearchQuery, setCustomerSearchQuery] = useState('')
@@ -175,7 +208,7 @@ export default function WalkInBookingForm({
   const handleSearchCustomer = async () => {
     const trimmed = customerSearchQuery.trim()
     if (!trimmed || trimmed.length < 3) {
-      setError('Masukkan minimal 3 karakter untuk mencari pelanggan (Nama, HP, atau Email).')
+      showError('Masukkan minimal 3 karakter untuk mencari pelanggan (Nama, HP, atau Email).')
       return
     }
     setIsSearchingCustomer(true)
@@ -184,7 +217,7 @@ export default function WalkInBookingForm({
     const res = await searchCustomerForWalkIn(trimmed)
     setIsSearchingCustomer(false)
     if (res.error) {
-      setError(res.error)
+      showError(res.error)
     } else {
       const results = res.customers || []
       setSearchResults(results)
@@ -222,55 +255,55 @@ export default function WalkInBookingForm({
 
     // Validasi Pelanggan
     if (!selectedCustomer && !isCreatingNewCustomer) {
-      setError('Pilih pelanggan yang sudah ada atau lengkapi data pelanggan baru.')
+      showError('Pilih pelanggan yang sudah ada atau lengkapi data pelanggan baru.')
       return
     }
 
     if (isCreatingNewCustomer) {
       if (!newCustomer.name || newCustomer.name.trim().length < 2) {
-        setError('Nama pelanggan baru wajib diisi minimal 2 karakter.')
+        showError('Nama pelanggan baru wajib diisi minimal 2 karakter.')
         return
       }
       if (!newCustomer.email || !newCustomer.email.includes('@')) {
-        setError('Email pelanggan baru tidak valid.')
+        showError('Email pelanggan baru tidak valid.')
         return
       }
       if (!formatIndonesianPhoneNumber(newCustomer.phone)) {
-        setError('Nomor HP pelanggan baru tidak valid (contoh: 08123456789).')
+        showError('Nomor HP pelanggan baru tidak valid (contoh: 08123456789).')
         return
       }
     }
 
     // Validasi Kendaraan & Jadwal
     if (!selectedVehicleId) {
-      setError('Pilih armada kendaraan yang akan disewa.')
+      showError('Pilih armada kendaraan yang akan disewa.')
       return
     }
 
     const start = new Date(startDateStr)
     const end = new Date(endDateStr)
     if (end <= start) {
-      setError('Waktu pengembalian harus setelah waktu penjemputan.')
+      showError('Waktu pengembalian harus setelah waktu penjemputan.')
       return
     }
 
     // Validasi Diskon
     const discNum = Number(discountAmount) || 0
     if (discNum < 0) {
-      setError('Nominal diskon tidak boleh bernilai negatif.')
+      showError('Nominal diskon tidak boleh bernilai negatif.')
       return
     }
     if (discNum > 0) {
       if (!isDiscountAuthorized) {
-        setError('Akses ditolak: Staf Cabang tidak berwenang memberikan diskon sewa.')
+        showError('Akses ditolak: Staf Cabang tidak berwenang memberikan diskon sewa.')
         return
       }
       if (!discountReason || discountReason.trim().length < 10) {
-        setError('Alasan diskon wajib diisi minimal 10 karakter dengan konteks manajerial yang jelas.')
+        showError('Alasan diskon wajib diisi minimal 10 karakter dengan konteks manajerial yang jelas.')
         return
       }
       if (discNum > maxAllowedDiscount) {
-        setError(
+        showError(
           `Nilai diskon melebihi batas maksimum 30% dari tarif sewa mobil (Maksimal: Rp ${maxAllowedDiscount.toLocaleString('id-ID')}).`
         )
         return
@@ -292,7 +325,7 @@ export default function WalkInBookingForm({
           })
 
           if (custRes.error || !custRes.customer) {
-            setError(custRes.error || 'Gagal memproses data pelanggan.')
+            showError(custRes.error || 'Gagal memproses data pelanggan.')
             return
           }
           activeCustomerId = custRes.customer.id
@@ -317,7 +350,7 @@ export default function WalkInBookingForm({
 
           const uploadRes = await uploadWalkInDocumentsAction(docFormData)
           if (uploadRes.error) {
-            setError(uploadRes.error)
+            showError(uploadRes.error)
             return
           }
         }
@@ -335,14 +368,14 @@ export default function WalkInBookingForm({
         })
 
         if (bookingRes.error || !bookingRes.bookingId) {
-          setError(bookingRes.error || 'Gagal menerbitkan pesanan walk-in.')
+          showError(bookingRes.error || 'Gagal menerbitkan pesanan walk-in.')
           return
         }
 
         setSuccessMessage('Pesanan walk-in berhasil dibuat dan pembayaran kas telah dicatat!')
         router.push(`/admin/bookings/${bookingRes.bookingId}`)
       } catch (err: any) {
-        setError(err.message || 'Terjadi kesalahan sistem saat memproses pemesanan.')
+        showError(err.message || 'Terjadi kesalahan sistem saat memproses pemesanan.')
       }
     })
   }
@@ -351,14 +384,31 @@ export default function WalkInBookingForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Anchor untuk auto-scroll ke puncak form */}
+      <div ref={formTopRef} className="scroll-mt-6" />
+
       {/* Alert Error / Success */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-3">
+        <div
+          ref={errorAlertRef}
+          tabIndex={-1}
+          role="alert"
+          aria-live="assertive"
+          className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-3 shadow-sm outline-none animate-alert-slide scroll-mt-6"
+        >
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold">Terjadi Kesalahan</p>
-            <p className="mt-0.5">{error}</p>
+          <div className="flex-1">
+            <p className="font-semibold text-red-900">Terjadi Kesalahan</p>
+            <p className="mt-0.5 text-red-800">{error}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="text-red-400 hover:text-red-700 p-1 rounded-md transition-colors cursor-pointer"
+            title="Tutup peringatan"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -955,6 +1005,23 @@ export default function WalkInBookingForm({
           </div>
         )}
       </div>
+
+      {/* Peringatan error tepat di atas tombol submit jika kasir berada di bagian bawah formulir */}
+      {error && (
+        <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center justify-between gap-3 shadow-sm animate-alert-slide">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <span className="font-medium text-red-800">{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={scrollToTopOrError}
+            className="text-xs font-semibold text-red-700 hover:text-red-900 underline flex items-center gap-1 shrink-0 cursor-pointer"
+          >
+            Lihat Detail di Atas ↑
+          </button>
+        </div>
+      )}
 
       {/* SUBMIT BUTTON */}
       <div className="flex justify-end gap-3 pt-4 border-t border-zinc-200">
