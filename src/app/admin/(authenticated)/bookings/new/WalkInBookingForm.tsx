@@ -430,7 +430,7 @@ export default function WalkInBookingForm({
                       handleSearchCustomer()
                     }
                   }}
-                  className="w-full pl-9 pr-4 py-2 border border-zinc-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-9 pr-4 py-2 border border-zinc-300 rounded-lg text-sm bg-white text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
               <div className="flex gap-2">
@@ -531,7 +531,7 @@ export default function WalkInBookingForm({
                       placeholder="Contoh: Budi Santoso"
                       value={newCustomer.name}
                       onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                   <div>
@@ -544,7 +544,7 @@ export default function WalkInBookingForm({
                       placeholder="Contoh: 08123456789"
                       value={newCustomer.phone}
                       onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                   <div>
@@ -557,7 +557,7 @@ export default function WalkInBookingForm({
                       placeholder="Contoh: budi@gmail.com"
                       value={newCustomer.email}
                       onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -592,7 +592,7 @@ export default function WalkInBookingForm({
                 setSelectedVehicleId('')
               }}
               disabled={userRole === 'staff_cabang' || userRole === 'admin_cabang'}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white disabled:bg-zinc-100 focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white text-zinc-900 disabled:bg-zinc-100 disabled:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -610,7 +610,7 @@ export default function WalkInBookingForm({
             <select
               value={rentalType}
               onChange={(e) => setRentalType(e.target.value as RentalType)}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="self_drive">Lepas Kunci (Self-Drive)</option>
               <option value="with_driver">Dengan Sopir (+ Rp 150.000 / hari)</option>
@@ -631,7 +631,7 @@ export default function WalkInBookingForm({
                 required
                 value={selectedVehicleId}
                 onChange={(e) => setSelectedVehicleId(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white font-medium focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white text-zinc-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">-- Pilih Unit Armada --</option>
                 {availableVehicles.map((v) => (
@@ -663,7 +663,7 @@ export default function WalkInBookingForm({
               required
               value={startDateStr}
               onChange={(e) => setStartDateStr(e.target.value)}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             <p className="text-[11px] text-zinc-500 mt-1">
               Jam operasional cabang: 08:00 – 21:00 WIB.
@@ -678,7 +678,7 @@ export default function WalkInBookingForm({
               required
               value={endDateStr}
               onChange={(e) => setEndDateStr(e.target.value)}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             <p className="text-[11px] text-zinc-500 mt-1">
               Durasi dihitung dalam kelipatan 24 jam kalender.
@@ -741,10 +741,10 @@ export default function WalkInBookingForm({
                     placeholder="Contoh: 50000"
                     value={discountAmount}
                     onChange={(e) => setDiscountAmount(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 ${
+                    className={`w-full px-3 py-2 border rounded-lg bg-white text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 ${
                       isDiscountOverLimit
-                        ? 'border-red-400 focus:ring-red-500'
-                        : 'border-zinc-300 focus:ring-blue-500'
+                        ? 'border-red-400 focus:ring-red-500 focus:border-red-500'
+                        : 'border-zinc-300 focus:ring-blue-500 focus:border-blue-500'
                     }`}
                   />
                   {isDiscountOverLimit && (
@@ -763,7 +763,7 @@ export default function WalkInBookingForm({
                     placeholder="Contoh: Diskon loyalitas pelanggan korporat"
                     value={discountReason}
                     onChange={(e) => setDiscountReason(e.target.value)}
-                    className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   {Number(discountAmount) > 0 && discountReason.trim().length < 10 && (
                     <p className="text-[11px] text-amber-600 mt-1">
@@ -869,7 +869,7 @@ export default function WalkInBookingForm({
                   type="file"
                   accept="image/jpeg,image/png,application/pdf"
                   onChange={(e) => setKtpFile(e.target.files?.[0] || null)}
-                  className="w-full text-xs text-zinc-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  className="w-full text-xs text-zinc-900 font-medium file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
                 {ktpFile && (
                   <div className="mt-2 flex items-center justify-between text-xs bg-emerald-50 text-emerald-800 px-2.5 py-1.5 rounded-lg border border-emerald-200">
@@ -896,7 +896,7 @@ export default function WalkInBookingForm({
                       placeholder="Contoh: 3271012345678901"
                       value={manualKtpNumber}
                       onChange={(e) => setManualKtpNumber(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                 )}
@@ -919,7 +919,7 @@ export default function WalkInBookingForm({
                   type="file"
                   accept="image/jpeg,image/png,application/pdf"
                   onChange={(e) => setSimFile(e.target.files?.[0] || null)}
-                  className="w-full text-xs text-zinc-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  className="w-full text-xs text-zinc-900 font-medium file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
                 {simFile && (
                   <div className="mt-2 flex items-center justify-between text-xs bg-emerald-50 text-emerald-800 px-2.5 py-1.5 rounded-lg border border-emerald-200">
@@ -946,7 +946,7 @@ export default function WalkInBookingForm({
                       placeholder="Contoh: 123456789012"
                       value={manualSimNumber}
                       onChange={(e) => setManualSimNumber(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                 )}
