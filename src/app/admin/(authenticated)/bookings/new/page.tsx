@@ -73,7 +73,7 @@ export default async function NewWalkInBookingPage() {
           Kembali ke Antrian Pesanan
         </Link>
         <h1 className="text-2xl md:text-3xl font-bold text-zinc-900">
-          Pemesanan Offline (*Walk-In*) & Kasir
+          Pemesanan Offline (Walk-In) & Kasir
         </h1>
         <p className="text-sm text-zinc-500 mt-1">
           Layanan pembuatan pesanan langsung di tempat untuk pelanggan walk-in dengan pembayaran tunai di meja resepsionis.

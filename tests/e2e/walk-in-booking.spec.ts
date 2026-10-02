@@ -530,7 +530,7 @@ test.describe('Walk-In Booking & Cash Payment Pipeline', () => {
     await newBtn.click()
 
     await page.waitForURL('**/admin/bookings/new')
-    await expect(page.locator('h1')).toContainText('Pemesanan Offline (*Walk-In*) & Kasir')
+    await expect(page.locator('h1')).toContainText('Pemesanan Offline (Walk-In) & Kasir')
 
     // Verifikasi Section 5 yang baru: Dokumentasi Fisik KTP & SIM (Wajib Bukti Foto)
     await expect(page.locator('text=1. Identitas Pelanggan Walk-In')).toBeVisible()

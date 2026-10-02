@@ -22,9 +22,9 @@ import {
   FileText,
   ShieldCheck,
   Percent,
-  MapPin,
   ArrowRight,
-  Info
+  Info,
+  X
 } from 'lucide-react'
 import { RentalType, UserRole } from '@prisma/client'
 
@@ -69,15 +69,14 @@ export default function WalkInBookingForm({
   const [customerSearchQuery, setCustomerSearchQuery] = useState('')
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false)
   const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchFeedback, setSearchFeedback] = useState<string | null>(null)
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null)
 
   // New Customer Form State
   const [newCustomer, setNewCustomer] = useState({
     name: '',
     email: '',
-    phone: '',
-    ktpNumber: '',
-    simNumber: ''
+    phone: ''
   })
   const [isCreatingNewCustomer, setIsCreatingNewCustomer] = useState(false)
 
@@ -88,10 +87,16 @@ export default function WalkInBookingForm({
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('')
   const [rentalType, setRentalType] = useState<RentalType>('self_drive')
 
-  // Tanggal & Jam (Default: hari ini + 3.5 jam)
+  // Tanggal & Jam (Default: hari ini dalam rentang jam operasional 08:00 - 21:00 WIB, min. 3.5 jam)
   const defaultStartDate = useMemo(() => {
     const d = new Date(Date.now() + 3.5 * 60 * 60 * 1000)
     d.setMinutes(0, 0, 0)
+    if (d.getHours() >= 21) {
+      d.setDate(d.getDate() + 1)
+      d.setHours(9, 0, 0)
+    } else if (d.getHours() < 8) {
+      d.setHours(9, 0, 0)
+    }
     const year = d.getFullYear()
     const month = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
@@ -101,15 +106,15 @@ export default function WalkInBookingForm({
   }, [])
 
   const defaultEndDate = useMemo(() => {
-    const d = new Date(Date.now() + 27.5 * 60 * 60 * 1000)
-    d.setMinutes(0, 0, 0)
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const hour = String(d.getHours()).padStart(2, '0')
-    const minute = String(d.getMinutes()).padStart(2, '0')
+    const start = new Date(defaultStartDate)
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+    const year = end.getFullYear()
+    const month = String(end.getMonth() + 1).padStart(2, '0')
+    const day = String(end.getDate()).padStart(2, '0')
+    const hour = String(end.getHours()).padStart(2, '0')
+    const minute = String(end.getMinutes()).padStart(2, '0')
     return `${year}-${month}-${day}T${hour}:${minute}`
-  }, [])
+  }, [defaultStartDate])
 
   const [startDateStr, setStartDateStr] = useState(defaultStartDate)
   const [endDateStr, setEndDateStr] = useState(defaultEndDate)
@@ -118,7 +123,7 @@ export default function WalkInBookingForm({
   const [discountAmount, setDiscountAmount] = useState<string>('')
   const [discountReason, setDiscountReason] = useState<string>('')
 
-  // 4. KYC File Upload State (Wajib Bukti Fisik)
+  // 4. KYC File Upload State (Wajib Bukti Fisik & Terpusat di Bagian 5)
   const [ktpFile, setKtpFile] = useState<File | null>(null)
   const [simFile, setSimFile] = useState<File | null>(null)
   const [manualKtpNumber, setManualKtpNumber] = useState('')
@@ -164,25 +169,50 @@ export default function WalkInBookingForm({
 
   const isDiscountAuthorized = userRole === 'admin_cabang' || userRole === 'admin_pusat'
   const maxAllowedDiscount = Math.floor(priceBreakdown.vehicleTotal * 0.3)
+  const isDiscountOverLimit = Number(discountAmount) > maxAllowedDiscount
 
   // Handle Search Customer
   const handleSearchCustomer = async () => {
-    if (!customerSearchQuery.trim() || customerSearchQuery.trim().length < 3) {
+    const trimmed = customerSearchQuery.trim()
+    if (!trimmed || trimmed.length < 3) {
       setError('Masukkan minimal 3 karakter untuk mencari pelanggan (Nama, HP, atau Email).')
       return
     }
     setIsSearchingCustomer(true)
     setError(null)
-    const res = await searchCustomerForWalkIn(customerSearchQuery)
+    setSearchFeedback(null)
+    const res = await searchCustomerForWalkIn(trimmed)
     setIsSearchingCustomer(false)
     if (res.error) {
       setError(res.error)
     } else {
-      setSearchResults(res.customers || [])
-      if (!res.customers || res.customers.length === 0) {
+      const results = res.customers || []
+      setSearchResults(results)
+      if (results.length === 0) {
         setIsCreatingNewCustomer(true)
+        setSearchFeedback(`Tidak ditemukan pelanggan dengan kueri "${trimmed}". Silakan lengkapi formulir pendaftaran di bawah.`)
+        // Auto pre-fill new customer if query looks like phone, email, or name
+        if (trimmed.includes('@')) {
+          setNewCustomer((prev) => ({ ...prev, email: trimmed }))
+        } else if (/^[0-9+\s-]+$/.test(trimmed)) {
+          setNewCustomer((prev) => ({ ...prev, phone: trimmed }))
+        } else {
+          setNewCustomer((prev) => ({ ...prev, name: trimmed }))
+        }
       }
     }
+  }
+
+  // Handle Reset / Ganti Customer
+  const handleResetCustomer = () => {
+    setSelectedCustomer(null)
+    setIsCreatingNewCustomer(false)
+    setSearchResults([])
+    setSearchFeedback(null)
+    setKtpFile(null)
+    setSimFile(null)
+    setManualKtpNumber('')
+    setManualSimNumber('')
   }
 
   // Handle Submit Booking
@@ -213,7 +243,7 @@ export default function WalkInBookingForm({
 
     // Validasi Kendaraan & Jadwal
     if (!selectedVehicleId) {
-      setError('Pilih armada yang akan disewa.')
+      setError('Pilih armada kendaraan yang akan disewa.')
       return
     }
 
@@ -257,8 +287,8 @@ export default function WalkInBookingForm({
             name: newCustomer.name,
             email: newCustomer.email,
             phone: newCustomer.phone,
-            ktpNumber: newCustomer.ktpNumber || manualKtpNumber || null,
-            simNumber: newCustomer.simNumber || manualSimNumber || null
+            ktpNumber: manualKtpNumber.trim() || null,
+            simNumber: manualSimNumber.trim() || null
           })
 
           if (custRes.error || !custRes.customer) {
@@ -274,14 +304,14 @@ export default function WalkInBookingForm({
           docFormData.append('customerId', activeCustomerId)
           if (ktpFile) {
             docFormData.append('ktpFile', ktpFile)
-            if (manualKtpNumber || newCustomer.ktpNumber) {
-              docFormData.append('ktpNumber', manualKtpNumber || newCustomer.ktpNumber)
+            if (manualKtpNumber.trim()) {
+              docFormData.append('ktpNumber', manualKtpNumber.trim())
             }
           }
           if (simFile) {
             docFormData.append('simFile', simFile)
-            if (manualSimNumber || newCustomer.simNumber) {
-              docFormData.append('simNumber', manualSimNumber || newCustomer.simNumber)
+            if (manualSimNumber.trim()) {
+              docFormData.append('simNumber', manualSimNumber.trim())
             }
           }
 
@@ -377,11 +407,8 @@ export default function WalkInBookingForm({
             </div>
             <button
               type="button"
-              onClick={() => {
-                setSelectedCustomer(null)
-                setIsCreatingNewCustomer(false)
-              }}
-              className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-3 py-1.5 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+              onClick={handleResetCustomer}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-3 py-1.5 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
             >
               Ganti Pelanggan
             </button>
@@ -389,7 +416,7 @@ export default function WalkInBookingForm({
         ) : (
           <div className="space-y-4">
             {/* Search Bar */}
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
                 <input
@@ -406,29 +433,40 @@ export default function WalkInBookingForm({
                   className="w-full pl-9 pr-4 py-2 border border-zinc-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <button
-                type="button"
-                onClick={handleSearchCustomer}
-                disabled={isSearchingCustomer}
-                className="px-4 py-2 bg-zinc-900 text-white rounded-lg text-sm font-semibold hover:bg-zinc-800 disabled:opacity-50"
-              >
-                {isSearchingCustomer ? 'Mencari...' : 'Cari'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCreatingNewCustomer(true)
-                  setSearchResults([])
-                }}
-                className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-semibold hover:bg-blue-100"
-              >
-                + Pelanggan Baru
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSearchCustomer}
+                  disabled={isSearchingCustomer}
+                  className="px-4 py-2 bg-zinc-900 text-white rounded-lg text-sm font-semibold hover:bg-zinc-800 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {isSearchingCustomer ? 'Mencari...' : 'Cari'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreatingNewCustomer(true)
+                    setSearchResults([])
+                    setSearchFeedback(null)
+                  }}
+                  className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-semibold hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  + Pelanggan Baru
+                </button>
+              </div>
             </div>
+
+            {/* Search Feedback Message */}
+            {searchFeedback && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 flex items-start gap-2">
+                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <span>{searchFeedback}</span>
+              </div>
+            )}
 
             {/* Search Results List */}
             {searchResults.length > 0 && !selectedCustomer && (
-              <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
+              <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden shadow-sm">
                 <p className="p-2.5 bg-zinc-50 text-xs font-semibold text-zinc-600">
                   Hasil Pencarian ({searchResults.length}):
                 </p>
@@ -439,6 +477,7 @@ export default function WalkInBookingForm({
                       setSelectedCustomer(cust)
                       setIsCreatingNewCustomer(false)
                       setSearchResults([])
+                      setSearchFeedback(null)
                     }}
                     className="p-3 hover:bg-blue-50/50 cursor-pointer flex justify-between items-center transition-colors"
                   >
@@ -471,8 +510,11 @@ export default function WalkInBookingForm({
                   </h3>
                   <button
                     type="button"
-                    onClick={() => setIsCreatingNewCustomer(false)}
-                    className="text-xs text-zinc-500 hover:text-zinc-700"
+                    onClick={() => {
+                      setIsCreatingNewCustomer(false)
+                      setSearchFeedback(null)
+                    }}
+                    className="text-xs text-zinc-500 hover:text-zinc-700 cursor-pointer"
                   >
                     Batal
                   </button>
@@ -489,7 +531,7 @@ export default function WalkInBookingForm({
                       placeholder="Contoh: Budi Santoso"
                       value={newCustomer.name}
                       onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
@@ -502,7 +544,7 @@ export default function WalkInBookingForm({
                       placeholder="Contoh: 08123456789"
                       value={newCustomer.phone}
                       onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
@@ -515,45 +557,14 @@ export default function WalkInBookingForm({
                       placeholder="Contoh: budi@gmail.com"
                       value={newCustomer.email}
                       onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm pt-2 border-t border-zinc-200">
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-700 mb-1">
-                      Nomor KTP (Opsional jika upload foto)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="16 digit NIK"
-                      value={newCustomer.ktpNumber}
-                      onChange={(e) =>
-                        setNewCustomer({ ...newCustomer, ktpNumber: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-700 mb-1">
-                      Nomor SIM (Opsional jika upload foto)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Nomor SIM aktif"
-                      value={newCustomer.simNumber}
-                      onChange={(e) =>
-                        setNewCustomer({ ...newCustomer, simNumber: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
+                      className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
 
                 <p className="text-[11px] text-zinc-500">
-                  Akun akan dibuatkan otomatis dengan kredensial acak aman. Link atur password
-                  mandiri akan dikirimkan ke email pelanggan.
+                  Foto dan nomor dokumen fisik (KTP & SIM) akan didokumentasikan pada Bagian 5 di bawah.
+                  Akun pelanggan akan dibuatkan otomatis dengan kredensial acak aman.
                 </p>
               </div>
             )}
@@ -581,7 +592,7 @@ export default function WalkInBookingForm({
                 setSelectedVehicleId('')
               }}
               disabled={userRole === 'staff_cabang' || userRole === 'admin_cabang'}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white disabled:bg-zinc-100"
+              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white disabled:bg-zinc-100 focus:ring-2 focus:ring-blue-500"
             >
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -599,7 +610,7 @@ export default function WalkInBookingForm({
             <select
               value={rentalType}
               onChange={(e) => setRentalType(e.target.value as RentalType)}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
             >
               <option value="self_drive">Lepas Kunci (Self-Drive)</option>
               <option value="with_driver">Dengan Sopir (+ Rp 150.000 / hari)</option>
@@ -620,7 +631,7 @@ export default function WalkInBookingForm({
                 required
                 value={selectedVehicleId}
                 onChange={(e) => setSelectedVehicleId(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white font-medium"
+                className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white font-medium focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">-- Pilih Unit Armada --</option>
                 {availableVehicles.map((v) => (
@@ -652,7 +663,7 @@ export default function WalkInBookingForm({
               required
               value={startDateStr}
               onChange={(e) => setStartDateStr(e.target.value)}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-lg"
+              className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-[11px] text-zinc-500 mt-1">
               Jam operasional cabang: 08:00 – 21:00 WIB.
@@ -667,13 +678,21 @@ export default function WalkInBookingForm({
               required
               value={endDateStr}
               onChange={(e) => setEndDateStr(e.target.value)}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-lg"
+              className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-[11px] text-zinc-500 mt-1">
               Durasi dihitung dalam kelipatan 24 jam kalender.
             </p>
           </div>
         </div>
+
+        {/* Real-time Date Range Validation */}
+        {startDateStr && endDateStr && new Date(endDateStr) <= new Date(startDateStr) && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <span>Waktu pengembalian harus setelah waktu penjemputan.</span>
+          </div>
+        )}
       </div>
 
       {/* SECTION 4: RINCIAN BIAYA & DISKON KHUSUS */}
@@ -683,8 +702,82 @@ export default function WalkInBookingForm({
           <h2 className="text-lg font-bold text-zinc-900">4. Rincian Biaya & Penerimaan Kas Tunai</h2>
         </div>
 
+        {/* Diskon Khusus Field */}
+        <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50/50 mb-6">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Percent className="w-4 h-4 text-zinc-700" />
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-800">
+              Diskon Khusus Transaksi Walk-In
+            </span>
+          </div>
+
+          {!isDiscountAuthorized ? (
+            <div className="p-3 bg-zinc-100 border border-zinc-200 rounded-lg text-xs text-zinc-600 flex items-start gap-2">
+              <Info className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-zinc-800">Wewenang Terbatas:</span> Hanya{' '}
+                <strong>Admin Cabang</strong> atau <strong>Admin Pusat</strong> yang berwenang
+                memberikan diskon sewa di tempat.
+              </div>
+            </div>
+          ) : !selectedVehicleId ? (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start gap-2">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                Pilih unit armada di Bagian 2 terlebih dahulu untuk mengaktifkan batas diskon (plafon 30%).
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3 mt-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">
+                    Nominal Diskon (Rp) — Maks. 30% (Rp {maxAllowedDiscount.toLocaleString('id-ID')})
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={maxAllowedDiscount}
+                    placeholder="Contoh: 50000"
+                    value={discountAmount}
+                    onChange={(e) => setDiscountAmount(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 ${
+                      isDiscountOverLimit
+                        ? 'border-red-400 focus:ring-red-500'
+                        : 'border-zinc-300 focus:ring-blue-500'
+                    }`}
+                  />
+                  {isDiscountOverLimit && (
+                    <p className="text-[11px] text-red-600 mt-1 font-semibold flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Diskon melebihi batas plafon 30% (Maks. Rp {maxAllowedDiscount.toLocaleString('id-ID')})
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">
+                    Alasan Diskon (Wajib min. 10 karakter jika ada diskon)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Diskon loyalitas pelanggan korporat"
+                    value={discountReason}
+                    onChange={(e) => setDiscountReason(e.target.value)}
+                    className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+                  />
+                  {Number(discountAmount) > 0 && discountReason.trim().length < 10 && (
+                    <p className="text-[11px] text-amber-600 mt-1">
+                      Alasan diskon wajib minimal 10 karakter ({discountReason.trim().length}/10 karakter).
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Pricing Summary Table */}
-        <div className="bg-zinc-50 rounded-xl p-4 border border-zinc-200 text-sm space-y-2 mb-6">
+        <div className="bg-zinc-50 rounded-xl p-4 border border-zinc-200 text-sm space-y-2">
           <div className="flex justify-between text-zinc-600">
             <span>Durasi Sewa:</span>
             <span className="font-semibold text-zinc-900">{priceBreakdown.days} Hari</span>
@@ -723,56 +816,6 @@ export default function WalkInBookingForm({
               Rp {priceBreakdown.finalPrice.toLocaleString('id-ID')}
             </span>
           </div>
-        </div>
-
-        {/* Diskon Khusus Field */}
-        <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50/50">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Percent className="w-4 h-4 text-zinc-700" />
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-800">
-              Diskon Khusus Transaksi Walk-In
-            </span>
-          </div>
-
-          {!isDiscountAuthorized ? (
-            <div className="p-3 bg-zinc-100 border border-zinc-200 rounded-lg text-xs text-zinc-600 flex items-start gap-2">
-              <Info className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold text-zinc-800">Wewenang Terbatas:</span> Hanya{' '}
-                <strong>Admin Cabang</strong> atau <strong>Admin Pusat</strong> yang berwenang
-                memberikan diskon sewa di tempat.
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-3">
-              <div>
-                <label className="block text-xs font-medium text-zinc-700 mb-1">
-                  Nominal Diskon (Rp) — Maks. 30% (Rp {maxAllowedDiscount.toLocaleString('id-ID')})
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={maxAllowedDiscount}
-                  placeholder="Contoh: 50000"
-                  value={discountAmount}
-                  onChange={(e) => setDiscountAmount(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-700 mb-1">
-                  Alasan Diskon (Wajib min. 10 karakter jika ada diskon)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Diskon loyalitas pelanggan korporat"
-                  value={discountReason}
-                  onChange={(e) => setDiscountReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg bg-white"
-                />
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -825,18 +868,37 @@ export default function WalkInBookingForm({
                 <input
                   type="file"
                   accept="image/jpeg,image/png,application/pdf"
-                  capture="environment"
                   onChange={(e) => setKtpFile(e.target.files?.[0] || null)}
-                  className="w-full text-xs text-zinc-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className="w-full text-xs text-zinc-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
+                {ktpFile && (
+                  <div className="mt-2 flex items-center justify-between text-xs bg-emerald-50 text-emerald-800 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                    <span className="truncate max-w-[200px] font-medium">
+                      ✓ {ktpFile.name} ({Math.round(ktpFile.size / 1024)} KB)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setKtpFile(null)}
+                      className="text-emerald-700 hover:text-red-600 transition-colors cursor-pointer"
+                      title="Hapus file"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
                 {!selectedCustomer?.ktpNumber && (
-                  <input
-                    type="text"
-                    placeholder="Nomor KTP (16 digit)"
-                    value={manualKtpNumber}
-                    onChange={(e) => setManualKtpNumber(e.target.value)}
-                    className="w-full mt-2 px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white"
-                  />
+                  <div className="mt-2">
+                    <label className="block text-[11px] font-medium text-zinc-600 mb-1">
+                      Nomor KTP (16 digit NIK)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 3271012345678901"
+                      value={manualKtpNumber}
+                      onChange={(e) => setManualKtpNumber(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 )}
               </div>
 
@@ -856,18 +918,37 @@ export default function WalkInBookingForm({
                 <input
                   type="file"
                   accept="image/jpeg,image/png,application/pdf"
-                  capture="environment"
                   onChange={(e) => setSimFile(e.target.files?.[0] || null)}
-                  className="w-full text-xs text-zinc-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className="w-full text-xs text-zinc-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
+                {simFile && (
+                  <div className="mt-2 flex items-center justify-between text-xs bg-emerald-50 text-emerald-800 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                    <span className="truncate max-w-[200px] font-medium">
+                      ✓ {simFile.name} ({Math.round(simFile.size / 1024)} KB)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSimFile(null)}
+                      className="text-emerald-700 hover:text-red-600 transition-colors cursor-pointer"
+                      title="Hapus file"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
                 {!selectedCustomer?.simNumber && (
-                  <input
-                    type="text"
-                    placeholder="Nomor SIM"
-                    value={manualSimNumber}
-                    onChange={(e) => setManualSimNumber(e.target.value)}
-                    className="w-full mt-2 px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white"
-                  />
+                  <div className="mt-2">
+                    <label className="block text-[11px] font-medium text-zinc-600 mb-1">
+                      Nomor SIM Aktif
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 123456789012"
+                      value={manualSimNumber}
+                      onChange={(e) => setManualSimNumber(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-zinc-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -887,7 +968,7 @@ export default function WalkInBookingForm({
         </button>
         <button
           type="submit"
-          disabled={isPending || !selectedVehicleId}
+          disabled={isPending}
           className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center gap-2 cursor-pointer"
         >
           {isPending ? 'Menerbitkan Pesanan...' : 'Terima Kas Tunai & Terbitkan Pesanan'}
