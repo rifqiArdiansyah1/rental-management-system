@@ -461,9 +461,17 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
               <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Odometer Awal</p>
+                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Odometer Unit Terkini</p>
+                <p className="font-mono font-bold text-zinc-900 text-base mt-1">
+                  {booking.vehicle.currentOdometerKm != null ? `${booking.vehicle.currentOdometerKm.toLocaleString('id-ID')} km` : '-'}
+                </p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Speedometer armada saat ini</p>
+              </div>
+
+              <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Odometer Awal Trip</p>
                 <p className="font-mono font-bold text-zinc-900 text-base mt-1">
                   {booking.odometerStart != null ? `${booking.odometerStart.toLocaleString('id-ID')} km` : '-'}
                 </p>
@@ -471,7 +479,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
               </div>
 
               <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Odometer Akhir</p>
+                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Odometer Akhir Trip</p>
                 <p className="font-mono font-bold text-zinc-900 text-base mt-1">
                   {booking.odometerEnd != null
                     ? `${booking.odometerEnd.toLocaleString('id-ID')} km`

@@ -6,6 +6,7 @@ import { Prisma, FuelType } from '@prisma/client'
 import { FUEL_TYPE_LABELS } from '@/lib/constants'
 import { Car } from 'lucide-react'
 import { getVehicleDisplayName } from '@/lib/vehicleHelper'
+import { calculateVehicleServiceStatus } from '@/lib/vehicleService'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,6 +191,41 @@ export default async function AdminVehiclesPage({
                   <span className="text-xs text-zinc-500 block mb-1">Cabang</span>
                   <div className="font-medium text-zinc-900">{vehicle.branch.name}</div>
                 </div>
+                <div className="col-span-2 pt-2 border-t border-zinc-200/60">
+                  <span className="text-xs text-zinc-500 block mb-1">Odometer & Servis Berkala</span>
+                  {(() => {
+                    const s = calculateVehicleServiceStatus(vehicle)
+                    return (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-zinc-900">
+                          {s.currentKm != null ? `${s.currentKm.toLocaleString('id-ID')} km` : 'Belum Ada Data'}
+                        </span>
+                        <div>
+                          {s.status === 'healthy' && (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              ✓ {s.label}
+                            </span>
+                          )}
+                          {s.status === 'due' && (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+                              ⚠️ Servis ({s.label})
+                            </span>
+                          )}
+                          {s.status === 'overdue' && (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-300">
+                              🔴 {s.label}
+                            </span>
+                          )}
+                          {s.status === 'unknown' && (
+                            <span className="px-2 py-0.5 rounded text-[11px] bg-zinc-100 text-zinc-500">
+                              -
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
               </div>
             </div>
           )
@@ -205,6 +241,7 @@ export default async function AdminVehiclesPage({
                 <th className="px-6 py-4">Kendaraan</th>
                 <th className="px-6 py-4">Plat Nomor</th>
                 <th className="px-6 py-4">Kategori Kelas</th>
+                <th className="px-6 py-4">Odometer & Servis</th>
                 {adminUser.role === 'admin_pusat' && <th className="px-6 py-4">Lokasi Cabang</th>}
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 w-12"></th>
@@ -213,7 +250,7 @@ export default async function AdminVehiclesPage({
             <tbody className="divide-y divide-zinc-200">
               {vehicles.length === 0 ? (
                 <tr>
-                  <td colSpan={adminUser.role === 'admin_pusat' ? 6 : 5} className="px-6 py-8 text-center text-zinc-500">
+                  <td colSpan={adminUser.role === 'admin_pusat' ? 7 : 6} className="px-6 py-8 text-center text-zinc-500">
                     Kendaraan tidak ditemukan.
                   </td>
                 </tr>
@@ -254,6 +291,40 @@ export default async function AdminVehiclesPage({
                       <div className="text-xs text-zinc-500 mt-0.5">
                         {vehicle.category.capacity} Kursi • {vehicle.category.transmission} • {FUEL_TYPE_LABELS[vehicle.fuelType as FuelType] || vehicle.fuelType}{vehicle.fuelEfficiencyKmL ? ` (${Number(vehicle.fuelEfficiencyKmL)} km/L)` : ''}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const s = calculateVehicleServiceStatus(vehicle)
+                        return (
+                          <div className="space-y-1">
+                            <div className="font-semibold text-zinc-900">
+                              {s.currentKm != null ? `${s.currentKm.toLocaleString('id-ID')} km` : 'Belum Ada Data'}
+                            </div>
+                            <div>
+                              {s.status === 'healthy' && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  ✓ {s.label}
+                                </span>
+                              )}
+                              {s.status === 'due' && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+                                  ⚠️ Waktunya Servis ({s.label})
+                                </span>
+                              )}
+                              {s.status === 'overdue' && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-300">
+                                  🔴 {s.label}
+                                </span>
+                              )}
+                              {s.status === 'unknown' && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-zinc-100 text-zinc-500">
+                                  -
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </td>
                     {adminUser.role === 'admin_pusat' && (
                       <td className="px-6 py-4">

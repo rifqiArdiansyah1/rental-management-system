@@ -146,6 +146,13 @@ model Vehicle {
   previousVehicleId String?  @unique
   fuelType          FuelType @default(pertalite)
   fuelEfficiencyKmL Decimal? @db.Decimal(5, 2)
+
+  // Pelacakan Odometer & Servis Berkala
+  initialOdometerKm     Int?
+  currentOdometerKm     Int?
+  lastServiceOdometerKm Int?
+  serviceIntervalKm     Int           @default(10000)
+
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

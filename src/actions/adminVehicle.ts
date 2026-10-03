@@ -36,6 +36,9 @@ export async function createVehicle(data: {
   photos?: string[]
   fuelType?: FuelType
   fuelEfficiencyKmL?: number | null
+  initialOdometerKm?: number | null
+  lastServiceOdometerKm?: number | null
+  serviceIntervalKm?: number | null
   actor?: { id: string; role: UserRole; branchId?: string | null }
 }) {
   try {
@@ -60,6 +63,26 @@ export async function createVehicle(data: {
       return { error: 'Efisiensi BBM harus berupa angka positif (km/liter).' }
     }
 
+    if (data.initialOdometerKm != null && data.initialOdometerKm !== undefined && (isNaN(Number(data.initialOdometerKm)) || Number(data.initialOdometerKm) < 0)) {
+      return { error: 'Odometer awal harus berupa angka non-negatif.' }
+    }
+
+    if (data.lastServiceOdometerKm != null && data.lastServiceOdometerKm !== undefined && (isNaN(Number(data.lastServiceOdometerKm)) || Number(data.lastServiceOdometerKm) < 0)) {
+      return { error: 'Odometer servis terakhir harus berupa angka non-negatif.' }
+    }
+
+    if (
+      data.initialOdometerKm != null &&
+      data.lastServiceOdometerKm != null &&
+      Number(data.lastServiceOdometerKm) > Number(data.initialOdometerKm)
+    ) {
+      return { error: 'Odometer servis terakhir tidak boleh melebihi odometer awal kendaraan saat masuk armada.' }
+    }
+
+    if (data.serviceIntervalKm != null && data.serviceIntervalKm !== undefined && (isNaN(Number(data.serviceIntervalKm)) || Number(data.serviceIntervalKm) <= 0)) {
+      return { error: 'Interval servis berkala harus berupa angka positif.' }
+    }
+
     const scope = (process.env.NODE_ENV !== 'production' && data.actor)
       ? (data.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: data.actor.branchId! })
       : await getStaffScope()
@@ -75,6 +98,16 @@ export async function createVehicle(data: {
       return { error: 'Plat nomor sudah terdaftar pada armada aktif lain.' }
     }
 
+    const parsedInitialOdo = (data.initialOdometerKm != null && data.initialOdometerKm !== undefined)
+      ? Math.round(Number(data.initialOdometerKm))
+      : null
+    const parsedLastServiceOdo = (data.lastServiceOdometerKm != null && data.lastServiceOdometerKm !== undefined)
+      ? Math.round(Number(data.lastServiceOdometerKm))
+      : (parsedInitialOdo !== null ? parsedInitialOdo : null)
+    const parsedServiceInterval = (data.serviceIntervalKm != null && data.serviceIntervalKm !== undefined && Number(data.serviceIntervalKm) > 0)
+      ? Math.round(Number(data.serviceIntervalKm))
+      : 10000
+
     const vehicle = await prisma.vehicle.create({
       data: {
         name: data.name.trim(),
@@ -87,6 +120,10 @@ export async function createVehicle(data: {
         fuelEfficiencyKmL: data.fuelEfficiencyKmL ? new Prisma.Decimal(data.fuelEfficiencyKmL) : null,
         status: 'available',
         isActive: true,
+        initialOdometerKm: parsedInitialOdo,
+        currentOdometerKm: parsedInitialOdo,
+        lastServiceOdometerKm: parsedLastServiceOdo,
+        serviceIntervalKm: parsedServiceInterval,
       }
     })
 
@@ -105,6 +142,10 @@ export async function createVehicle(data: {
         dailyRate: Number(vehicle.dailyRate),
         fuelType: vehicle.fuelType,
         fuelEfficiencyKmL: vehicle.fuelEfficiencyKmL ? Number(vehicle.fuelEfficiencyKmL) : null,
+        initialOdometerKm: vehicle.initialOdometerKm,
+        currentOdometerKm: vehicle.currentOdometerKm,
+        lastServiceOdometerKm: vehicle.lastServiceOdometerKm,
+        serviceIntervalKm: vehicle.serviceIntervalKm,
       }
     })
 
@@ -131,9 +172,16 @@ export async function updateVehicle(id: string, data: {
   photos?: string[]
   fuelType?: FuelType
   fuelEfficiencyKmL?: number | null
+  initialOdometerKm?: number | null
+  currentOdometerKm?: number | null
+  lastServiceOdometerKm?: number | null
+  serviceIntervalKm?: number | null
+  actor?: { id: string; role: UserRole; branchId?: string | null }
 }) {
   try {
-    const adminUser = await requireAdminSession()
+    const adminUser = (process.env.NODE_ENV !== 'production' && data.actor)
+      ? data.actor
+      : await requireAdminSession()
     if (adminUser.role === 'staff_cabang') {
       return { error: 'Akses ditolak.' }
     }
@@ -163,7 +211,9 @@ export async function updateVehicle(id: string, data: {
 
     if (!existingVehicle) return { error: 'Kendaraan tidak ditemukan' }
 
-    const scope = await getStaffScope()
+    const scope = (process.env.NODE_ENV !== 'production' && data.actor)
+      ? (data.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: data.actor.branchId! })
+      : await getStaffScope()
     assertInScope([existingVehicle.branchId, data.branchId], scope)
 
     if (existingVehicle.branchId !== data.branchId && existingVehicle.bookings.length > 0) {
@@ -179,6 +229,72 @@ export async function updateVehicle(id: string, data: {
       return { error: 'Plat nomor sudah terdaftar pada armada aktif lain.' }
     }
 
+    // Role check and lower bound validation for manual odometer modifications
+    const isModifyingOdometer =
+      (data.initialOdometerKm !== undefined && data.initialOdometerKm !== existingVehicle.initialOdometerKm) ||
+      (data.currentOdometerKm !== undefined && data.currentOdometerKm !== existingVehicle.currentOdometerKm)
+
+    if (isModifyingOdometer) {
+      if (adminUser.role !== 'admin_pusat') {
+        return { error: 'Akses ditolak: Hanya Admin Pusat yang berwenang mengoreksi data odometer kendaraan.' }
+      }
+
+      if (data.initialOdometerKm != null && (isNaN(Number(data.initialOdometerKm)) || Number(data.initialOdometerKm) < 0)) {
+        return { error: 'Odometer awal harus berupa angka non-negatif.' }
+      }
+
+      if (data.currentOdometerKm != null) {
+        if (isNaN(Number(data.currentOdometerKm)) || Number(data.currentOdometerKm) < 0) {
+          return { error: 'Odometer saat ini harus berupa angka non-negatif.' }
+        }
+
+        // Lower bound validation: cannot set currentOdometerKm lower than highest completed booking odometerEnd
+        // Gather all vehicle IDs in the mutation chain to preserve odometer history across branch relocations
+        const chainIds = new Set<string>([id])
+        let curr = existingVehicle.previousVehicleId
+        while (curr) {
+          chainIds.add(curr)
+          const prev = await prisma.vehicle.findUnique({
+            where: { id: curr },
+            select: { previousVehicleId: true }
+          })
+          curr = prev?.previousVehicleId || null
+        }
+
+        // Also include any vehicle records with matching plate number
+        const vehiclesWithSamePlate = await prisma.vehicle.findMany({
+          where: { plateNumber: normalizedPlate },
+          select: { id: true }
+        })
+        for (const v of vehiclesWithSamePlate) {
+          chainIds.add(v.id)
+        }
+
+        const maxHistoricTrip = await prisma.booking.aggregate({
+          where: { vehicleId: { in: Array.from(chainIds) }, status: 'completed' },
+          _max: { odometerEnd: true }
+        })
+        const highestHistoricOdo = maxHistoricTrip._max.odometerEnd ?? 0
+        if (Number(data.currentOdometerKm) < highestHistoricOdo) {
+          return {
+            error: `Odometer kendaraan (${Number(data.currentOdometerKm).toLocaleString('id-ID')} km) tidak boleh disetel lebih rendah dari riwayat sewa tertinggi yang pernah tercatat (${highestHistoricOdo.toLocaleString('id-ID')} km).`
+          }
+        }
+      }
+    }
+
+    if (data.serviceIntervalKm !== undefined && data.serviceIntervalKm !== null) {
+      if (isNaN(Number(data.serviceIntervalKm)) || Number(data.serviceIntervalKm) <= 0) {
+        return { error: 'Interval servis harus berupa angka positif.' }
+      }
+    }
+
+    if (data.lastServiceOdometerKm !== undefined && data.lastServiceOdometerKm !== null) {
+      if (isNaN(Number(data.lastServiceOdometerKm)) || Number(data.lastServiceOdometerKm) < 0) {
+        return { error: 'Odometer servis terakhir harus berupa angka non-negatif.' }
+      }
+    }
+
     // Note: status is strictly omitted from data update to prevent status bypass
     await prisma.vehicle.update({
       where: { id },
@@ -191,6 +307,18 @@ export async function updateVehicle(id: string, data: {
         photos: data.photos || [],
         fuelType: data.fuelType || existingVehicle.fuelType || 'pertalite',
         fuelEfficiencyKmL: data.fuelEfficiencyKmL ? new Prisma.Decimal(data.fuelEfficiencyKmL) : (data.fuelEfficiencyKmL === null ? null : existingVehicle.fuelEfficiencyKmL),
+        initialOdometerKm: data.initialOdometerKm !== undefined
+          ? (data.initialOdometerKm != null ? Math.round(Number(data.initialOdometerKm)) : null)
+          : existingVehicle.initialOdometerKm,
+        currentOdometerKm: data.currentOdometerKm !== undefined
+          ? (data.currentOdometerKm != null ? Math.round(Number(data.currentOdometerKm)) : null)
+          : existingVehicle.currentOdometerKm,
+        lastServiceOdometerKm: data.lastServiceOdometerKm !== undefined
+          ? (data.lastServiceOdometerKm != null ? Math.round(Number(data.lastServiceOdometerKm)) : null)
+          : existingVehicle.lastServiceOdometerKm,
+        serviceIntervalKm: data.serviceIntervalKm !== undefined && data.serviceIntervalKm !== null
+          ? Math.round(Number(data.serviceIntervalKm))
+          : existingVehicle.serviceIntervalKm,
       }
     })
 
@@ -210,6 +338,10 @@ export async function updateVehicle(id: string, data: {
           dailyRate: Number(existingVehicle.dailyRate),
           fuelType: existingVehicle.fuelType,
           fuelEfficiencyKmL: existingVehicle.fuelEfficiencyKmL ? Number(existingVehicle.fuelEfficiencyKmL) : null,
+          initialOdometerKm: existingVehicle.initialOdometerKm,
+          currentOdometerKm: existingVehicle.currentOdometerKm,
+          lastServiceOdometerKm: existingVehicle.lastServiceOdometerKm,
+          serviceIntervalKm: existingVehicle.serviceIntervalKm,
         },
         after: {
           name: data.name.trim(),
@@ -219,6 +351,10 @@ export async function updateVehicle(id: string, data: {
           dailyRate: Number(data.dailyRate),
           fuelType: data.fuelType || existingVehicle.fuelType || 'pertalite',
           fuelEfficiencyKmL: data.fuelEfficiencyKmL ? Number(data.fuelEfficiencyKmL) : (data.fuelEfficiencyKmL === null ? null : (existingVehicle.fuelEfficiencyKmL ? Number(existingVehicle.fuelEfficiencyKmL) : null)),
+          initialOdometerKm: data.initialOdometerKm !== undefined ? (data.initialOdometerKm != null ? Math.round(Number(data.initialOdometerKm)) : null) : existingVehicle.initialOdometerKm,
+          currentOdometerKm: data.currentOdometerKm !== undefined ? (data.currentOdometerKm != null ? Math.round(Number(data.currentOdometerKm)) : null) : existingVehicle.currentOdometerKm,
+          lastServiceOdometerKm: data.lastServiceOdometerKm !== undefined ? (data.lastServiceOdometerKm != null ? Math.round(Number(data.lastServiceOdometerKm)) : null) : existingVehicle.lastServiceOdometerKm,
+          serviceIntervalKm: data.serviceIntervalKm !== undefined && data.serviceIntervalKm !== null ? Math.round(Number(data.serviceIntervalKm)) : existingVehicle.serviceIntervalKm,
         }
       }
     })
@@ -757,7 +893,11 @@ export async function relocateVehicle(
           fuelEfficiencyKmL: sourceVehicle.fuelEfficiencyKmL,
           status: 'available',
           isActive: true,
-          previousVehicleId: sourceVehicle.id
+          previousVehicleId: sourceVehicle.id,
+          initialOdometerKm: sourceVehicle.initialOdometerKm,
+          currentOdometerKm: sourceVehicle.currentOdometerKm,
+          lastServiceOdometerKm: sourceVehicle.lastServiceOdometerKm,
+          serviceIntervalKm: sourceVehicle.serviceIntervalKm,
         }
       })
 
@@ -824,6 +964,10 @@ export async function relocateVehicle(
         toBranchId: targetBranchId,
         toBranchName: targetBranch.name,
         plateNumber: result.sourceVehicle.plateNumber,
+        initialOdometerKm: result.newVehicle.initialOdometerKm,
+        currentOdometerKm: result.newVehicle.currentOdometerKm,
+        lastServiceOdometerKm: result.newVehicle.lastServiceOdometerKm,
+        serviceIntervalKm: result.newVehicle.serviceIntervalKm,
         closedUnavailability: result.activeUnavail ? {
           id: result.activeUnavail.id,
           reason: result.activeUnavail.reason,
@@ -853,5 +997,87 @@ export async function relocateVehicle(
       return { error: 'Plat nomor sudah terdaftar pada armada aktif lain.' }
     }
     return { error: error.message || 'Terjadi kesalahan sistem saat memindahkan armada.' }
+  }
+}
+
+export async function recordVehicleServiceAction(
+  vehicleId: string,
+  data?: {
+    servicedAtKm?: number
+    note?: string
+    actor?: { id: string; role: UserRole; branchId?: string | null }
+  }
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const adminUser = (process.env.NODE_ENV !== 'production' && data?.actor)
+      ? data.actor
+      : await requireAdminSession()
+
+    if (adminUser.role === 'staff_cabang') {
+      return { error: 'Akses ditolak: Staf cabang tidak berwenang mencatat servis armada.' }
+    }
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId }
+    })
+
+    if (!vehicle) {
+      return { error: 'Kendaraan tidak ditemukan.' }
+    }
+
+    const scope = (process.env.NODE_ENV !== 'production' && data?.actor)
+      ? (data.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: data.actor.branchId! })
+      : await getStaffScope()
+    assertInScope([vehicle.branchId], scope)
+
+    const rawKm = data?.servicedAtKm
+    let servicedKm: number
+
+    if (rawKm !== undefined && rawKm !== null) {
+      if (isNaN(Number(rawKm)) || Number(rawKm) < 0) {
+        return { error: 'Kilometer servis harus berupa angka non-negatif.' }
+      }
+      servicedKm = Math.round(Number(rawKm))
+      if (vehicle.lastServiceOdometerKm != null && servicedKm < vehicle.lastServiceOdometerKm) {
+        return { error: `Kilometer servis (${servicedKm.toLocaleString('id-ID')} km) tidak boleh lebih kecil dari servis sebelumnya (${vehicle.lastServiceOdometerKm.toLocaleString('id-ID')} km).` }
+      }
+    } else {
+      servicedKm = vehicle.currentOdometerKm ?? vehicle.initialOdometerKm ?? 0
+    }
+
+    const nextCurrentKm = (vehicle.currentOdometerKm == null || servicedKm > vehicle.currentOdometerKm)
+      ? servicedKm
+      : vehicle.currentOdometerKm
+
+    await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        lastServiceOdometerKm: servicedKm,
+        currentOdometerKm: nextCurrentKm,
+      }
+    })
+
+    logAudit({
+      actorId: adminUser.id,
+      actorRole: adminUser.role,
+      branchId: vehicle.branchId,
+      action: 'vehicle.service_recorded',
+      entityType: 'Vehicle',
+      entityId: vehicle.id,
+      metadata: {
+        plateNumber: vehicle.plateNumber,
+        servicedAtKm: servicedKm,
+        previousLastServiceOdometerKm: vehicle.lastServiceOdometerKm,
+        updatedCurrentOdometerKm: nextCurrentKm,
+        note: data?.note?.trim() || null,
+      }
+    })
+
+    safeRevalidatePath('/admin/vehicles')
+    safeRevalidatePath('/admin/dashboard')
+
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message || 'Terjadi kesalahan sistem.' }
   }
 }

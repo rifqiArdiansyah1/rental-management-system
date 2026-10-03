@@ -17,6 +17,14 @@ import { syncCustomerVerificationStatus } from '@/lib/kyc'
 // Valid roles
 const VALID_ROLES = ['staff_cabang', 'admin_cabang', 'admin_pusat']
 
+function safeRevalidatePath(path: string) {
+  try {
+    revalidatePath(path)
+  } catch {
+    // Gracefully ignore when invoked outside Next.js request context (e.g. unit/e2e tests)
+  }
+}
+
 /**
  * Memastikan sesi admin valid dan mengembalikan data User dari DB
  * (untuk memastikan branchId akurat).
@@ -50,9 +58,15 @@ export async function requireAdminSession() {
   return user
 }
 
-export async function startRental(bookingId: string, options?: { odometerStart?: number }) {
+export async function startRental(bookingId: string, options?: { odometerStart?: number; actor?: { id: string; role: any; branchId?: string | null } }) {
   try {
-    const scope = await getStaffScope()
+    const adminUser = (process.env.NODE_ENV !== 'production' && options?.actor)
+      ? options.actor
+      : await requireAdminSession()
+
+    const scope = (process.env.NODE_ENV !== 'production' && options?.actor)
+      ? (options.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: options.actor.branchId! })
+      : await getStaffScope()
 
     // 1. Dapatkan informasi Booking beserta Customer-nya
     const booking = await prisma.booking.findUnique({
@@ -133,7 +147,9 @@ export async function startRental(bookingId: string, options?: { odometerStart?:
       }
     })
 
-    const adminUser = await requireAdminSession()
+    const currentVehicleKm = booking.vehicle?.currentOdometerKm != null ? Number(booking.vehicle.currentOdometerKm) : null
+    const isStartOdoAnomaly = odometerStart !== undefined && currentVehicleKm !== null && odometerStart < currentVehicleKm
+
     logAudit({
       actorId: adminUser.id,
       actorRole: adminUser.role,
@@ -145,14 +161,33 @@ export async function startRental(bookingId: string, options?: { odometerStart?:
         vehicleId: booking.vehicleId,
         driverId: booking.driverId,
         odometerStart: odometerStart ?? null,
+        currentVehicleOdometer: currentVehicleKm,
+        isOdometerAnomaly: isStartOdoAnomaly,
         startedAt: new Date().toISOString()
       }
     })
 
-    revalidatePath('/admin/bookings')
-    revalidatePath(`/admin/bookings/${bookingId}`)
-    revalidatePath('/admin/vehicles')
-    revalidatePath('/admin/dashboard')
+    if (isStartOdoAnomaly) {
+      logAudit({
+        actorId: adminUser.id,
+        actorRole: adminUser.role,
+        branchId: booking.pickupBranchId,
+        action: 'vehicle.odometer_start_anomaly',
+        entityType: 'Vehicle',
+        entityId: booking.vehicleId,
+        metadata: {
+          bookingId: booking.id,
+          odometerStart,
+          currentVehicleOdometer: currentVehicleKm,
+          message: 'KM awal yang diinput lebih rendah dari odometer unit terkini (kemungkinan salah ketik).'
+        }
+      })
+    }
+
+    safeRevalidatePath('/admin/bookings')
+    safeRevalidatePath(`/admin/bookings/${bookingId}`)
+    safeRevalidatePath('/admin/vehicles')
+    safeRevalidatePath('/admin/dashboard')
 
     // Non-blocking fire-and-forget notification (Email + WhatsApp)
     notifyRentalStarted({
@@ -193,6 +228,7 @@ export interface EndRentalOptions {
   waiveLateFee?: boolean
   paymentMethod?: 'cash_late_fee' | 'midtrans_late_fee'
   odometerEnd?: number
+  actor?: { id: string; role: any; branchId?: string | null }
 }
 
 interface LateFeeResolution {
@@ -295,7 +331,9 @@ function resolveOdometerTrip(
 
 export async function endRental(bookingId: string, options?: EndRentalOptions) {
   try {
-    const adminUser = await requireAdminSession()
+    const adminUser = (process.env.NODE_ENV !== 'production' && options?.actor)
+      ? options.actor
+      : await requireAdminSession()
 
     // Otorisasi Pembebasan Denda Berbasis Allowlist
     const ALLOWED_WAIVE_ROLES = ['admin_cabang', 'admin_pusat']
@@ -306,7 +344,9 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
       return { error: 'Catatan alasan wajib diisi saat membebaskan denda keterlambatan.' }
     }
 
-    const scope = await getStaffScope()
+    const scope = (process.env.NODE_ENV !== 'production' && options?.actor)
+      ? (options.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: options.actor.branchId! })
+      : await getStaffScope()
 
     // 1. Dapatkan informasi Booking beserta unit kendaraan
     const booking = await prisma.booking.findUnique({
@@ -377,6 +417,25 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
         }
       }
 
+      // Propagasi Odometer ke Vehicle (NON-BLOCKING Skip-and-Audit)
+      const currentVehicleOdo = booking.vehicle.currentOdometerKm != null ? Number(booking.vehicle.currentOdometerKm) : null
+      let shouldUpdateVehicleKm = false
+
+      if (odoRes.odometerEnd !== undefined) {
+        if (currentVehicleOdo == null || odoRes.odometerEnd >= currentVehicleOdo) {
+          shouldUpdateVehicleKm = true
+        }
+      }
+
+      if (shouldUpdateVehicleKm && odoRes.odometerEnd !== undefined) {
+        await tx.vehicle.update({
+          where: { id: booking.vehicleId },
+          data: {
+            currentOdometerKm: odoRes.odometerEnd,
+          }
+        })
+      }
+
       // Buat pencatatan Payment denda jika ada denda yang wajib dibayar
       if (lateFeeRes.finalLateFeeAmount > 0 && !lateFeeRes.isWaived) {
         const paymentMethod = options?.paymentMethod === 'midtrans_late_fee' ? 'midtrans_late_fee' : 'cash_late_fee'
@@ -396,6 +455,9 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
       }
     })
 
+    const currentVehicleOdo = booking.vehicle.currentOdometerKm != null ? Number(booking.vehicle.currentOdometerKm) : null
+    const isVehicleOdoRollback = odoRes.odometerEnd !== undefined && currentVehicleOdo !== null && odoRes.odometerEnd < currentVehicleOdo
+
     logAudit({
       actorId: adminUser.id,
       actorRole: adminUser.role,
@@ -413,16 +475,36 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
         lateFeeNote: lateFeeRes.lateFeeNote,
         odometerStart: booking.odometerStart ?? null,
         odometerEnd: odoRes.odometerEnd ?? null,
+        currentVehicleOdometer: currentVehicleOdo,
+        vehicleOdometerUpdated: !isVehicleOdoRollback && odoRes.odometerEnd !== undefined,
+        isVehicleOdometerRollback: isVehicleOdoRollback,
         odometerAnomaly: odoRes.isAnomaly ? odoRes.anomalyReason : null,
         paymentMethod: lateFeeRes.finalLateFeeAmount > 0 && !lateFeeRes.isWaived ? (options?.paymentMethod || 'cash_late_fee') : null,
       }
     })
 
-    revalidatePath('/admin/bookings')
-    revalidatePath(`/admin/bookings/${bookingId}`)
-    revalidatePath('/admin/vehicles')
-    revalidatePath('/admin/dashboard')
-    revalidatePath('/dashboard')
+    if (isVehicleOdoRollback) {
+      logAudit({
+        actorId: adminUser.id,
+        actorRole: adminUser.role,
+        branchId: booking.returnBranchId ?? booking.pickupBranchId,
+        action: 'vehicle.odometer_anomaly',
+        entityType: 'Vehicle',
+        entityId: booking.vehicleId,
+        metadata: {
+          bookingId: booking.id,
+          odometerEnd: odoRes.odometerEnd,
+          currentVehicleOdometer: currentVehicleOdo,
+          message: 'KM akhir sewa lebih kecil dari odometer unit terkini. Nilai odometer armada tidak diturunkan (skip-and-audit).'
+        }
+      })
+    }
+
+    safeRevalidatePath('/admin/bookings')
+    safeRevalidatePath(`/admin/bookings/${bookingId}`)
+    safeRevalidatePath('/admin/vehicles')
+    safeRevalidatePath('/admin/dashboard')
+    safeRevalidatePath('/dashboard')
 
     // Non-blocking fire-and-forget notification (Email + WhatsApp)
     const bookingLocale = (booking.locale as any) || 'id'

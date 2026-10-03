@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle, updateVehicleUnavailabilityEstimate, relocateVehicle } from '@/actions/adminVehicle'
+import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle, updateVehicleUnavailabilityEstimate, relocateVehicle, recordVehicleServiceAction } from '@/actions/adminVehicle'
 import { uploadVehiclePhoto } from '@/actions/vehiclePhoto'
 import { VehicleStatus, FuelType } from '@prisma/client'
 import { MIN_VEHICLE_DAILY_RATE, FUEL_TYPE_LABELS } from '@/lib/constants'
@@ -249,6 +249,9 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
     photos: [] as string[],
     fuelType: 'pertalite' as FuelType,
     fuelEfficiencyKmL: '',
+    initialOdometerKm: '',
+    lastServiceOdometerKm: '',
+    serviceIntervalKm: '10000',
   })
 
   const availableBranches = userRole === 'admin_pusat'
@@ -265,6 +268,9 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
       photos: [],
       fuelType: 'pertalite' as FuelType,
       fuelEfficiencyKmL: '',
+      initialOdometerKm: '',
+      lastServiceOdometerKm: '',
+      serviceIntervalKm: '10000',
     })
     setError(null)
     setIsOpen(true)
@@ -295,6 +301,9 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
         photos: form.photos,
         fuelType: form.fuelType,
         fuelEfficiencyKmL: form.fuelEfficiencyKmL ? Number(form.fuelEfficiencyKmL) : null,
+        initialOdometerKm: form.initialOdometerKm ? Number(form.initialOdometerKm) : null,
+        lastServiceOdometerKm: form.lastServiceOdometerKm ? Number(form.lastServiceOdometerKm) : null,
+        serviceIntervalKm: form.serviceIntervalKm ? Number(form.serviceIntervalKm) : 10000,
       })
       if (res.error) setError(res.error)
       else {
@@ -308,6 +317,9 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
           photos: [],
           fuelType: 'pertalite' as FuelType,
           fuelEfficiencyKmL: '',
+          initialOdometerKm: '',
+          lastServiceOdometerKm: '',
+          serviceIntervalKm: '10000',
         })
         router.refresh()
       }
@@ -437,6 +449,50 @@ export function CreateVehicleButton({ branches, categories, userRole, userBranch
                 </div>
               </div>
 
+              {/* Odometer & Servis Berkala */}
+              <div className="pt-3 border-t border-zinc-100">
+                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Odometer & Servis Berkala</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">Odometer Awal (km)</label>
+                    <input 
+                      type="number"
+                      min="0"
+                      placeholder="Misal: 45000 (opsional)"
+                      value={form.initialOdometerKm}
+                      onChange={e => setForm({...form, initialOdometerKm: e.target.value})}
+                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-[11px] text-zinc-500 mt-1">KM fisik saat unit masuk armada</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">KM Servis Terakhir (km)</label>
+                    <input 
+                      type="number"
+                      min="0"
+                      placeholder="Misal: 40000 (opsional)"
+                      value={form.lastServiceOdometerKm}
+                      onChange={e => setForm({...form, lastServiceOdometerKm: e.target.value})}
+                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-[11px] text-zinc-500 mt-1">Kosongkan jika sama dengan KM awal</p>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Interval Servis Berkala (km)</label>
+                  <input 
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    placeholder="10000"
+                    value={form.serviceIntervalKm}
+                    onChange={e => setForm({...form, serviceIntervalKm: e.target.value})}
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-[11px] text-zinc-500 mt-1">Standar bengkel: 10.000 km per servis</p>
+                </div>
+              </div>
+
               {/* Photo Manager */}
               <div className="pt-2 border-t border-zinc-100">
                 <PhotoManager 
@@ -483,7 +539,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
   const [menuOpen, setMenuOpen] = useState(false)
   const [openUpward, setOpenUpward] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
-  const [modalType, setModalType] = useState<'edit' | 'status' | 'delete' | 'estimate' | 'relocate' | null>(null)
+  const [modalType, setModalType] = useState<'edit' | 'status' | 'delete' | 'estimate' | 'relocate' | 'service' | null>(null)
   
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -505,6 +561,10 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
   const [estimateNote, setEstimateNote] = useState<string>('')
   const [estimateConflictWarning, setEstimateConflictWarning] = useState<boolean>(false)
   const [estimateConflictingBookings, setEstimateConflictingBookings] = useState<any[]>([])
+
+  // Service Modal states
+  const [serviceKm, setServiceKm] = useState<string>('')
+  const [serviceNote, setServiceNote] = useState<string>('')
   
   const [form, setForm] = useState({
     name: vehicle.name || '',
@@ -515,6 +575,10 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
     photos: (vehicle.photos || []) as string[],
     fuelType: (vehicle.fuelType || 'pertalite') as FuelType,
     fuelEfficiencyKmL: vehicle.fuelEfficiencyKmL ? vehicle.fuelEfficiencyKmL.toString() : '',
+    initialOdometerKm: vehicle.initialOdometerKm != null ? String(vehicle.initialOdometerKm) : '',
+    currentOdometerKm: vehicle.currentOdometerKm != null ? String(vehicle.currentOdometerKm) : '',
+    lastServiceOdometerKm: vehicle.lastServiceOdometerKm != null ? String(vehicle.lastServiceOdometerKm) : '',
+    serviceIntervalKm: vehicle.serviceIntervalKm != null ? String(vehicle.serviceIntervalKm) : '10000',
   })
 
   useEffect(() => {
@@ -528,8 +592,26 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
       photos: (vehicle.photos || []) as string[],
       fuelType: (vehicle.fuelType || 'pertalite') as FuelType,
       fuelEfficiencyKmL: vehicle.fuelEfficiencyKmL ? vehicle.fuelEfficiencyKmL.toString() : '',
+      initialOdometerKm: vehicle.initialOdometerKm != null ? String(vehicle.initialOdometerKm) : '',
+      currentOdometerKm: vehicle.currentOdometerKm != null ? String(vehicle.currentOdometerKm) : '',
+      lastServiceOdometerKm: vehicle.lastServiceOdometerKm != null ? String(vehicle.lastServiceOdometerKm) : '',
+      serviceIntervalKm: vehicle.serviceIntervalKm != null ? String(vehicle.serviceIntervalKm) : '10000',
     })
-  }, [vehicle.status, vehicle.name, vehicle.plateNumber, vehicle.categoryId, vehicle.branchId, vehicle.dailyRate, vehicle.photos, vehicle.fuelType, vehicle.fuelEfficiencyKmL])
+  }, [
+    vehicle.status,
+    vehicle.name,
+    vehicle.plateNumber,
+    vehicle.categoryId,
+    vehicle.branchId,
+    vehicle.dailyRate,
+    vehicle.photos,
+    vehicle.fuelType,
+    vehicle.fuelEfficiencyKmL,
+    vehicle.initialOdometerKm,
+    vehicle.currentOdometerKm,
+    vehicle.lastServiceOdometerKm,
+    vehicle.serviceIntervalKm
+  ])
 
   const canEditOrDelete = userRole !== 'staff_cabang'
 
@@ -643,6 +725,29 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
     })
   }
 
+  const handleOpenServiceModal = () => {
+    setMenuOpen(false)
+    setServiceKm(vehicle.currentOdometerKm != null ? String(vehicle.currentOdometerKm) : '')
+    setServiceNote('')
+    setError(null)
+    setModalType('service')
+  }
+
+  const handleRecordService = () => {
+    startTransition(async () => {
+      setError(null)
+      const res = await recordVehicleServiceAction(vehicle.id, {
+        servicedAtKm: serviceKm ? Number(serviceKm) : undefined,
+        note: serviceNote.trim() || undefined
+      })
+      if (res.error) setError(res.error)
+      else {
+        setModalType(null)
+        router.refresh()
+      }
+    })
+  }
+
   const handleEdit = () => {
     startTransition(async () => {
       setError(null)
@@ -659,6 +764,10 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
         photos: form.photos,
         fuelType: form.fuelType,
         fuelEfficiencyKmL: form.fuelEfficiencyKmL ? Number(form.fuelEfficiencyKmL) : null,
+        initialOdometerKm: form.initialOdometerKm ? Number(form.initialOdometerKm) : null,
+        currentOdometerKm: form.currentOdometerKm ? Number(form.currentOdometerKm) : null,
+        lastServiceOdometerKm: form.lastServiceOdometerKm ? Number(form.lastServiceOdometerKm) : null,
+        serviceIntervalKm: form.serviceIntervalKm ? Number(form.serviceIntervalKm) : 10000,
       })
       if (res.error) setError(res.error)
       else {
@@ -738,6 +847,18 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
               >
                 <span>Estimasi Maintenance</span>
                 <span className="text-[10px] bg-amber-100 px-1.5 py-0.5 rounded font-medium">Update</span>
+              </button>
+            )}
+
+            {canEditOrDelete && vehicle.isActive && (
+              <button 
+                onClick={handleOpenServiceModal}
+                className="w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-50 flex items-center justify-between"
+              >
+                <span>Catat Servis Berkala</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-medium">
+                  Bengkel
+                </span>
               </button>
             )}
 
@@ -1010,6 +1131,78 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
         </div>
       )}
 
+      {/* Modal: Catat Servis Berkala */}
+      {modalType === 'service' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-xl max-w-md w-full shadow-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-zinc-900 mb-1">Catat Servis Berkala</h3>
+            <p className="text-xs text-zinc-500 mb-4">
+              Armada: <strong>{getVehicleDisplayName(vehicle, { mode: 'staff' })}</strong> ({vehicle.plateNumber})
+            </p>
+
+            <div className="space-y-4">
+              <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-xs space-y-1">
+                <div className="flex justify-between text-zinc-600">
+                  <span>Odometer Unit Saat Ini:</span>
+                  <span className="font-semibold text-zinc-900">{vehicle.currentOdometerKm != null ? `${Number(vehicle.currentOdometerKm).toLocaleString('id-ID')} km` : 'Belum Ada Data'}</span>
+                </div>
+                <div className="flex justify-between text-zinc-600">
+                  <span>Servis Terakhir:</span>
+                  <span className="font-semibold text-zinc-900">{vehicle.lastServiceOdometerKm != null ? `${Number(vehicle.lastServiceOdometerKm).toLocaleString('id-ID')} km` : '-'}</span>
+                </div>
+                <div className="flex justify-between text-zinc-600">
+                  <span>Interval Servis:</span>
+                  <span className="font-semibold text-zinc-900">{Number(vehicle.serviceIntervalKm || 10000).toLocaleString('id-ID')} km</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Kilometer Servis Selesai (km) *</label>
+                <input 
+                  type="number"
+                  min="0"
+                  value={serviceKm}
+                  onChange={e => setServiceKm(e.target.value)}
+                  placeholder="Misal: 50000"
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <p className="text-[11px] text-zinc-500 mt-1">KM tercatat di kwitansi bengkel / speedometer fisik</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Catatan Servis / Bengkel</label>
+                <textarea 
+                  rows={2}
+                  value={serviceNote}
+                  onChange={e => setServiceNote(e.target.value)}
+                  placeholder="Misal: Ganti oli mesin 5W-30, filter oli & kampas rem (Bengkel Resmi)"
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+
+            {error && <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded-md">{error}</div>}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button 
+                onClick={() => setModalType(null)}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 rounded-md"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleRecordService}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-md disabled:opacity-50"
+              >
+                {isPending ? 'Menyimpan...' : 'Simpan Servis Selesai'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalType === 'edit' && canEditOrDelete && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white p-6 rounded-xl max-w-lg w-full shadow-lg max-h-[90vh] overflow-y-auto">
@@ -1107,6 +1300,56 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                     className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="text-[11px] text-zinc-500 mt-1">Estimasi jarak tempuh per liter</p>
+                </div>
+              </div>
+
+              {/* Odometer & Servis Berkala */}
+              <div className="pt-3 border-t border-zinc-100">
+                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Odometer & Servis Berkala</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">
+                      Odometer Saat Ini (km)
+                      {userRole === 'admin_pusat' && <span className="text-[10px] text-purple-600 ml-1 font-bold">(Pusat)</span>}
+                    </label>
+                    <input 
+                      type="number"
+                      min="0"
+                      disabled={userRole !== 'admin_pusat'}
+                      value={form.currentOdometerKm}
+                      onChange={e => setForm({...form, currentOdometerKm: e.target.value})}
+                      placeholder="Misal: 52000"
+                      className={`w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${userRole !== 'admin_pusat' ? 'bg-zinc-100 cursor-not-allowed text-zinc-500' : ''}`}
+                    />
+                    <p className="text-[11px] text-zinc-500 mt-1">
+                      {userRole === 'admin_pusat' ? 'Koreksi darurat. Tidak boleh < riwayat sewa.' : 'Hanya Admin Pusat yang dapat mengoreksi.'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">KM Servis Terakhir (km)</label>
+                    <input 
+                      type="number"
+                      min="0"
+                      value={form.lastServiceOdometerKm}
+                      onChange={e => setForm({...form, lastServiceOdometerKm: e.target.value})}
+                      placeholder="Misal: 48000"
+                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-[11px] text-zinc-500 mt-1">Acuan perhitungan jadwal servis</p>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Interval Servis Berkala (km)</label>
+                  <input 
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    value={form.serviceIntervalKm}
+                    onChange={e => setForm({...form, serviceIntervalKm: e.target.value})}
+                    placeholder="10000"
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-[11px] text-zinc-500 mt-1">Standar bengkel: 10.000 km per servis</p>
                 </div>
               </div>
 
