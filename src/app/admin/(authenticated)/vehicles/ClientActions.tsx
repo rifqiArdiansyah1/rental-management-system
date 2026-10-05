@@ -766,7 +766,6 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
         fuelEfficiencyKmL: form.fuelEfficiencyKmL ? Number(form.fuelEfficiencyKmL) : null,
         initialOdometerKm: form.initialOdometerKm ? Number(form.initialOdometerKm) : null,
         currentOdometerKm: form.currentOdometerKm ? Number(form.currentOdometerKm) : null,
-        lastServiceOdometerKm: form.lastServiceOdometerKm ? Number(form.lastServiceOdometerKm) : null,
         serviceIntervalKm: form.serviceIntervalKm ? Number(form.serviceIntervalKm) : 10000,
       })
       if (res.error) setError(res.error)
@@ -850,7 +849,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
               </button>
             )}
 
-            {canEditOrDelete && vehicle.isActive && (
+            {vehicle.isActive && (
               <button 
                 onClick={handleOpenServiceModal}
                 className="w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-50 flex items-center justify-between"
@@ -1326,16 +1325,12 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">KM Servis Terakhir (km)</label>
-                    <input 
-                      type="number"
-                      min="0"
-                      value={form.lastServiceOdometerKm}
-                      onChange={e => setForm({...form, lastServiceOdometerKm: e.target.value})}
-                      placeholder="Misal: 48000"
-                      className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <p className="text-[11px] text-zinc-500 mt-1">Acuan perhitungan jadwal servis</p>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">KM Servis Terakhir</label>
+                    <div className="w-full text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-md p-2 text-sm font-mono flex items-center justify-between">
+                      <span>{vehicle.lastServiceOdometerKm != null ? `${Number(vehicle.lastServiceOdometerKm).toLocaleString('id-ID')} km` : 'Belum Ada Data'}</span>
+                      <span className="text-[10px] text-zinc-500 font-sans">Aksi Khusus</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-1">Dicatat otomatis lewat menu &quot;Catat Servis Berkala&quot;.</p>
                   </div>
                 </div>
                 <div className="mt-3">

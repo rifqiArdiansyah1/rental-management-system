@@ -37,9 +37,11 @@ test.describe('Pelacakan Odometer Armada & Preventive Maintenance (Non-Blocking 
   let customerId = ''
   let adminPusatId = ''
   let adminCabangId = ''
+  let staffCabangId = ''
 
   const pusatActor = () => ({ id: adminPusatId, role: 'admin_pusat' as UserRole, branchId: null })
   const cabangActor = (bId: string) => ({ id: adminCabangId, role: 'admin_cabang' as UserRole, branchId: bId })
+  const staffActor = (bId: string) => ({ id: staffCabangId, role: 'staff_cabang' as UserRole, branchId: bId })
 
   test.beforeAll(async () => {
     // 1. Create Branches
@@ -102,6 +104,18 @@ test.describe('Pelacakan Odometer Armada & Preventive Maintenance (Non-Blocking 
     })
     adminCabangId = adminCabang.id
 
+    const staffCabang = await prisma.user.create({
+      data: {
+        id: `staff_${testPrefix.toLowerCase()}`,
+        name: `Staff Cabang ${testPrefix}`,
+        email: `staff_${testPrefix.toLowerCase()}@test.com`,
+        role: 'staff_cabang',
+        isActive: true,
+        branchId: branchAId,
+      }
+    })
+    staffCabangId = staffCabang.id
+
     // 4. Create Verified Customer
     const customer = await prisma.customer.create({
       data: {
@@ -118,13 +132,13 @@ test.describe('Pelacakan Odometer Armada & Preventive Maintenance (Non-Blocking 
   test.afterAll(async () => {
     // Cleanup
     await prisma.incidentReport.deleteMany({ where: { customerId } })
-    await prisma.auditLog.deleteMany({ where: { actorId: { in: [adminPusatId, adminCabangId] } } })
+    await prisma.auditLog.deleteMany({ where: { actorId: { in: [adminPusatId, adminCabangId, staffCabangId] } } })
     await prisma.payment.deleteMany({ where: { booking: { customerId } } })
     await prisma.booking.deleteMany({ where: { customerId } })
     await prisma.vehicleUnavailability.deleteMany({ where: { vehicle: { branchId: { in: [branchAId, branchBId] } } } })
     await prisma.vehicle.deleteMany({ where: { branchId: { in: [branchAId, branchBId] } } })
     await prisma.vehicleCategory.deleteMany({ where: { id: categoryId } })
-    await prisma.user.deleteMany({ where: { id: { in: [adminPusatId, adminCabangId] } } })
+    await prisma.user.deleteMany({ where: { id: { in: [adminPusatId, adminCabangId, staffCabangId] } } })
     await prisma.customer.deleteMany({ where: { id: customerId } })
     await prisma.branch.deleteMany({ where: { id: { in: [branchAId, branchBId] } } })
     await pool.end()
@@ -209,7 +223,7 @@ test.describe('Pelacakan Odometer Armada & Preventive Maintenance (Non-Blocking 
     expect(updatedVehicle?.status).toBe('rented')
     expect(updatedVehicle?.currentOdometerKm).toBe(25000)
 
-    // Audit log mencatat anomali start
+    // Audit log mencatat anomali start secara simetris dengan endRental
     const anomalyLog = await prisma.auditLog.findFirst({
       where: {
         entityId: vehicle!.id,
@@ -217,6 +231,8 @@ test.describe('Pelacakan Odometer Armada & Preventive Maintenance (Non-Blocking 
       }
     })
     expect(anomalyLog).toBeDefined()
+    expect((anomalyLog?.metadata as any)?.odometerStart).toBe(24500)
+    expect((anomalyLog?.metadata as any)?.currentVehicleOdometer).toBe(25000)
   })
 
   test('3. Non-blocking endRental: input odometer mundur tetap menyelesaikan sewa (skip update & audit)', async () => {
@@ -326,11 +342,19 @@ test.describe('Pelacakan Odometer Armada & Preventive Maintenance (Non-Blocking 
     expect(overdueStatus.kmUntilNextService).toBe(-500)
     expect(overdueStatus.label).toContain('Lewat 500 km')
 
-    // Catat servis berkala selesai di bengkel pada KM 30.500
+    // A. Percobaan catat servis oleh staf cabang lain (out of scope) -> Ditolak
+    const outOfScopeRes = await recordVehicleServiceAction(vehicle!.id, {
+      servicedAtKm: 30500,
+      note: 'Staf cabang lain mencoba catat servis',
+      actor: staffActor(branchBId),
+    })
+    expect(outOfScopeRes.error).toBeDefined()
+
+    // B. Catat servis berkala selesai oleh staff_cabang armada (in scope) -> SUKSES
     const serviceRes = await recordVehicleServiceAction(vehicle!.id, {
       servicedAtKm: 30500,
       note: 'Ganti oli mesin & filter oli selesai di bengkel resmi',
-      actor: cabangActor(branchAId),
+      actor: staffActor(branchAId),
     })
     expect(serviceRes.success).toBe(true)
 
@@ -414,5 +438,6 @@ test.describe('Pelacakan Odometer Armada & Preventive Maintenance (Non-Blocking 
 
     const finalVehicle = await prisma.vehicle.findUnique({ where: { id: activeVehicle!.id } })
     expect(finalVehicle?.currentOdometerKm).toBe(31000)
+    expect(finalVehicle?.lastServiceOdometerKm).toBe(30500) // Nilai servis terlindungi & tidak terpengaruh updateVehicle
   })
 })

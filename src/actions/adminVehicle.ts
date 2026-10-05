@@ -174,7 +174,6 @@ export async function updateVehicle(id: string, data: {
   fuelEfficiencyKmL?: number | null
   initialOdometerKm?: number | null
   currentOdometerKm?: number | null
-  lastServiceOdometerKm?: number | null
   serviceIntervalKm?: number | null
   actor?: { id: string; role: UserRole; branchId?: string | null }
 }) {
@@ -289,13 +288,8 @@ export async function updateVehicle(id: string, data: {
       }
     }
 
-    if (data.lastServiceOdometerKm !== undefined && data.lastServiceOdometerKm !== null) {
-      if (isNaN(Number(data.lastServiceOdometerKm)) || Number(data.lastServiceOdometerKm) < 0) {
-        return { error: 'Odometer servis terakhir harus berupa angka non-negatif.' }
-      }
-    }
-
-    // Note: status is strictly omitted from data update to prevent status bypass
+    // Note: status is strictly omitted from data update to prevent status bypass.
+    // Note: lastServiceOdometerKm is strictly omitted from data update to prevent service reset bypass.
     await prisma.vehicle.update({
       where: { id },
       data: {
@@ -313,9 +307,6 @@ export async function updateVehicle(id: string, data: {
         currentOdometerKm: data.currentOdometerKm !== undefined
           ? (data.currentOdometerKm != null ? Math.round(Number(data.currentOdometerKm)) : null)
           : existingVehicle.currentOdometerKm,
-        lastServiceOdometerKm: data.lastServiceOdometerKm !== undefined
-          ? (data.lastServiceOdometerKm != null ? Math.round(Number(data.lastServiceOdometerKm)) : null)
-          : existingVehicle.lastServiceOdometerKm,
         serviceIntervalKm: data.serviceIntervalKm !== undefined && data.serviceIntervalKm !== null
           ? Math.round(Number(data.serviceIntervalKm))
           : existingVehicle.serviceIntervalKm,
@@ -353,7 +344,7 @@ export async function updateVehicle(id: string, data: {
           fuelEfficiencyKmL: data.fuelEfficiencyKmL ? Number(data.fuelEfficiencyKmL) : (data.fuelEfficiencyKmL === null ? null : (existingVehicle.fuelEfficiencyKmL ? Number(existingVehicle.fuelEfficiencyKmL) : null)),
           initialOdometerKm: data.initialOdometerKm !== undefined ? (data.initialOdometerKm != null ? Math.round(Number(data.initialOdometerKm)) : null) : existingVehicle.initialOdometerKm,
           currentOdometerKm: data.currentOdometerKm !== undefined ? (data.currentOdometerKm != null ? Math.round(Number(data.currentOdometerKm)) : null) : existingVehicle.currentOdometerKm,
-          lastServiceOdometerKm: data.lastServiceOdometerKm !== undefined ? (data.lastServiceOdometerKm != null ? Math.round(Number(data.lastServiceOdometerKm)) : null) : existingVehicle.lastServiceOdometerKm,
+          lastServiceOdometerKm: existingVehicle.lastServiceOdometerKm,
           serviceIntervalKm: data.serviceIntervalKm !== undefined && data.serviceIntervalKm !== null ? Math.round(Number(data.serviceIntervalKm)) : existingVehicle.serviceIntervalKm,
         }
       }
@@ -1013,62 +1004,70 @@ export async function recordVehicleServiceAction(
       ? data.actor
       : await requireAdminSession()
 
-    if (adminUser.role === 'staff_cabang') {
-      return { error: 'Akses ditolak: Staf cabang tidak berwenang mencatat servis armada.' }
-    }
-
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id: vehicleId }
-    })
-
-    if (!vehicle) {
-      return { error: 'Kendaraan tidak ditemukan.' }
-    }
-
     const scope = (process.env.NODE_ENV !== 'production' && data?.actor)
       ? (data.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: data.actor.branchId! })
       : await getStaffScope()
-    assertInScope([vehicle.branchId], scope)
 
-    const rawKm = data?.servicedAtKm
-    let servicedKm: number
+    const result = await prisma.$transaction(async (tx) => {
+      // Defense-in-depth: explicit row lock on Vehicle to prevent race conditions with concurrent endRental / status change
+      await tx.$queryRawUnsafe('SELECT id FROM "Vehicle" WHERE id = $1 FOR UPDATE', vehicleId)
 
-    if (rawKm !== undefined && rawKm !== null) {
-      if (isNaN(Number(rawKm)) || Number(rawKm) < 0) {
-        return { error: 'Kilometer servis harus berupa angka non-negatif.' }
+      const vehicle = await tx.vehicle.findUnique({
+        where: { id: vehicleId }
+      })
+
+      if (!vehicle) {
+        throw new Error('Kendaraan tidak ditemukan.')
       }
-      servicedKm = Math.round(Number(rawKm))
-      if (vehicle.lastServiceOdometerKm != null && servicedKm < vehicle.lastServiceOdometerKm) {
-        return { error: `Kilometer servis (${servicedKm.toLocaleString('id-ID')} km) tidak boleh lebih kecil dari servis sebelumnya (${vehicle.lastServiceOdometerKm.toLocaleString('id-ID')} km).` }
-      }
-    } else {
-      servicedKm = vehicle.currentOdometerKm ?? vehicle.initialOdometerKm ?? 0
-    }
 
-    const nextCurrentKm = (vehicle.currentOdometerKm == null || servicedKm > vehicle.currentOdometerKm)
-      ? servicedKm
-      : vehicle.currentOdometerKm
-
-    await prisma.vehicle.update({
-      where: { id: vehicleId },
-      data: {
-        lastServiceOdometerKm: servicedKm,
-        currentOdometerKm: nextCurrentKm,
+      if (!vehicle.isActive) {
+        throw new Error('Kendaraan nonaktif tidak dapat dicatat servisnya.')
       }
+
+      assertInScope([vehicle.branchId], scope)
+
+      const rawKm = data?.servicedAtKm
+      let servicedKm: number
+
+      if (rawKm !== undefined && rawKm !== null) {
+        if (isNaN(Number(rawKm)) || Number(rawKm) < 0) {
+          throw new Error('Kilometer servis harus berupa angka non-negatif.')
+        }
+        servicedKm = Math.round(Number(rawKm))
+        if (vehicle.lastServiceOdometerKm != null && servicedKm < vehicle.lastServiceOdometerKm) {
+          throw new Error(`Kilometer servis (${servicedKm.toLocaleString('id-ID')} km) tidak boleh lebih kecil dari servis sebelumnya (${vehicle.lastServiceOdometerKm.toLocaleString('id-ID')} km).`)
+        }
+      } else {
+        servicedKm = vehicle.currentOdometerKm ?? vehicle.initialOdometerKm ?? 0
+      }
+
+      const nextCurrentKm = (vehicle.currentOdometerKm == null || servicedKm > vehicle.currentOdometerKm)
+        ? servicedKm
+        : vehicle.currentOdometerKm
+
+      await tx.vehicle.update({
+        where: { id: vehicleId },
+        data: {
+          lastServiceOdometerKm: servicedKm,
+          currentOdometerKm: nextCurrentKm,
+        }
+      })
+
+      return { vehicle, servicedKm, nextCurrentKm }
     })
 
     logAudit({
       actorId: adminUser.id,
       actorRole: adminUser.role,
-      branchId: vehicle.branchId,
+      branchId: result.vehicle.branchId,
       action: 'vehicle.service_recorded',
       entityType: 'Vehicle',
-      entityId: vehicle.id,
+      entityId: result.vehicle.id,
       metadata: {
-        plateNumber: vehicle.plateNumber,
-        servicedAtKm: servicedKm,
-        previousLastServiceOdometerKm: vehicle.lastServiceOdometerKm,
-        updatedCurrentOdometerKm: nextCurrentKm,
+        plateNumber: result.vehicle.plateNumber,
+        servicedAtKm: result.servicedKm,
+        previousLastServiceOdometerKm: result.vehicle.lastServiceOdometerKm,
+        updatedCurrentOdometerKm: result.nextCurrentKm,
         note: data?.note?.trim() || null,
       }
     })

@@ -375,7 +375,17 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
     const odoRes = resolveOdometerTrip(booking, options)
 
     // 3. Eksekusi Atomik Database Transaction
+    let lockedVehicleOdo: number | null = null
     await prisma.$transaction(async (tx) => {
+      // Defense-in-depth: explicit row lock on Vehicle to prevent race conditions with concurrent service records / status updates
+      await tx.$queryRawUnsafe('SELECT id FROM "Vehicle" WHERE id = $1 FOR UPDATE', booking.vehicleId)
+
+      const lockedVehicle = await tx.vehicle.findUnique({
+        where: { id: booking.vehicleId },
+        select: { id: true, currentOdometerKm: true }
+      })
+      lockedVehicleOdo = lockedVehicle?.currentOdometerKm != null ? Number(lockedVehicle.currentOdometerKm) : null
+
       // Ubah status Booking (Guard: pastikan masih 'ongoing')
       const bookingUpdate = await tx.booking.updateMany({
         where: { id: bookingId, status: 'ongoing' },
@@ -418,7 +428,9 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
       }
 
       // Propagasi Odometer ke Vehicle (NON-BLOCKING Skip-and-Audit)
-      const currentVehicleOdo = booking.vehicle.currentOdometerKm != null ? Number(booking.vehicle.currentOdometerKm) : null
+      const currentVehicleOdo = lockedVehicleOdo != null
+        ? lockedVehicleOdo
+        : (booking.vehicle.currentOdometerKm != null ? Number(booking.vehicle.currentOdometerKm) : null)
       let shouldUpdateVehicleKm = false
 
       if (odoRes.odometerEnd !== undefined) {
@@ -455,7 +467,9 @@ export async function endRental(bookingId: string, options?: EndRentalOptions) {
       }
     })
 
-    const currentVehicleOdo = booking.vehicle.currentOdometerKm != null ? Number(booking.vehicle.currentOdometerKm) : null
+    const currentVehicleOdo = lockedVehicleOdo != null
+      ? lockedVehicleOdo
+      : (booking.vehicle.currentOdometerKm != null ? Number(booking.vehicle.currentOdometerKm) : null)
     const isVehicleOdoRollback = odoRes.odometerEnd !== undefined && currentVehicleOdo !== null && odoRes.odometerEnd < currentVehicleOdo
 
     logAudit({
