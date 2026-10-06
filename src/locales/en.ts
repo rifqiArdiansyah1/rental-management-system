@@ -281,4 +281,191 @@ export const en: Dictionary = {
     closeBtn: 'Close',
     rentalPeriod: 'Rental Period',
   },
+  guide: {
+    breadcrumb: 'Rental Guide',
+    kicker: 'Customer Itinerary Guide',
+    title: 'Complete Executive Car Rental Guide',
+    subtitle:
+      'Step-by-step guidance from vehicle curation, mandatory dual-credential KYC verification, to seamless vehicle return.',
+    quickBadges: {
+      gracePeriod: 'Return Grace Period',
+      kycMandate: 'ID & Driver License Mandatory',
+      bufferSanitization: '3-Hour Sanitization Buffer',
+      operatingHours: 'Branch Operating Hours',
+    },
+    stepperTitle: '7-Step Executive Rental Journey',
+    stepperSubtitle:
+      'Detailed procedures ensuring a smooth handover, verified compliance, and uninterrupted travel comfort.',
+    steps: {
+      step1: {
+        number: '01',
+        title: 'Browse & Select Vehicle',
+        desc: 'Explore our executive fleet collection filtered by strategic branch locations and vehicle categories to match your travel profile.',
+        selfDriveTitle: 'Self-Drive (Autonomous)',
+        selfDriveDesc: 'Full driving freedom. Requires the designated driver to hold an active valid driver license.',
+        withDriverTitle: 'With Executive Chauffeur',
+        withDriverDesc:
+          'A certified professional chauffeur is assigned automatically by branch operations post-confirmation. You do not need to book or search for a driver separately.',
+      },
+      step2: {
+        number: '02',
+        title: 'Schedule & Real-Time Availability',
+        desc: 'Select pickup and return timestamps within official branch operating hours (08:00 – 21:00 WIB).',
+        bufferNotice:
+          'Why are certain time slots unavailable? The platform automatically enforces a 3-hour sanitization and technical inspection buffer between rentals for ultimate safety and pristine cabin cleanliness.',
+        rateTransparency:
+          'Transparent daily rates starting from the official minimum baseline, with automatic chauffeur fee calculation, and zero hidden surcharges.',
+      },
+      step3: {
+        number: '03',
+        title: 'Instant Secure Payment via Midtrans',
+        desc: 'Complete reservations seamlessly via instant QRIS (GoPay, OVO, ShopeePay, BCA QRIS), national bank Virtual Accounts, or 3D Secure Credit Cards.',
+        expiryNotice:
+          'Payment window is 60 minutes from checkout. Expired reservations are automatically released back to the fleet catalog.',
+      },
+      step4: {
+        number: '04',
+        title: 'Complete Identity Verification (KYC)',
+        kycAlertTitle: 'Important: Both National ID and Driver License are Mandatory for All Rentals',
+        kycAlertDesc:
+          'Whether booking Self-Drive or With Chauffeur, clients must upload clear photos of both their original National ID (KTP/Passport) and valid Driver License prior to handover.',
+        whyBothTitle: 'Why is a Driver License required even when hiring a Chauffeur?',
+        whyBothDesc:
+          'Commercial luxury fleet insurance underwriters and legal compliance mandate verified dual-credential identification of the responsible contracting party. This safeguards against identity fraud and validates full insurance claim coverage.',
+        photoTips:
+          'Document photo tips: Ensure original documents are sharply legible, uncropped at the corners, and free from camera glare.',
+      },
+      step5: {
+        number: '05',
+        title: 'Vehicle Handover at Branch',
+        desc: 'Visit your chosen branch location at your scheduled pickup time during branch operating hours (08:00 – 21:00 WIB).',
+        physicalCheck:
+          'Present physical original credentials for visual matching. Our team will guide a joint 21-point checklist recording starting odometer (KM) and fuel levels.',
+      },
+      step6: {
+        number: '06',
+        title: 'On the Road & Emergency Assistance',
+        fuelPolicyTitle: 'Fuel Policy (Option A)',
+        fuelPolicyDesc:
+          'Fuel (BBM), tollway charges, and parking fees are borne entirely by the renter. The vehicle is provided with recorded fuel levels and must be returned at the same level.',
+        incidentTitle: '24/7 Digital Incident & Breakdown Support',
+        incidentDesc:
+          'In case of technical issues or emergencies, file a report directly via Incident Reporting in your Customer Dashboard or call your branch emergency hotline.',
+      },
+      step7: {
+        number: '07',
+        title: 'Vehicle Return & Completion',
+        desc: 'Return the vehicle to the destination branch on time within official operating hours (08:00 – 21:00 WIB).',
+        graceSummary:
+          'An official 45-minute grace period is provided free of charge. Returns past 45 minutes incur proportional hourly overtime charges.',
+        inspectionEnd:
+          'Branch staff will record the final odometer reading, inspect fuel levels, and confirm rental completion in the system.',
+      },
+    },
+    overtime: {
+      title: 'Overtime Penalty Breakdown',
+      subtitle: 'Transparent and equitable late fee calculation based on return delay duration.',
+      tier1Title: 'On-Time up to 45 Minutes',
+      tier1Desc: 'Free of charge (IDR 0). Official grace allowance for traffic contingencies on the road.',
+      tier2Title: 'Late 46 Minutes up to 3 Hours',
+      tier2Desc: 'Billed per hour at 10% of the daily vehicle rate (minimum IDR 50,000/hour).',
+      tier3Title: 'Late Exceeding 3 Hours',
+      tier3Desc: 'Billed full 1-day rental rate as it breaches the 3-hour turnaround sanitization buffer for subsequent reservations.',
+      termsLinkText: 'Read full legal details in Terms & Conditions of Rental →',
+    },
+    faq: {
+      sectionTitle: 'Frequently Asked Questions (FAQ)',
+      sectionSubtitle:
+        'Comprehensive answers regarding rental procedures, credential verification, payments, and road policies.',
+      allTab: 'All Categories',
+      categories: {
+        kyc: 'Documents & KYC',
+        booking: 'Booking & Scheduling',
+        payment: 'Payment & Fees',
+        road: 'Road Policies & Support',
+      },
+      items: [
+        {
+          category: 'kyc',
+          question: 'Why must I upload a Driver License even when booking With Chauffeur?',
+          answer:
+            'Commercial fleet insurance underwriters and regulatory compliance mandate verified dual-credential identification of the responsible contracting party (National ID & Driver License), regardless of who drives. This ensures valid insurance coverage and legal clarity for both parties.',
+        },
+        {
+          category: 'kyc',
+          question: 'How long does document verification take?',
+          answer:
+            'Branch operations review credentials promptly within 15–30 minutes during official operating hours (08:00–21:00 WIB). You can monitor your verification status in real-time on your Customer Dashboard.',
+        },
+        {
+          category: 'kyc',
+          question: 'Are my identity documents secure?',
+          answer:
+            'Fully secured. Our infrastructure complies strictly with PDP privacy laws utilizing role-based access control and encrypted cloud storage. Your credentials are only accessible by authorized branch staff for the purpose of booking verification.',
+        },
+        {
+          category: 'booking',
+          question: 'Why are certain dates or times unavailable on the booking calendar?',
+          answer:
+            'This occurs when a vehicle is occupied by another client or is undergoing our mandatory 3-hour sanitization and detailing buffer. Additionally, pickup and return timestamps must fall within official branch operating hours (08:00–21:00 WIB).',
+        },
+        {
+          category: 'booking',
+          question: 'Can I pick up or return a vehicle outside 08:00–21:00 WIB?',
+          answer:
+            'To maintain rigorous physical handover inspections and operational safety, branch desks operate strictly from 08:00–21:00 WIB. Please schedule your itinerary within these hours.',
+        },
+        {
+          category: 'booking',
+          question: 'How do I request a rental extension?',
+          answer:
+            'Rental extensions can be requested by contacting branch staff before your active rental concludes, provided the vehicle is not reserved by another client for the subsequent time slot.',
+        },
+        {
+          category: 'payment',
+          question: 'Which payment methods are accepted?',
+          answer:
+            'We accept instant QRIS (GoPay, OVO, ShopeePay, BCA QRIS), national bank Virtual Accounts (BCA, Mandiri, BRI, BNI), and 3D Secure Credit/Debit Cards via official Midtrans payment gateway.',
+        },
+        {
+          category: 'payment',
+          question: 'What is the payment completion window after checkout?',
+          answer:
+            'Payment must be completed within 60 minutes of checkout. Unsettled bookings expire automatically after 60 minutes to release unit availability back to fellow travelers.',
+        },
+        {
+          category: 'payment',
+          question: 'How are late return penalties calculated?',
+          answer:
+            'We provide an official 45-minute grace period free of charge. If delayed past 45 minutes up to 3 hours, an hourly overtime fee of 10% of the daily vehicle rate applies (minimum IDR 50,000/hour). Delays beyond 3 hours incur a full 1-day rental charge.',
+        },
+        {
+          category: 'road',
+          question: 'Are fuel, tollway charges, and parking fees included in the rate?',
+          answer:
+            'No. All rental rates (both Self-Drive and With Chauffeur) operate under Option A Policy, where fuel consumption, expressway tolls, and parking surcharges are directly borne by the renter throughout the journey.',
+        },
+        {
+          category: 'road',
+          question: 'What should I do if the vehicle encounters mechanical issues on the road?',
+          answer:
+            'You can submit an immediate report via Incident Reporting on your Customer Dashboard or call your branch emergency hotline. Our field support will dispatch technical assistance or provide a replacement vehicle.',
+        },
+        {
+          category: 'road',
+          question: 'When is a chauffeur assigned for With Driver reservations?',
+          answer:
+            'Once payment is verified, branch operations automatically assign a certified professional chauffeur to your booking. You will be able to view their contact information on your Customer Dashboard prior to departure.',
+        },
+      ],
+    },
+    branchesTitle: 'Official Operational Branch Network',
+    branchesSubtitle: 'Ready to serve vehicle handovers and returns across strategic metropolitan hubs.',
+    ctaTitle: 'Ready to Embark on Your Executive Journey?',
+    ctaSubtitle:
+      'Curate your luxury vehicle today with guaranteed availability and uncompromising rate transparency.',
+    ctaButton: 'Explore Fleet Collection Now',
+    contextualHint: 'First time renting? Learn about booking steps & document rules in our Rental Guide →',
+    bookingFormHint: 'Need guidance on booking steps & required documents?',
+  },
 }

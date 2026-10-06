@@ -63,6 +63,15 @@ export default async function Footer() {
                   {dict.nav.contact}
                 </Link>
               </li>
+              <li>
+                <Link 
+                  href="/guide" 
+                  className="text-on-surface-variant hover:text-white hover:translate-x-1 transition-all inline-block"
+                  data-testid="footer-guide-link"
+                >
+                  {dict.guide?.breadcrumb || (isEn ? 'Rental Guide' : 'Panduan Sewa')}
+                </Link>
+              </li>
             </ul>
           </div>
 

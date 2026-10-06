@@ -279,6 +279,193 @@ export const id = {
     closeBtn: 'Tutup',
     rentalPeriod: 'Masa Sewa',
   },
+  guide: {
+    breadcrumb: 'Panduan Sewa',
+    kicker: 'Panduan Pelanggan',
+    title: 'Panduan Lengkap Reservasi Armada Premium',
+    subtitle:
+      'Alur langkah demi langkah mulai dari pemilihan armada, verifikasi KYC wajib dua dokumen, hingga pengembalian unit bebas repot.',
+    quickBadges: {
+      gracePeriod: 'Toleransi Pengembalian',
+      kycMandate: 'KTP & SIM Wajib',
+      bufferSanitization: 'Jeda Inspeksi 3 Jam',
+      operatingHours: 'Jam Layanan Cabang',
+    },
+    stepperTitle: '7 Langkah Alur Perjalanan Sewa Anda',
+    stepperSubtitle:
+      'Panduan terperinci agar proses serah-terima dan perjalanan Anda berlangsung nyaman tanpa kendala.',
+    steps: {
+      step1: {
+        number: '01',
+        title: 'Cari & Pilih Armada',
+        desc: 'Telusuri koleksi kendaraan eksekutif berdasarkan cabang terdekat dan kategori armada sesuai kebutuhan mobilitas Anda.',
+        selfDriveTitle: 'Lepas Kunci (Self-Drive)',
+        selfDriveDesc: 'Kendarai sendiri dengan kebebasan penuh. Memerlukan pengemudi dengan SIM A/B aktif.',
+        withDriverTitle: 'Dengan Sopir (With Driver)',
+        withDriverDesc:
+          'Sopir profesional bersertifikasi ditugaskan otomatis oleh tim cabang setelah pesanan terkonfirmasi. Anda tidak perlu memilih atau menyewa sopir secara terpisah.',
+      },
+      step2: {
+        number: '02',
+        title: 'Tentukan Jadwal & Cek Ketersediaan',
+        desc: 'Pilih tanggal dan jam pengambilan serta pengembalian dalam jam operasional resmi cabang (08:00 – 21:00 WIB).',
+        bufferNotice:
+          'Mengapa ada jadwal yang tidak dapat dipilih? Sistem menerapkan jeda pembersihan dan inspeksi 3 jam antar-penyewa demi keselamatan dan standar kebersihan tertinggi.',
+        rateTransparency:
+          'Tarif sewa transparan mulai dari minimal tarif resmi per hari, dengan kalkulasi biaya sopir otomatis jika dipilih, tanpa biaya tersembunyi.',
+      },
+      step3: {
+        number: '03',
+        title: 'Pembayaran Instan via Midtrans',
+        desc: 'Selesaikan transaksi dengan mudah menggunakan QRIS (GoPay, OVO, ShopeePay, BCA), Virtual Account bank nasional, atau Kartu Kredit/Debit berstandar 3D Secure.',
+        expiryNotice:
+          'Batas waktu pembayaran adalah 60 menit sejak checkout. Jika melewati batas waktu, pesanan kedaluwarsa otomatis dan unit dilepaskan kembali ke katalog.',
+      },
+      step4: {
+        number: '04',
+        title: 'Lengkapi Dokumen Verifikasi (KYC)',
+        kycAlertTitle: 'Penting: KTP & SIM Dua-duanya Wajib untuk Semua Layanan',
+        kycAlertDesc:
+          'Baik sewa Lepas Kunci maupun Dengan Sopir, penyewa wajib mengunggah foto e-KTP asli dan SIM A/B asli yang masih berlaku sebelum unit dapat diserahterimakan.',
+        whyBothTitle: 'Mengapa sewa Dengan Sopir tetap wajib mengunggah SIM & KTP?',
+        whyBothDesc:
+          'Polis asuransi komersial kendaraan mewah dan kepatuhan regulasi hukum mewajibkan identitas resmi penanggung jawab sewa terdaftar ganda. Hal ini melindungi penyewa dari risiko penyalahgunaan identitas dan memastikan keabsahan klaim asuransi.',
+        photoTips:
+          'Tips foto dokumen: Pastikan foto dokumen asli terlihat jelas, tidak terpotong sudutnya, dan bebas pantulan kilau cahaya (glare).',
+      },
+      step5: {
+        number: '05',
+        title: 'Pengambilan Armada di Cabang (Handover)',
+        desc: 'Kunjungi cabang pilihan Anda sesuai jadwal penjemputan pada jam operasional cabang (08:00 – 21:00 WIB).',
+        physicalCheck:
+          'Tunjukkan dokumen fisik asli (KTP & SIM) untuk pencocokan visual akhir. Staf kami akan mendampingi inspeksi bersama mencatat odometer awal (KM) dan posisi bahan bakar.',
+      },
+      step6: {
+        number: '06',
+        title: 'Selama Perjalanan & Bantuan Operasional',
+        fuelPolicyTitle: 'Ketentuan Bahan Bakar (BBM Opsi A)',
+        fuelPolicyDesc:
+          'Biaya bahan bakar (BBM), tarif tol, dan parkir ditanggung sepenuhnya oleh penyewa. Kendaraan diserahkan dengan posisi BBM tercatat dan dikembalikan pada level yang sama.',
+        incidentTitle: 'Bantuan Darurat & Tiket Insiden 24 Jam',
+        incidentDesc:
+          'Jika terjadi kendala teknis atau situasi darurat di perjalanan, laporkan langsung melalui fitur Bantuan Insiden di Dasbor Pelanggan atau hubungi nomor darurat cabang Anda.',
+      },
+      step7: {
+        number: '07',
+        title: 'Pengembalian Armada & Selesai',
+        desc: 'Kembalikan kendaraan ke cabang tujuan tepat waktu dalam jam operasional resmi cabang (08:00 – 21:00 WIB).',
+        graceSummary:
+          'Tersedia masa tenggang resmi 45 menit bebas denda. Jika terlambat melebihi 45 menit, denda overtime per jam akan berlaku secara proporsional.',
+        inspectionEnd:
+          'Staf cabang akan mencatat odometer akhir, memeriksa level BBM, dan mengonfirmasi penyelesaian sewa di sistem.',
+      },
+    },
+    overtime: {
+      title: 'Rincian Skema Denda Keterlambatan',
+      subtitle: 'Perhitungan denda transparan dan adil berdasarkan durasi keterlambatan unit.',
+      tier1Title: 'Tepat Waktu s/d 45 Menit',
+      tier1Desc: 'Bebas denda (Rp 0). Masa toleransi resmi untuk mengantisipasi hambatan lalu lintas di perjalanan.',
+      tier2Title: 'Terlambat 46 Menit s/d 3 Jam',
+      tier2Desc: 'Dikenakan denda per jam sebesar 10% dari tarif harian unit (minimal Rp 50.000/jam).',
+      tier3Title: 'Terlambat Lebih dari 3 Jam',
+      tier3Desc: 'Dikenakan denda tarif sewa 1 hari penuh karena mengganggu jadwal sterilisasi & pemesanan pelanggan berikutnya.',
+      termsLinkText: 'Pelajari rincian hukum selengkapnya di Syarat & Ketentuan Sewa →',
+    },
+    faq: {
+      sectionTitle: 'Pertanyaan yang Sering Diajukan (FAQ)',
+      sectionSubtitle:
+        'Jawaban lengkap seputar alur sewa, verifikasi dokumen, pembayaran, dan ketentuan operasional perjalanan.',
+      allTab: 'Semua Kategori',
+      categories: {
+        kyc: 'Dokumen & KYC',
+        booking: 'Pemesanan & Jadwal',
+        payment: 'Pembayaran & Denda',
+        road: 'Operasional Perjalanan',
+      },
+      items: [
+        {
+          category: 'kyc',
+          question: 'Mengapa saya tetap wajib upload SIM padahal memilih sewa Dengan Sopir?',
+          answer:
+            'Regulasi asuransi komersial armada kami dan kepatuhan hukum mewajibkan identitas resmi penanggung jawab sewa terverifikasi penuh dengan dua dokumen (KTP & SIM), terlepas dari siapa yang mengemudikan kendaraan. Hal ini menjamin perlindungan klaim asuransi dan kepastian hukum kedua belah pihak.',
+        },
+        {
+          category: 'kyc',
+          question: 'Berapa lama proses verifikasi dokumen saya?',
+          answer:
+            'Staf cabang meninjau dokumen secara berkala dalam 15–30 menit pada jam kerja operasional (08:00–21:00 WIB). Status verifikasi dapat Anda pantau langsung di Dasbor Pelanggan.',
+        },
+        {
+          category: 'kyc',
+          question: 'Apakah data KTP dan SIM saya aman?',
+          answer:
+            'Sangat aman. Sistem kami mematuhi standar UU PDP (Pelindungan Data Pribadi) dengan kontrol akses berjenjang dan enkripsi cloud. Dokumen Anda hanya dapat diakses staf cabang yang berwenang untuk keperluan verifikasi sewa Anda.',
+        },
+        {
+          category: 'booking',
+          question: 'Mengapa tanggal atau jam tertentu tidak bisa dipilih di kalender sewa?',
+          answer:
+            'Hal ini terjadi karena kendaraan sedang dalam masa sewa pelanggan lain atau berada dalam masa jeda inspeksi & detailing 3 jam (turnover buffer). Selain itu, waktu penjemputan dan pengembalian wajib berada dalam jam operasional cabang (08:00–21:00 WIB).',
+        },
+        {
+          category: 'booking',
+          question: 'Bisakah saya mengambil atau mengembalikan unit di luar jam 08:00–21:00 WIB?',
+          answer:
+            'Demi ketelitian serah-terima fisik dan keselamatan operasional, konter cabang hanya melayani serah-terima pada jam operasional seragam: 08:00–21:00 WIB. Silakan atur jadwal perjalanan Anda dalam rentang jam tersebut.',
+        },
+        {
+          category: 'booking',
+          question: 'Bagaimana jika saya ingin memperpanjang masa sewa?',
+          answer:
+            'Perpanjangan sewa dapat diajukan dengan menghubungi staf cabang sebelum masa sewa berakhir, dengan syarat unit tersebut belum dipesan oleh penyewa lain pada jadwal berikutnya.',
+        },
+        {
+          category: 'payment',
+          question: 'Metode pembayaran apa saja yang didukung?',
+          answer:
+            'Kami mendukung QRIS instan (GoPay, OVO, ShopeePay, BCA QRIS), Virtual Account bank nasional (BCA, Mandiri, BRI, BNI), serta Kartu Kredit/Debit berstandar 3D Secure via payment gateway resmi Midtrans.',
+        },
+        {
+          category: 'payment',
+          question: 'Berapa batas waktu pembayaran setelah pemesanan dibuat?',
+          answer:
+            'Batas waktu pembayaran adalah 60 menit sejak checkout. Jika tidak diselesaikan dalam 60 menit, sistem otomatis membatalkan pesanan untuk membebaskan ketersediaan unit bagi pelanggan lain.',
+        },
+        {
+          category: 'payment',
+          question: 'Bagaimana perhitungan denda jika saya terlambat mengembalikan mobil?',
+          answer:
+            'Kami memberikan toleransi keterlambatan resmi selama 45 menit tanpa denda. Jika terlambat lebih dari 45 menit hingga 3 jam, berlaku denda per jam sebesar 10% dari tarif harian unit (minimal Rp 50.000/jam). Keterlambatan di atas 3 jam dikenakan denda sewa 1 hari penuh.',
+        },
+        {
+          category: 'road',
+          question: 'Apakah harga sewa sudah termasuk bensin, tol, dan biaya parkir?',
+          answer:
+            'Belum. Seluruh tarif rental (Lepas Kunci maupun Dengan Sopir) menganut Kebijakan Opsi A, di mana pengeluaran BBM, tiket tol, dan retribusi parkir ditanggung langsung oleh penyewa selama perjalanan.',
+        },
+        {
+          category: 'road',
+          question: 'Bagaimana jika kendaraan mengalami kendala mesin atau insiden di perjalanan?',
+          answer:
+            'Anda dapat membuat laporan langsung melalui fitur Pelaporan Insiden di Dasbor Pelanggan atau menghubungi hotline darurat cabang yang tertera pada detail pesanan Anda. Tim teknis cabang siap memberikan pendampingan atau unit pengganti.',
+        },
+        {
+          category: 'road',
+          question: 'Kapan pengemudi ditugaskan pada pesanan Dengan Sopir?',
+          answer:
+            'Setelah pembayaran terverifikasi, manajemen cabang otomatis menugaskan sopir profesional bersertifikasi ke pesanan Anda. Anda dapat melihat informasi kontak pengemudi di Dasbor Pelanggan sebelum jadwal penjemputan.',
+        },
+      ],
+    },
+    branchesTitle: 'Jaringan Cabang Operasional Resmi',
+    branchesSubtitle: 'Siap melayani penjemputan dan pengembalian unit di kota-kota strategis.',
+    ctaTitle: 'Siap Memulai Perjalanan Eksekutif Anda?',
+    ctaSubtitle:
+      'Temukan armada mewah pilihan Anda sekarang dengan kepastian jadwal dan transparansi tarif tanpa kompromi.',
+    ctaButton: 'Pilih Armada Sekarang',
+    contextualHint: 'Baru pertama kali sewa? Pelajari alur booking & syarat dokumen di Panduan Kami →',
+    bookingFormHint: 'Perlu panduan langkah sewa & syarat dokumen?',
+  },
 }
 
 export type Dictionary = typeof id

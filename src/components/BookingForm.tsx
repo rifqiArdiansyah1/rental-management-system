@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createDraftBookingAction, BookingFormPayload } from '@/actions/booking'
 import { calculateEstimatedPrice } from '@/lib/pricing'
 import { RentalType } from '@prisma/client'
@@ -150,6 +151,19 @@ export default function BookingForm({
       <h2 className="font-headline-md text-on-surface mb-2">
         {t.booking.pageTitle}
       </h2>
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-surface-container-low border border-surface-variant/40 text-xs text-on-surface-variant">
+        <span>{t.guide?.bookingFormHint || (isEn ? 'Need guidance on booking steps & required documents?' : 'Perlu panduan langkah sewa & syarat dokumen?')}</span>
+        <Link 
+          href="/guide" 
+          target="_blank" 
+          data-testid="booking-contextual-guide-link"
+          className="text-secondary hover:underline font-semibold inline-flex items-center gap-1 self-start sm:self-auto"
+        >
+          <span>{isEn ? 'Read Rental Guide' : 'Lihat Panduan Sewa'}</span>
+          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+        </Link>
+      </div>
       
       {errorMsg && (
         <div className="p-4 bg-error-container/20 border border-error text-error rounded-lg text-body-md" data-testid="booking-error-msg">

@@ -316,6 +316,16 @@ export default async function VehicleDetail({ params }: { params: Promise<{ id: 
                   <p className="font-label-caps text-label-caps text-on-surface-variant text-center lowercase tracking-normal">
                     {dict.vehicles.guaranteeNotice}
                   </p>
+                  <div className="pt-2 text-center border-t border-surface-variant/30">
+                    <Link
+                      href="/guide"
+                      data-testid="vehicle-detail-guide-link"
+                      className="inline-flex items-center gap-1.5 text-xs text-secondary hover:underline font-medium"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">menu_book</span>
+                      <span>{isEn ? 'Rental Guide & KYC Requirements' : 'Panduan Sewa & Syarat Dokumen KYC'}</span>
+                    </Link>
+                  </div>
                 </div>
               </ScrollReveal>
             </div>

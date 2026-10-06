@@ -111,7 +111,7 @@ export default async function Home({
         {/* Vehicle Grid Section */}
         <section id="vehicles" className="w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto py-20 scroll-mt-20">
           <ScrollReveal>
-            <div className="flex justify-between items-end mb-12 border-b border-surface-variant pb-4">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-12 border-b border-surface-variant pb-4">
               <div>
                 <h2 className="font-headline-lg text-headline-lg text-on-surface">
                   {isEn ? 'Executive Fleet Collection' : 'Pilihan Armada'}
@@ -120,6 +120,13 @@ export default async function Home({
                   {isEn ? 'Meticulously maintained fleet ready for your bespoke itinerary.' : 'Armada terawat yang siap digunakan untuk perjalanan Anda.'}
                 </p>
               </div>
+              <Link
+                href="/guide"
+                data-testid="home-contextual-guide-link"
+                className="text-xs font-semibold text-secondary hover:underline inline-flex items-center gap-1 self-start md:self-end pb-1"
+              >
+                <span>{dict.guide?.contextualHint || (isEn ? 'First time renting? Read Rental Guide →' : 'Baru pertama kali sewa? Baca Panduan Sewa →')}</span>
+              </Link>
             </div>
           </ScrollReveal>
 
