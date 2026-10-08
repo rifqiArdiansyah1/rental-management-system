@@ -2,14 +2,15 @@ import { test, expect } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
+import fs from 'fs'
+import path from 'path'
 import {
   LATE_RETURN_GRACE_MINUTES,
   TURNOVER_BUFFER_HOURS,
-  BRANCH_OPERATING_HOURS,
+  GLOBAL_OPERATING_HOURS,
   MIDTRANS_SNAP_EXPIRY_MINUTES,
   OVERTIME_HOURLY_PERCENTAGE,
   MIN_HOURLY_OVERTIME_RATE,
-  MIN_VEHICLE_DAILY_RATE,
 } from '../../src/lib/constants'
 
 const pool = new Pool({
@@ -55,36 +56,59 @@ test.describe('Halaman Panduan Pelanggan (Customer Flow & Rental Guide)', () => 
     await expect(page.getByText('Pengambilan Armada di Cabang (Handover)', { exact: true })).toBeVisible()
 
     await expect(page.getByText('06', { exact: true })).toBeVisible()
-    await expect(page.getByText('Selama Perjalanan & Bantuan Operasional', { exact: true })).toBeVisible()
+    await expect(page.getByText('Bantuan Insiden & Dukungan Operasional Perjalanan', { exact: true })).toBeVisible()
 
     await expect(page.getByText('07', { exact: true })).toBeVisible()
     await expect(page.getByText('Pengembalian Armada & Selesai', { exact: true })).toBeVisible()
   })
 
-  test('2. Verifikasi Anti Magic-Number-Drift: seluruh angka kebijakan sinkron dengan constants.ts', async ({ page }) => {
-    await page.goto('/guide')
+  test('2. Verifikasi Anti Magic-Number-Drift: Static Source Code AST & Live Database Aggregation', async ({ page }) => {
+    // A. Static Analysis: Memastikan angka kebijakan beneran diimpor dari constants.ts, bukan hardcoded di JSX
+    const guidePagePath = path.resolve(__dirname, '../../src/app/guide/page.tsx')
+    const guideClientPath = path.resolve(__dirname, '../../src/components/guide/GuideClient.tsx')
+    const guidePageSource = fs.readFileSync(guidePagePath, 'utf-8')
+    const guideClientSource = fs.readFileSync(guideClientPath, 'utf-8')
 
+    // Verifikasi impor konstanta terpusat
+    expect(guidePageSource).toContain('LATE_RETURN_GRACE_MINUTES')
+    expect(guidePageSource).toContain('TURNOVER_BUFFER_HOURS')
+    expect(guidePageSource).toContain('GLOBAL_OPERATING_HOURS')
+    expect(guidePageSource).toContain('MIDTRANS_SNAP_EXPIRY_MINUTES')
+    expect(guidePageSource).toContain('OVERTIME_HOURLY_PERCENTAGE')
+    
+    // Verifikasi MIN_VEHICLE_DAILY_RATE (anomaly guard) TIDAK dipakai sebagai janji harga katalog
+    expect(guidePageSource).not.toContain('MIN_VEHICLE_DAILY_RATE')
+
+    // B. Live Browser Assertions
+    await page.goto('/guide')
     const bodyText = await page.locator('body').innerText()
 
-    // A. Toleransi Keterlambatan (45 menit)
+    // 1. Toleransi Keterlambatan (45 menit)
     expect(bodyText).toContain(`${LATE_RETURN_GRACE_MINUTES} menit`)
 
-    // B. Jeda Sanitasi & Detailing (3 jam)
+    // 2. Jeda Sanitasi & Detailing (3 jam)
     expect(bodyText).toContain(`${TURNOVER_BUFFER_HOURS} jam steril`)
 
-    // C. Jam Operasional Cabang (08:00 – 21:00 WIB)
-    const openHoursPattern = `${String(BRANCH_OPERATING_HOURS.OPEN_HOUR).padStart(2, '0')}:00 – ${String(BRANCH_OPERATING_HOURS.CLOSE_HOUR).padStart(2, '0')}:00 WIB`
+    // 3. Jam Operasional Universal Platform (08:00 – 21:00 WIB)
+    const openHoursPattern = `${String(GLOBAL_OPERATING_HOURS.OPEN_HOUR).padStart(2, '0')}:00 – ${String(GLOBAL_OPERATING_HOURS.CLOSE_HOUR).padStart(2, '0')}:00 WIB`
     expect(bodyText).toContain(openHoursPattern)
 
-    // D. Batas Waktu Bayar Midtrans (60 menit)
+    // 4. Batas Waktu Bayar Midtrans (60 menit)
     expect(bodyText).toContain(`${MIDTRANS_SNAP_EXPIRY_MINUTES} menit`)
 
-    // E. Tarif Overtime per Jam (10%)
+    // 5. Tarif Overtime per Jam (10%)
     const overtimePercentStr = `${OVERTIME_HOURLY_PERCENTAGE * 100}%`
     expect(bodyText).toContain(overtimePercentStr)
 
-    // F. Tarif Harian Minimum (Rp 250.000)
-    expect(bodyText).toContain(MIN_VEHICLE_DAILY_RATE.toLocaleString('id-ID'))
+    // 6. Tarif Harian Terendah: Diambil dari live aggregate Prisma (Bukan hardcoded 250.000)
+    const lowestRateAggregate = await prisma.vehicle.aggregate({
+      where: { isActive: true },
+      _min: { dailyRate: true }
+    })
+    if (lowestRateAggregate._min.dailyRate) {
+      const minDailyPriceFormatted = Number(lowestRateAggregate._min.dailyRate).toLocaleString('id-ID')
+      expect(bodyText).toContain(minDailyPriceFormatted)
+    }
   })
 
   test('3. Penegasan KTP & SIM wajib untuk kedua model sewa (Lepas Kunci & Dengan Sopir)', async ({ page }) => {
@@ -186,5 +210,40 @@ test.describe('Halaman Panduan Pelanggan (Customer Flow & Rental Guide)', () => 
     // Verifikasi Stepper Bahasa Inggris
     await expect(page.getByText('Browse & Select Vehicle')).toBeVisible()
     await expect(page.getByText('Complete Identity Verification (KYC)')).toBeVisible()
+    await expect(page.getByText('Incident Reporting & Roadside Support')).toBeVisible()
+
+    const enBodyText = await page.locator('body').innerText()
+    // Anti-Claim Checks (English)
+    expect(enBodyText).not.toContain('24/7 Digital Incident')
+    expect(enBodyText).not.toContain('assigned automatically')
+    expect(enBodyText).not.toContain('21-point checklist')
+    expect(enBodyText).not.toContain('replacement vehicle')
+  })
+
+  test('7. Verifikasi Kejujuran Operasional & Pencegahan Klaim Tanpa Dasar (Zero Unsubstantiated Claims)', async ({ page }) => {
+    await page.goto('/guide')
+    const bodyText = await page.locator('body').innerText()
+
+    // A. Penugasan Sopir: Manual oleh staf cabang (Bukan klaim otomatis instan)
+    expect(bodyText).toContain('akan ditugaskan oleh staf cabang kami')
+    expect(bodyText).not.toContain('ditugaskan otomatis oleh tim cabang')
+
+    // B. SLA Verifikasi Dokumen: Realistis jam kerja (Bukan klaim 15-30 menit tanpa jaminan)
+    expect(bodyText).not.toContain('15–30 menit')
+    expect(bodyText).not.toContain('15-30 menit')
+
+    // C. Bantuan Perjalanan: Terikat jam operasional cabang & eskalasi darurat (Bukan klaim 24 jam palsu & unit pengganti)
+    expect(bodyText).toContain('Bantuan Insiden & Dukungan Operasional Perjalanan')
+    expect(bodyText).not.toContain('Bantuan Darurat & Tiket Insiden 24 Jam')
+    expect(bodyText).not.toContain('unit pengganti')
+
+    // D. Standar Inspeksi: Menyeluruh (Bukan klaim angka rekaan "21 titik")
+    expect(bodyText).not.toContain('21 titik')
+
+    // E. Cek Halaman Syarat & Ketentuan (/terms) juga bebas klaim "21 titik"
+    await page.goto('/terms')
+    const termsBodyText = await page.locator('body').innerText()
+    expect(termsBodyText).not.toContain('21 titik')
+    expect(termsBodyText).toContain('inspeksi teknis menyeluruh')
   })
 })

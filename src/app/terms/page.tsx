@@ -181,7 +181,7 @@ export default async function TermsOfServicePage() {
               <li>
                 {isEn
                   ? 'Every vehicle receives a mandatory 3-hour inspection and sanitization buffer post-return prior to subsequent release.'
-                  : 'Setiap armada mendapatkan buffer proteksi 3 jam setelah pengembalian untuk keperluan inspeksi teknis 21 titik, pencucian menyeluruh, dan sanitasi kabin.'}
+                  : 'Setiap armada mendapatkan buffer proteksi 3 jam setelah pengembalian untuk keperluan inspeksi teknis menyeluruh, pencucian, dan sanitasi kabin.'}
               </li>
               <li>
                 {isEn

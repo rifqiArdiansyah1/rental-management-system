@@ -27,12 +27,11 @@ import GuideClient, { FaqItem } from '@/components/guide/GuideClient'
 import {
   LATE_RETURN_GRACE_MINUTES,
   TURNOVER_BUFFER_HOURS,
-  BRANCH_OPERATING_HOURS,
+  GLOBAL_OPERATING_HOURS,
   MIDTRANS_SNAP_EXPIRY_MINUTES,
   OVERTIME_HOURLY_PERCENTAGE,
   MIN_HOURLY_OVERTIME_RATE,
   EXTREME_LATE_HOURS,
-  MIN_VEHICLE_DAILY_RATE,
 } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
@@ -43,7 +42,7 @@ export const metadata = {
 }
 
 export default async function GuidePage() {
-  const [locale, activeBranches] = await Promise.all([
+  const [locale, activeBranches, lowestRateAggregate] = await Promise.all([
     getLocale(),
     prisma.branch.findMany({
       where: { isActive: true },
@@ -57,13 +56,18 @@ export default async function GuidePage() {
         }
       },
       orderBy: { city: 'asc' }
+    }),
+    prisma.vehicle.aggregate({
+      where: { isActive: true },
+      _min: { dailyRate: true }
     })
   ])
 
   const dict = await getDictionary(locale)
   const isEn = locale === 'en'
 
-  const openHoursStr = `${String(BRANCH_OPERATING_HOURS.OPEN_HOUR).padStart(2, '0')}:00 – ${String(BRANCH_OPERATING_HOURS.CLOSE_HOUR).padStart(2, '0')}:00 WIB`
+  const lowestDailyRate = lowestRateAggregate._min.dailyRate ? Number(lowestRateAggregate._min.dailyRate) : null
+  const openHoursStr = `${String(GLOBAL_OPERATING_HOURS.OPEN_HOUR).padStart(2, '0')}:00 – ${String(GLOBAL_OPERATING_HOURS.CLOSE_HOUR).padStart(2, '0')}:00 WIB`
 
   const constantsData = {
     graceMinutes: LATE_RETURN_GRACE_MINUTES,
@@ -239,7 +243,10 @@ export default async function GuidePage() {
                       <div className="flex items-start gap-2 text-emerald-400">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                         <span>
-                          {dict.guide.steps.step2.rateTransparency} (min. Rp {MIN_VEHICLE_DAILY_RATE.toLocaleString('id-ID')}/hari).
+                          {dict.guide.steps.step2.rateTransparency}
+                          {lowestDailyRate 
+                            ? ` (${isEn ? 'starting from IDR' : 'mulai dari Rp'} ${lowestDailyRate.toLocaleString('id-ID')}/${isEn ? 'day' : 'hari'}).` 
+                            : '.'}
                         </span>
                       </div>
                     </div>

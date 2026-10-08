@@ -300,10 +300,11 @@ export const id = {
         title: 'Cari & Pilih Armada',
         desc: 'Telusuri koleksi kendaraan eksekutif berdasarkan cabang terdekat dan kategori armada sesuai kebutuhan mobilitas Anda.',
         selfDriveTitle: 'Lepas Kunci (Self-Drive)',
-        selfDriveDesc: 'Kendarai sendiri dengan kebebasan penuh. Memerlukan pengemudi dengan SIM A/B aktif.',
+        selfDriveDesc:
+          'Kendarai sendiri dengan kebebasan penuh. Penyewa wajib memiliki SIM A/B aktif yang masih berlaku untuk mengemudikan kendaraan sendiri.',
         withDriverTitle: 'Dengan Sopir (With Driver)',
         withDriverDesc:
-          'Sopir profesional bersertifikasi ditugaskan otomatis oleh tim cabang setelah pesanan terkonfirmasi. Anda tidak perlu memilih atau menyewa sopir secara terpisah.',
+          'Sopir profesional bersertifikasi akan ditugaskan oleh staf cabang kami setelah pesanan terkonfirmasi. Anda tidak perlu mencari atau menyewa sopir secara terpisah.',
       },
       step2: {
         number: '02',
@@ -312,7 +313,7 @@ export const id = {
         bufferNotice:
           'Mengapa ada jadwal yang tidak dapat dipilih? Sistem menerapkan jeda pembersihan dan inspeksi 3 jam antar-penyewa demi keselamatan dan standar kebersihan tertinggi.',
         rateTransparency:
-          'Tarif sewa transparan mulai dari minimal tarif resmi per hari, dengan kalkulasi biaya sopir otomatis jika dipilih, tanpa biaya tersembunyi.',
+          'Tarif sewa transparan dengan kalkulasi biaya sopir otomatis jika dipilih, tanpa biaya tersembunyi',
       },
       step3: {
         number: '03',
@@ -338,7 +339,7 @@ export const id = {
         title: 'Pengambilan Armada di Cabang (Handover)',
         desc: 'Kunjungi cabang pilihan Anda sesuai jadwal penjemputan pada jam operasional cabang (08:00 – 21:00 WIB).',
         physicalCheck:
-          'Tunjukkan dokumen fisik asli (KTP & SIM) untuk pencocokan visual akhir. Staf kami akan mendampingi inspeksi bersama mencatat odometer awal (KM) dan posisi bahan bakar.',
+          'Tunjukkan dokumen fisik asli (KTP & SIM) untuk pencocokan visual akhir. Staf kami akan mendampingi inspeksi menyeluruh bersama mencatat odometer awal (KM) dan posisi bahan bakar.',
       },
       step6: {
         number: '06',
@@ -346,9 +347,9 @@ export const id = {
         fuelPolicyTitle: 'Ketentuan Bahan Bakar (BBM Opsi A)',
         fuelPolicyDesc:
           'Biaya bahan bakar (BBM), tarif tol, dan parkir ditanggung sepenuhnya oleh penyewa. Kendaraan diserahkan dengan posisi BBM tercatat dan dikembalikan pada level yang sama.',
-        incidentTitle: 'Bantuan Darurat & Tiket Insiden 24 Jam',
+        incidentTitle: 'Bantuan Insiden & Dukungan Operasional Perjalanan',
         incidentDesc:
-          'Jika terjadi kendala teknis atau situasi darurat di perjalanan, laporkan langsung melalui fitur Bantuan Insiden di Dasbor Pelanggan atau hubungi nomor darurat cabang Anda.',
+          'Jika terjadi kendala teknis atau insiden di perjalanan, laporkan langsung melalui fitur Bantuan Insiden di Dasbor Pelanggan pada jam operasional cabang (08:00 – 21:00 WIB). Untuk kondisi darurat di luar jam operasional, hubungi kontak eskalasi darurat resmi atau nomor darurat nasional.',
       },
       step7: {
         number: '07',
@@ -393,7 +394,7 @@ export const id = {
           category: 'kyc',
           question: 'Berapa lama proses verifikasi dokumen saya?',
           answer:
-            'Staf cabang meninjau dokumen secara berkala dalam 15–30 menit pada jam kerja operasional (08:00–21:00 WIB). Status verifikasi dapat Anda pantau langsung di Dasbor Pelanggan.',
+            'Staf cabang kami meninjau dokumen secepatnya pada jam operasional kerja cabang (08:00–21:00 WIB). Status verifikasi dapat Anda pantau langsung secara real-time di Dasbor Pelanggan.',
         },
         {
           category: 'kyc',
@@ -447,13 +448,13 @@ export const id = {
           category: 'road',
           question: 'Bagaimana jika kendaraan mengalami kendala mesin atau insiden di perjalanan?',
           answer:
-            'Anda dapat membuat laporan langsung melalui fitur Pelaporan Insiden di Dasbor Pelanggan atau menghubungi hotline darurat cabang yang tertera pada detail pesanan Anda. Tim teknis cabang siap memberikan pendampingan atau unit pengganti.',
+            'Anda dapat membuat laporan langsung melalui fitur Pelaporan Insiden di Dasbor Pelanggan pada jam operasional cabang (08:00 – 21:00 WIB) untuk penanganan oleh tim staf cabang. Untuk situasi darurat keselamatan di jalan atau di luar jam operasional cabang, hubungi nomor eskalasi darurat di halaman Kontak atau layanan darurat nasional (112 / 110).',
         },
         {
           category: 'road',
           question: 'Kapan pengemudi ditugaskan pada pesanan Dengan Sopir?',
           answer:
-            'Setelah pembayaran terverifikasi, manajemen cabang otomatis menugaskan sopir profesional bersertifikasi ke pesanan Anda. Anda dapat melihat informasi kontak pengemudi di Dasbor Pelanggan sebelum jadwal penjemputan.',
+            'Setelah pembayaran terverifikasi, staf cabang kami akan menugaskan sopir profesional bersertifikasi yang siap bertugas sesuai jadwal pesanan Anda. Anda dapat melihat informasi kontak pengemudi di Dasbor Pelanggan sebelum jadwal penjemputan.',
         },
       ],
     },

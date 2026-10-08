@@ -302,10 +302,11 @@ export const en: Dictionary = {
         title: 'Browse & Select Vehicle',
         desc: 'Explore our executive fleet collection filtered by strategic branch locations and vehicle categories to match your travel profile.',
         selfDriveTitle: 'Self-Drive (Autonomous)',
-        selfDriveDesc: 'Full driving freedom. Requires the designated driver to hold an active valid driver license.',
+        selfDriveDesc:
+          'Full driving freedom. The renter must hold an active valid driver license to operate the vehicle.',
         withDriverTitle: 'With Executive Chauffeur',
         withDriverDesc:
-          'A certified professional chauffeur is assigned automatically by branch operations post-confirmation. You do not need to book or search for a driver separately.',
+          'A certified professional chauffeur will be assigned by our branch staff once your booking is confirmed. You do not need to book or search for a driver separately.',
       },
       step2: {
         number: '02',
@@ -314,7 +315,7 @@ export const en: Dictionary = {
         bufferNotice:
           'Why are certain time slots unavailable? The platform automatically enforces a 3-hour sanitization and technical inspection buffer between rentals for ultimate safety and pristine cabin cleanliness.',
         rateTransparency:
-          'Transparent daily rates starting from the official minimum baseline, with automatic chauffeur fee calculation, and zero hidden surcharges.',
+          'Transparent rental rates with automatic chauffeur fee calculation, and zero hidden surcharges',
       },
       step3: {
         number: '03',
@@ -340,7 +341,7 @@ export const en: Dictionary = {
         title: 'Vehicle Handover at Branch',
         desc: 'Visit your chosen branch location at your scheduled pickup time during branch operating hours (08:00 – 21:00 WIB).',
         physicalCheck:
-          'Present physical original credentials for visual matching. Our team will guide a joint 21-point checklist recording starting odometer (KM) and fuel levels.',
+          'Present physical original credentials for visual matching. Our team will guide a thorough joint inspection recording starting odometer (KM) and fuel levels.',
       },
       step6: {
         number: '06',
@@ -348,9 +349,9 @@ export const en: Dictionary = {
         fuelPolicyTitle: 'Fuel Policy (Option A)',
         fuelPolicyDesc:
           'Fuel (BBM), tollway charges, and parking fees are borne entirely by the renter. The vehicle is provided with recorded fuel levels and must be returned at the same level.',
-        incidentTitle: '24/7 Digital Incident & Breakdown Support',
+        incidentTitle: 'Incident Reporting & Roadside Support',
         incidentDesc:
-          'In case of technical issues or emergencies, file a report directly via Incident Reporting in your Customer Dashboard or call your branch emergency hotline.',
+          'In case of technical issues or roadside incidents, submit a report directly via Incident Assistance in your Customer Dashboard during branch operating hours (08:00 – 21:00 WIB). For emergencies outside operational hours, reach our official emergency escalation hotline or national emergency services.',
       },
       step7: {
         number: '07',
@@ -395,7 +396,7 @@ export const en: Dictionary = {
           category: 'kyc',
           question: 'How long does document verification take?',
           answer:
-            'Branch operations review credentials promptly within 15–30 minutes during official operating hours (08:00–21:00 WIB). You can monitor your verification status in real-time on your Customer Dashboard.',
+            'Our branch staff review credentials as promptly as possible during official branch operating hours (08:00–21:00 WIB). You can monitor your verification status in real-time on your Customer Dashboard.',
         },
         {
           category: 'kyc',
@@ -449,13 +450,13 @@ export const en: Dictionary = {
           category: 'road',
           question: 'What should I do if the vehicle encounters mechanical issues on the road?',
           answer:
-            'You can submit an immediate report via Incident Reporting on your Customer Dashboard or call your branch emergency hotline. Our field support will dispatch technical assistance or provide a replacement vehicle.',
+            'You can submit a ticket directly through Incident Reporting on your Customer Dashboard during branch operating hours (08:00 – 21:00 WIB) for branch staff assistance. For road safety emergencies or outside branch operating hours, reach our emergency escalation line on the Contact page or national emergency services (112 / 110).',
         },
         {
           category: 'road',
           question: 'When is a chauffeur assigned for With Driver reservations?',
           answer:
-            'Once payment is verified, branch operations automatically assign a certified professional chauffeur to your booking. You will be able to view their contact information on your Customer Dashboard prior to departure.',
+            'Once payment is verified, our branch staff will assign an available certified professional chauffeur to your booking. You will be able to view their contact information on your Customer Dashboard prior to departure.',
         },
       ],
     },
