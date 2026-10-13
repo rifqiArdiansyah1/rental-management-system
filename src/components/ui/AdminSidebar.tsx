@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, CalendarRange, Car, LogOut, Users, Building2, UserCog, ScrollText, Menu, X, Fuel, Star } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Car, LogOut, Users, Building2, UserCog, ScrollText, Menu, X, Fuel, Star, TrendingUp } from 'lucide-react'
 
 type AdminSidebarProps = {
   userRole: string;
@@ -37,9 +37,11 @@ export default function AdminSidebar({ userRole, handleLogout, openIncidentsCoun
   const canManageStaff = isAdminPusat || normalizedRole === 'admin_cabang'
   const canViewAuditLog = isAdminPusat || normalizedRole === 'admin_cabang'
   const canModerateReviews = isAdminPusat || normalizedRole === 'admin_cabang'
+  const canViewAnalytics = isAdminPusat || normalizedRole === 'admin_cabang'
 
   const navLinks = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    ...(canViewAnalytics ? [{ href: '/admin/analytics', icon: TrendingUp, label: 'Analisis & Laporan' }] : []),
     { href: '/admin/bookings', icon: CalendarRange, label: 'Manajemen Pesanan' },
     { href: '/admin/vehicles', icon: Car, label: 'Manajemen Armada' },
     { href: '/admin/drivers', icon: Users, label: 'Manajemen Sopir' },
