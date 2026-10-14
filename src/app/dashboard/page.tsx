@@ -200,7 +200,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
           {/* ── Left Column: Profile & Docs ── */}
-          <div className="lg:col-span-5 flex flex-col gap-6">
+          <div className="lg:col-span-5 flex flex-col gap-6 min-w-0">
 
             {/* Profile Card */}
             <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm">
@@ -233,19 +233,20 @@ export default async function DashboardPage() {
             />
 
             {/* Upload Form (anchored for rejected / urgent CTA scroll) */}
-            <div id="document-upload-form">
+            <div id="document-upload-form" className="w-full min-w-0">
               <DocumentUploadForm
                 initialKtpNumber={customer.ktpNumber}
                 initialSimNumber={customer.simNumber}
                 ktpDoc={ktpDoc}
                 simDoc={simDoc}
                 verificationStatus={customer.verificationStatus}
+                columns={1}
               />
             </div>
           </div>
 
           {/* ── Right Column: Booking History ── */}
-          <div className="lg:col-span-7 bg-surface p-6 sm:p-8 rounded-xl border border-surface-variant shadow-sm h-fit">
+          <div className="lg:col-span-7 bg-surface p-6 sm:p-8 rounded-xl border border-surface-variant shadow-sm h-fit min-w-0">
             <h2 className="font-semibold text-on-surface text-lg mb-6">Riwayat Pemesanan</h2>
             <BookingList bookings={serializedBookings} />
           </div>

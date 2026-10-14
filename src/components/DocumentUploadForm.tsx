@@ -19,6 +19,7 @@ type Props = {
   initialKtpNumber?: string | null
   initialSimNumber?: string | null
   verificationStatus?: string | null
+  columns?: 1 | 2
   onSuccess?: () => void
 }
 
@@ -29,6 +30,7 @@ export default function DocumentUploadForm({
   initialKtpNumber,
   initialSimNumber,
   verificationStatus,
+  columns = 2,
   onSuccess
 }: Props) {
   const router = useRouter()
@@ -126,7 +128,7 @@ export default function DocumentUploadForm({
   const renderBadge = (doc: DocumentSummary | null | undefined) => {
     if (!doc) {
       return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-surface-variant text-on-surface-variant">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-surface-variant text-on-surface-variant shrink-0 whitespace-nowrap">
           <span className="material-symbols-outlined text-[14px]">help_outline</span>
           Belum Diunggah
         </span>
@@ -135,7 +137,7 @@ export default function DocumentUploadForm({
 
     if (doc.verifiedAt) {
       return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0 whitespace-nowrap">
           <span className="material-symbols-outlined text-[14px]">verified</span>
           Terverifikasi
         </span>
@@ -144,7 +146,7 @@ export default function DocumentUploadForm({
 
     if (doc.rejectionReason) {
       return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 shrink-0 whitespace-nowrap">
           <span className="material-symbols-outlined text-[14px]">cancel</span>
           Ditolak
         </span>
@@ -152,7 +154,7 @@ export default function DocumentUploadForm({
     }
 
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0 whitespace-nowrap">
         <span className="material-symbols-outlined text-[14px]">schedule</span>
         Menunggu Review
       </span>
@@ -160,15 +162,15 @@ export default function DocumentUploadForm({
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="flex flex-col gap-6 w-full min-w-0">
+      <div className={`grid gap-6 ${columns === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
         
         {/* ── Slot 1: KTP ── */}
-        <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm flex flex-col justify-between" data-testid="kyc-slot-ktp">
+        <div className="bg-surface p-5 sm:p-6 rounded-xl border border-surface-variant shadow-sm flex flex-col justify-between min-w-0 overflow-hidden" data-testid="kyc-slot-ktp">
           <div>
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary text-2xl">badge</span>
+            <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-secondary text-2xl shrink-0">badge</span>
                 <h4 className="font-semibold text-on-surface text-base">KTP (Identitas Nasional)</h4>
               </div>
               {renderBadge(ktpDoc)}
@@ -206,7 +208,7 @@ export default function DocumentUploadForm({
                 required 
                 defaultValue={initialKtpNumber || ''}
                 placeholder="16 digit NIK"
-                className="p-2 text-sm rounded-md border border-outline bg-surface text-on-surface focus:outline-none focus:border-primary"
+                className="p-2 text-sm rounded-md border border-outline bg-surface text-on-surface focus:outline-none focus:border-primary w-full"
                 data-testid="input-ktp-number"
               />
             </div>
@@ -218,7 +220,7 @@ export default function DocumentUploadForm({
                 name="file" 
                 accept="image/jpeg, image/png, application/pdf" 
                 required 
-                className="p-1.5 text-xs text-on-surface-variant file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-medium file:bg-primary-container file:text-on-primary-container hover:file:bg-primary hover:file:text-on-primary transition-all cursor-pointer"
+                className="w-full max-w-full p-1.5 text-xs text-on-surface-variant file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-medium file:bg-primary-container file:text-on-primary-container hover:file:bg-primary hover:file:text-on-primary transition-all cursor-pointer"
                 data-testid="input-ktp-file"
               />
             </div>
@@ -245,11 +247,11 @@ export default function DocumentUploadForm({
         </div>
 
         {/* ── Slot 2: SIM ── */}
-        <div className="bg-surface p-6 rounded-xl border border-surface-variant shadow-sm flex flex-col justify-between" data-testid="kyc-slot-sim">
+        <div className="bg-surface p-5 sm:p-6 rounded-xl border border-surface-variant shadow-sm flex flex-col justify-between min-w-0 overflow-hidden" data-testid="kyc-slot-sim">
           <div>
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary text-2xl">directions_car</span>
+            <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-secondary text-2xl shrink-0">directions_car</span>
                 <h4 className="font-semibold text-on-surface text-base">SIM (Surat Izin Mengemudi)</h4>
               </div>
               {renderBadge(simDoc)}
@@ -287,7 +289,7 @@ export default function DocumentUploadForm({
                 required 
                 defaultValue={initialSimNumber || ''}
                 placeholder="Nomor SIM Anda"
-                className="p-2 text-sm rounded-md border border-outline bg-surface text-on-surface focus:outline-none focus:border-primary"
+                className="p-2 text-sm rounded-md border border-outline bg-surface text-on-surface focus:outline-none focus:border-primary w-full"
                 data-testid="input-sim-number"
               />
             </div>
@@ -299,7 +301,7 @@ export default function DocumentUploadForm({
                 name="file" 
                 accept="image/jpeg, image/png, application/pdf" 
                 required 
-                className="p-1.5 text-xs text-on-surface-variant file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-medium file:bg-primary-container file:text-on-primary-container hover:file:bg-primary hover:file:text-on-primary transition-all cursor-pointer"
+                className="w-full max-w-full p-1.5 text-xs text-on-surface-variant file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-medium file:bg-primary-container file:text-on-primary-container hover:file:bg-primary hover:file:text-on-primary transition-all cursor-pointer"
                 data-testid="input-sim-file"
               />
             </div>
