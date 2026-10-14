@@ -23,6 +23,15 @@ enum VehicleUnavailabilityReason {
   maintenance
 }
 
+enum VehicleExpenseCategory {
+  routine_service
+  repair
+  tires
+  detailing
+  tax_registration
+  other
+}
+
 enum VerificationStatus {
   pending
   verified
@@ -114,6 +123,7 @@ model Branch {
   returns  Booking[] @relation("ReturnBranch")
   reviews  Review[]
   incidents IncidentReport[]
+  expenses VehicleExpense[]
 
   @@index([city])
   @@index([isActive])
@@ -163,6 +173,7 @@ model Vehicle {
   bookings Booking[]
   unavailabilities VehicleUnavailability[]
   reviews  Review[]
+  expenses VehicleExpense[]
 
   // Query paling sering: "mobil tersedia di cabang X" -> filter branchId + status
   @@index([branchId, status])
@@ -249,6 +260,7 @@ model Booking {
 
   startDate DateTime @db.Timestamptz(6)
   endDate   DateTime @db.Timestamptz(6)
+  rental_period Unsupported("tstzrange")?
 
   rentalType             RentalType
   driverId               String?
@@ -409,6 +421,8 @@ model User {
   auditLogs           AuditLog[] @relation("UserAuditLogs")
   fuelPriceUpdates    FuelPrice[]
   moderatedReviews    Review[] @relation("ReviewModerator")
+  recordedExpenses    VehicleExpense[] @relation("ExpenseRecorder")
+  voidedExpenses      VehicleExpense[] @relation("ExpenseVoider")
 
   @@index([branchId, role])
   @@index([branchId, isActive])
@@ -506,5 +520,36 @@ model IncidentReport {
   @@index([bookingId])
   @@index([branchId, status])
   @@index([reportedAt])
+}
+
+model VehicleExpense {
+  id            String                 @id @default(uuid())
+  vehicleId     String
+  branchId      String
+  category      VehicleExpenseCategory @default(routine_service)
+  amount        Decimal                @db.Decimal(12, 2)
+  odometerKm    Int?
+  vendorName    String?
+  invoiceNumber String?
+  receiptUrl    String?
+  description   String?
+  expenseDate   DateTime               @default(now()) @db.Timestamptz(6)
+  recordedById  String
+  isVoided      Boolean                @default(false)
+  voidedAt      DateTime?              @db.Timestamptz(6)
+  voidedById    String?
+  voidReason    String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  vehicle       Vehicle                @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  branch        Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  recordedBy    User                   @relation("ExpenseRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  voidedBy      User?                  @relation("ExpenseVoider", fields: [voidedById], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId, expenseDate])
+  @@index([branchId, expenseDate])
+  @@index([branchId, isVoided])
+  @@index([category])
 }
 

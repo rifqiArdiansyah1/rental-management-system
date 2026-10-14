@@ -2,13 +2,13 @@
 
 import React, { useState, useMemo } from 'react'
 import { FleetPerformanceItem } from '@/lib/analytics/metrics'
-import { Search, Gauge, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Gauge, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 
 interface FleetPerformanceTableProps {
   fleetPerformance: FleetPerformanceItem[]
 }
 
-type SortField = 'revenue' | 'utilization' | 'days'
+type SortField = 'revenue' | 'utilization' | 'days' | 'expense' | 'margin'
 
 export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -45,6 +45,10 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
         diff = a.utilizationRate - b.utilizationRate
       } else if (sortBy === 'days') {
         diff = a.totalRentalDays - b.totalRentalDays
+      } else if (sortBy === 'expense') {
+        diff = a.maintenanceExpenses - b.maintenanceExpenses
+      } else if (sortBy === 'margin') {
+        diff = a.unitProfitMargin - b.unitProfitMargin
       }
       return sortAsc ? diff : -diff
     })
@@ -81,7 +85,7 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
         <div>
           <h2 className="text-base font-bold text-zinc-900 tracking-tight">Performa & Utilisasi Armada</h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Analisis kontribusi pendapatan dan jam operasional tiap unit armada
+            Analisis kontribusi pendapatan, biaya pemeliharaan riil, dan margin laba tiap unit armada
           </p>
         </div>
 
@@ -121,6 +125,18 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
                   <ArrowUpDown className="w-3 h-3 text-zinc-400" />
                 </div>
               </th>
+              <th className="py-3 px-4 cursor-pointer hover:text-zinc-800 select-none" onClick={() => handleSort('expense')}>
+                <div className="flex items-center gap-1">
+                  <span>Biaya Servis</span>
+                  <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                </div>
+              </th>
+              <th className="py-3 px-4 cursor-pointer hover:text-zinc-800 select-none" onClick={() => handleSort('margin')}>
+                <div className="flex items-center gap-1">
+                  <span>Margin Unit</span>
+                  <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                </div>
+              </th>
               <th className="py-3 px-4 cursor-pointer hover:text-zinc-800 select-none" onClick={() => handleSort('utilization')}>
                 <div className="flex items-center gap-1">
                   <span>Utilisasi</span>
@@ -133,13 +149,14 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
           <tbody className="divide-y divide-zinc-100">
             {paginatedItems.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-zinc-400">
+                <td colSpan={8} className="py-8 text-center text-zinc-400">
                   Tidak ada armada yang sesuai dengan pencarian atau rentang tanggal.
                 </td>
               </tr>
             ) : (
               paginatedItems.map((item) => {
                 const badge = getUtilizationBadge(item.utilizationRate)
+                const isDeficit = item.unitProfitMargin < 0
                 return (
                   <tr key={item.plateNumber} className="hover:bg-zinc-50/80 transition-colors">
                     <td className="py-3.5 px-4">
@@ -161,8 +178,29 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
                     <td className="py-3.5 px-4 font-mono font-semibold text-zinc-900">
                       Rp {item.revenueGenerated.toLocaleString('id-ID')}
                     </td>
+                    <td className="py-3.5 px-4 font-mono text-zinc-700">
+                      {item.maintenanceExpenses > 0 ? (
+                        <span className="text-rose-600 font-medium">
+                          Rp {item.maintenanceExpenses.toLocaleString('id-ID')}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400 italic">Rp 0</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono">
+                      {isDeficit ? (
+                        <div className="flex items-center gap-1.5 text-rose-600 font-bold">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          <span>-Rp {Math.abs(item.unitProfitMargin).toLocaleString('id-ID')}</span>
+                        </div>
+                      ) : (
+                        <span className="text-emerald-700 font-bold">
+                          +Rp {item.unitProfitMargin.toLocaleString('id-ID')}
+                        </span>
+                      )}
+                    </td>
                     <td className="py-3.5 px-4">
-                      <div className="w-32">
+                      <div className="w-28">
                         <div className="flex items-center justify-between text-[11px] mb-1 font-mono">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${badge.bg}`}>
                             {item.utilizationRate}%

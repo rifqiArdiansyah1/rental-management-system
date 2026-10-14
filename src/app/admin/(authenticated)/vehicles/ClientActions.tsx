@@ -3,8 +3,9 @@
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createVehicle, updateVehicleStatus, softDeleteVehicle, updateVehicle, updateVehicleUnavailabilityEstimate, relocateVehicle, recordVehicleServiceAction } from '@/actions/adminVehicle'
+import { recordVehicleExpenseAction } from '@/actions/adminExpense'
 import { uploadVehiclePhoto } from '@/actions/vehiclePhoto'
-import { VehicleStatus, FuelType } from '@prisma/client'
+import { VehicleStatus, FuelType, VehicleExpenseCategory } from '@prisma/client'
 import { MIN_VEHICLE_DAILY_RATE, FUEL_TYPE_LABELS } from '@/lib/constants'
 import { getVehicleDisplayName } from '@/lib/vehicleHelper'
 
@@ -539,7 +540,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
   const [menuOpen, setMenuOpen] = useState(false)
   const [openUpward, setOpenUpward] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
-  const [modalType, setModalType] = useState<'edit' | 'status' | 'delete' | 'estimate' | 'relocate' | 'service' | null>(null)
+  const [modalType, setModalType] = useState<'edit' | 'status' | 'delete' | 'estimate' | 'relocate' | 'service' | 'expense' | null>(null)
   
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -565,6 +566,17 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
   // Service Modal states
   const [serviceKm, setServiceKm] = useState<string>('')
   const [serviceNote, setServiceNote] = useState<string>('')
+  const [serviceAmount, setServiceAmount] = useState<string>('')
+  const [serviceVendor, setServiceVendor] = useState<string>('')
+  const [serviceInvoice, setServiceInvoice] = useState<string>('')
+
+  // Expense Modal states
+  const [expenseCategory, setExpenseCategory] = useState<VehicleExpenseCategory>(VehicleExpenseCategory.repair)
+  const [expenseAmount, setExpenseAmount] = useState<string>('')
+  const [expenseVendor, setExpenseVendor] = useState<string>('')
+  const [expenseInvoice, setExpenseInvoice] = useState<string>('')
+  const [expenseOdo, setExpenseOdo] = useState<string>('')
+  const [expenseDescription, setExpenseDescription] = useState<string>('')
   
   const [form, setForm] = useState({
     name: vehicle.name || '',
@@ -729,6 +741,9 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
     setMenuOpen(false)
     setServiceKm(vehicle.currentOdometerKm != null ? String(vehicle.currentOdometerKm) : '')
     setServiceNote('')
+    setServiceAmount('')
+    setServiceVendor('')
+    setServiceInvoice('')
     setError(null)
     setModalType('service')
   }
@@ -738,7 +753,46 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
       setError(null)
       const res = await recordVehicleServiceAction(vehicle.id, {
         servicedAtKm: serviceKm ? Number(serviceKm) : undefined,
-        note: serviceNote.trim() || undefined
+        note: serviceNote.trim() || undefined,
+        amount: serviceAmount ? Number(serviceAmount) : undefined,
+        vendorName: serviceVendor.trim() || undefined,
+        invoiceNumber: serviceInvoice.trim() || undefined,
+      })
+      if (res.error) setError(res.error)
+      else {
+        setModalType(null)
+        router.refresh()
+      }
+    })
+  }
+
+  const handleOpenExpenseModal = () => {
+    setMenuOpen(false)
+    setExpenseCategory(VehicleExpenseCategory.repair)
+    setExpenseAmount('')
+    setExpenseVendor('')
+    setExpenseInvoice('')
+    setExpenseOdo(vehicle.currentOdometerKm != null ? String(vehicle.currentOdometerKm) : '')
+    setExpenseDescription('')
+    setError(null)
+    setModalType('expense')
+  }
+
+  const handleRecordExpense = () => {
+    startTransition(async () => {
+      setError(null)
+      if (!expenseAmount || Number(expenseAmount) <= 0) {
+        setError('Nominal biaya pengeluaran wajib diisi lebih besar dari 0.')
+        return
+      }
+      const res = await recordVehicleExpenseAction({
+        vehicleId: vehicle.id,
+        category: expenseCategory,
+        amount: Number(expenseAmount),
+        vendorName: expenseVendor.trim() || undefined,
+        invoiceNumber: expenseInvoice.trim() || undefined,
+        odometerKm: expenseOdo ? Number(expenseOdo) : undefined,
+        description: expenseDescription.trim() || undefined,
       })
       if (res.error) setError(res.error)
       else {
@@ -793,6 +847,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
       <button 
         ref={buttonRef}
         onClick={handleToggleMenu}
+        data-testid="vehicle-actions-menu-btn"
         className="p-1 hover:bg-zinc-200 rounded-md text-zinc-500 transition-colors"
       >
         •••
@@ -850,15 +905,28 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
             )}
 
             {vehicle.isActive && (
-              <button 
-                onClick={handleOpenServiceModal}
-                className="w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-50 flex items-center justify-between"
-              >
-                <span>Catat Servis Berkala</span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-medium">
-                  Bengkel
-                </span>
-              </button>
+              <>
+                <button 
+                  onClick={handleOpenServiceModal}
+                  className="w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-50 flex items-center justify-between"
+                  data-testid="vehicle-action-service-btn"
+                >
+                  <span>Catat Servis Berkala</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-medium">
+                    Bengkel
+                  </span>
+                </button>
+                <button 
+                  onClick={handleOpenExpenseModal}
+                  className="w-full text-left px-4 py-2 text-sm text-rose-700 hover:bg-rose-50 flex items-center justify-between"
+                  data-testid="vehicle-action-expense-btn"
+                >
+                  <span>Catat Biaya Pemeliharaan</span>
+                  <span className="text-[10px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-medium">
+                    Kas Keluar
+                  </span>
+                </button>
+              </>
             )}
 
             {canEditOrDelete && (
@@ -1164,12 +1232,51 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                   onChange={e => setServiceKm(e.target.value)}
                   placeholder="Misal: 50000"
                   className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  data-testid="service-km-input"
                 />
                 <p className="text-[11px] text-zinc-500 mt-1">KM tercatat di kwitansi bengkel / speedometer fisik</p>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">Total Biaya Servis (Rp)</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    value={serviceAmount}
+                    onChange={e => setServiceAmount(e.target.value)}
+                    placeholder="Misal: 850000"
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    data-testid="service-amount-input"
+                  />
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Biaya kas keluar riil bengkel</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">Nama Bengkel / Rekanan</label>
+                  <input 
+                    type="text"
+                    value={serviceVendor}
+                    onChange={e => setServiceVendor(e.target.value)}
+                    placeholder="Misal: Auto2000 Juanda"
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    data-testid="service-vendor-input"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-medium text-zinc-700 mb-1">Catatan Servis / Bengkel</label>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Nomor Nota / Faktur</label>
+                <input 
+                  type="text"
+                  value={serviceInvoice}
+                  onChange={e => setServiceInvoice(e.target.value)}
+                  placeholder="Misal: INV-2026/X/0012"
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Catatan Servis / Pengerjaan</label>
                 <textarea 
                   rows={2}
                   value={serviceNote}
@@ -1193,9 +1300,124 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
               <button 
                 onClick={handleRecordService}
                 disabled={isPending}
-                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-md disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-md disabled:opacity-50 shadow-xs"
+                data-testid="submit-service-btn"
               >
                 {isPending ? 'Menyimpan...' : 'Simpan Servis Selesai'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Catat Biaya Pemeliharaan */}
+      {modalType === 'expense' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-xl max-w-md w-full shadow-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-zinc-900 mb-1">Catat Biaya Pemeliharaan</h3>
+            <p className="text-xs text-zinc-500 mb-4">
+              Armada: <strong>{getVehicleDisplayName(vehicle, { mode: 'staff' })}</strong> ({vehicle.plateNumber})
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Kategori Pengeluaran *</label>
+                <select
+                  value={expenseCategory}
+                  onChange={e => setExpenseCategory(e.target.value as VehicleExpenseCategory)}
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                  data-testid="expense-category-select"
+                >
+                  <option value={VehicleExpenseCategory.repair}>Perbaikan / Kerusakan Bengkel</option>
+                  <option value={VehicleExpenseCategory.routine_service}>Servis Rutin / Mesin</option>
+                  <option value={VehicleExpenseCategory.tires}>Ganti Ban / Spooring / Balancing</option>
+                  <option value={VehicleExpenseCategory.detailing}>Cuci / Salon / Detailing</option>
+                  <option value={VehicleExpenseCategory.tax_registration}>Pajak STNK / Kir / Dokumen</option>
+                  <option value={VehicleExpenseCategory.other}>Lain-lain</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Nominal Biaya (Rp) *</label>
+                <input 
+                  type="number"
+                  min="1"
+                  value={expenseAmount}
+                  onChange={e => setExpenseAmount(e.target.value)}
+                  placeholder="Misal: 450000"
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  data-testid="expense-amount-input"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">Vendor / Toko / Bengkel</label>
+                  <input 
+                    type="text"
+                    value={expenseVendor}
+                    onChange={e => setExpenseVendor(e.target.value)}
+                    placeholder="Misal: Toko Ban Sejahtera"
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    data-testid="expense-vendor-input"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">Nomor Nota / Kwitansi</label>
+                  <input 
+                    type="text"
+                    value={expenseInvoice}
+                    onChange={e => setExpenseInvoice(e.target.value)}
+                    placeholder="Misal: KW-8821"
+                    className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    data-testid="expense-invoice-input"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Odometer Terkini (km) (Opsional)</label>
+                <input 
+                  type="number"
+                  min="0"
+                  value={expenseOdo}
+                  onChange={e => setExpenseOdo(e.target.value)}
+                  placeholder="Misal: 51200"
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+                <p className="text-[10px] text-zinc-400 mt-0.5">Catatan KM fisik saat pengeluaran terjadi</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">Keterangan / Rincian Pengeluaran</label>
+                <textarea 
+                  rows={2}
+                  value={expenseDescription}
+                  onChange={e => setExpenseDescription(e.target.value)}
+                  placeholder="Misal: Tambal ban tubeless & isi nitrogen 4 roda"
+                  className="w-full text-zinc-900 border border-zinc-300 rounded-md p-2 text-xs focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  data-testid="expense-desc-input"
+                />
+              </div>
+            </div>
+
+            {error && <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded-md">{error}</div>}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button 
+                onClick={() => setModalType(null)}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 rounded-md"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleRecordExpense}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-medium bg-rose-600 text-white hover:bg-rose-700 rounded-md disabled:opacity-50 shadow-xs"
+                data-testid="submit-expense-btn"
+              >
+                {isPending ? 'Menyimpan...' : 'Simpan Pengeluaran'}
               </button>
             </div>
           </div>

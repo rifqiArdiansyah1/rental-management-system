@@ -3,19 +3,20 @@
 import React, { useState } from 'react'
 import { DailyTrendItem } from '@/lib/analytics/metrics'
 import { generateSmoothAreaPaths, formatCompactCurrency, formatCompactNumber } from '@/lib/analytics/svgChartHelper'
-import { DollarSign, FileSpreadsheet, ShoppingBag } from 'lucide-react'
+import { DollarSign, FileSpreadsheet, ShoppingBag, Wrench, Wallet } from 'lucide-react'
 
 interface TrendAreaChartProps {
   dailyTrends: DailyTrendItem[]
 }
 
-type MetricType = 'cashInflow' | 'rentalValue' | 'bookingsCount'
+type MetricType = 'cashInflow' | 'maintenanceExpense' | 'netCashFlow' | 'rentalValue' | 'bookingsCount'
 
 export function TrendAreaChart({ dailyTrends }: TrendAreaChartProps) {
   const [activeMetric, setActiveMetric] = useState<MetricType>('cashInflow')
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
 
-  const values = dailyTrends.map(item => item[activeMetric])
+  // Pastikan nilai tidak negatif untuk perenderan area chart SVG sederhana
+  const values = dailyTrends.map(item => Math.max(0, item[activeMetric]))
 
   const chartWidth = 720
   const chartHeight = 240
@@ -38,6 +39,26 @@ export function TrendAreaChart({ dailyTrends }: TrendAreaChartProps) {
       formatAxis: (val: number) => `Rp ${formatCompactCurrency(val)}`,
       icon: DollarSign,
       activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold'
+    },
+    maintenanceExpense: {
+      label: 'Biaya Perawatan',
+      color: '#f43f5e', // rose-500
+      strokeColor: '#e11d48', // rose-600
+      gradientId: 'expenseGrad',
+      formatTooltip: (val: number) => `Rp ${val.toLocaleString('id-ID')}`,
+      formatAxis: (val: number) => `Rp ${formatCompactCurrency(val)}`,
+      icon: Wrench,
+      activeClass: 'bg-rose-50 text-rose-700 border-rose-300 font-semibold'
+    },
+    netCashFlow: {
+      label: 'Arus Kas Bersih',
+      color: '#6366f1', // indigo-500
+      strokeColor: '#4f46e5', // indigo-600
+      gradientId: 'netFlowGrad',
+      formatTooltip: (val: number) => `Rp ${val.toLocaleString('id-ID')}`,
+      formatAxis: (val: number) => `Rp ${formatCompactCurrency(val)}`,
+      icon: Wallet,
+      activeClass: 'bg-indigo-50 text-indigo-700 border-indigo-300 font-semibold'
     },
     rentalValue: {
       label: 'Nilai Kontrak Sewa',
@@ -78,17 +99,17 @@ export function TrendAreaChart({ dailyTrends }: TrendAreaChartProps) {
   return (
     <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm" data-testid="trend-area-chart">
       {/* Header & Metric Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-zinc-100">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-5 border-b border-zinc-100">
         <div>
           <h2 className="text-base font-bold text-zinc-900 tracking-tight">Tren Performa Harian</h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Dinamika kas dan transaksi rental harian dalam rentang filter
+            Dinamika kas masuk, biaya pemeliharaan, dan volume rental harian (WIB)
           </p>
         </div>
 
         {/* Tab Buttons */}
-        <div className="inline-flex rounded-xl bg-zinc-100 p-1 border border-zinc-200/60 self-start sm:self-auto">
-          {(['cashInflow', 'rentalValue', 'bookingsCount'] as MetricType[]).map((metric) => {
+        <div className="inline-flex flex-wrap rounded-xl bg-zinc-100 p-1 border border-zinc-200/60 self-start xl:self-auto gap-0.5">
+          {(['cashInflow', 'maintenanceExpense', 'netCashFlow', 'rentalValue', 'bookingsCount'] as MetricType[]).map((metric) => {
             const isSelected = activeMetric === metric
             return (
               <button
@@ -98,7 +119,7 @@ export function TrendAreaChart({ dailyTrends }: TrendAreaChartProps) {
                   setActiveMetric(metric)
                   setHoveredIdx(null)
                 }}
-                className={`px-3 py-1.5 text-xs rounded-lg transition-all border ${
+                className={`px-2.5 py-1 text-xs rounded-lg transition-all border ${
                   isSelected
                     ? config.activeClass + ' shadow-xs'
                     : 'text-zinc-600 border-transparent hover:text-zinc-900'
@@ -106,6 +127,8 @@ export function TrendAreaChart({ dailyTrends }: TrendAreaChartProps) {
                 data-testid={`metric-tab-${metric}`}
               >
                 {metric === 'cashInflow' && 'Kas Masuk'}
+                {metric === 'maintenanceExpense' && 'Biaya Perawatan'}
+                {metric === 'netCashFlow' && 'Kas Bersih'}
                 {metric === 'rentalValue' && 'Nilai Sewa'}
                 {metric === 'bookingsCount' && 'Volume Pesanan'}
               </button>
@@ -131,6 +154,11 @@ export function TrendAreaChart({ dailyTrends }: TrendAreaChartProps) {
             <div className="font-bold text-sm text-white font-mono">
               {config.formatTooltip(hoveredItem[activeMetric])}
             </div>
+            {activeMetric === 'netCashFlow' && (
+              <div className="text-[10px] text-zinc-400 mt-0.5">
+                Masuk: Rp {hoveredItem.cashInflow.toLocaleString('id-ID')} | Keluar: Rp {hoveredItem.maintenanceExpense.toLocaleString('id-ID')}
+              </div>
+            )}
           </div>
         )}
 

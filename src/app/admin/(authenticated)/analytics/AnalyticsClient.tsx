@@ -145,7 +145,9 @@ export function AnalyticsClient({ initialData, branches, userRole }: AnalyticsCl
                   <th className="py-2.5 px-4">Kota</th>
                   <th className="py-2.5 px-4">Unit Aktif</th>
                   <th className="py-2.5 px-4">Total Pesanan</th>
-                  <th className="py-2.5 px-4 text-right">Kas Masuk Bersih</th>
+                  <th className="py-2.5 px-4 text-right">Kas Masuk</th>
+                  <th className="py-2.5 px-4 text-right">Biaya Servis</th>
+                  <th className="py-2.5 px-4 text-right">Kas Bersih</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
@@ -155,8 +157,14 @@ export function AnalyticsClient({ initialData, branches, userRole }: AnalyticsCl
                     <td className="py-3 px-4 text-zinc-600">{b.city}</td>
                     <td className="py-3 px-4 font-mono text-zinc-700">{b.activeVehicles} unit</td>
                     <td className="py-3 px-4 font-mono text-zinc-700">{b.totalBookings} sewa</td>
-                    <td className="py-3 px-4 font-mono font-bold text-zinc-900 text-right">
+                    <td className="py-3 px-4 font-mono text-zinc-800 text-right">
                       Rp {b.cashInflow.toLocaleString('id-ID')}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-rose-600 text-right">
+                      Rp {b.maintenanceExpenses.toLocaleString('id-ID')}
+                    </td>
+                    <td className="py-3 px-4 font-mono font-bold text-emerald-700 text-right">
+                      Rp {b.netCashFlow.toLocaleString('id-ID')}
                     </td>
                   </tr>
                 ))}

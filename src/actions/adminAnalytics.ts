@@ -71,7 +71,7 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
 
     const totalWindowHours = Math.max(1, (endBoundary.getTime() - startBoundary.getTime()) / (1000 * 60 * 60))
 
-    // 1. Ambil data Pembayaran (Basis Kas)
+    // 1. Ambil data Pembayaran (Basis Kas) & Pengeluaran Kas
     const paymentsWhere: any = {
       createdAt: { gte: startBoundary, lte: endBoundary },
       status: PaymentStatus.success
@@ -80,7 +80,15 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
       paymentsWhere.booking = { pickupBranchId: targetBranchId }
     }
 
-    const [payments, lateFeeBookings, refundedPayments] = await Promise.all([
+    const expensesWhere: any = {
+      expenseDate: { gte: startBoundary, lte: endBoundary },
+      isVoided: false
+    }
+    if (targetBranchId) {
+      expensesWhere.branchId = targetBranchId
+    }
+
+    const [payments, lateFeeBookings, refundedPayments, expenses] = await Promise.all([
       prisma.payment.findMany({
         where: paymentsWhere,
         select: {
@@ -114,6 +122,18 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
           updatedAt: { gte: startBoundary, lte: endBoundary }
         },
         select: { amount: true }
+      }),
+      prisma.vehicleExpense.findMany({
+        where: expensesWhere,
+        select: {
+          id: true,
+          amount: true,
+          category: true,
+          expenseDate: true,
+          branchId: true,
+          vehicleId: true,
+          vehicle: { select: { plateNumber: true } }
+        }
       })
     ])
 
@@ -121,6 +141,8 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
     const totalLateFeeRevenue = lateFeeBookings.reduce((sum, b) => sum + Number(b.lateFeeAmount || 0), 0)
     const totalRefunds = refundedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
     const netCashInflow = totalSettledPayments + totalLateFeeRevenue - totalRefunds
+    const totalMaintenanceExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+    const netOperatingCashFlow = netCashInflow - totalMaintenanceExpenses
 
     // 2. Ambil data Booking dalam rentang waktu
     const bookings = await prisma.booking.findMany({
@@ -167,14 +189,14 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
     }
 
     // 4. Tren Harian (Daily Trends dalam Timezone WIB)
-    const dailyMap = new Map<string, { cashInflow: number; rentalValue: number; bookingsCount: number }>()
+    const dailyMap = new Map<string, { cashInflow: number; maintenanceExpense: number; rentalValue: number; bookingsCount: number }>()
     
     // Inisialisasi setiap hari dalam rentang kalender
     const curDate = new Date(dateFromStr + 'T00:00:00Z')
     const endDateObj = new Date(dateToStr + 'T00:00:00Z')
     while (curDate <= endDateObj) {
       const key = curDate.toISOString().split('T')[0]
-      dailyMap.set(key, { cashInflow: 0, rentalValue: 0, bookingsCount: 0 })
+      dailyMap.set(key, { cashInflow: 0, maintenanceExpense: 0, rentalValue: 0, bookingsCount: 0 })
       curDate.setUTCDate(curDate.getUTCDate() + 1)
     }
 
@@ -196,6 +218,14 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
         }
       }
     }
+    // Petakan Pengeluaran Perawatan ke Hari WIB
+    for (const e of expenses) {
+      const eWibStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(e.expenseDate))
+      const entry = dailyMap.get(eWibStr)
+      if (entry) {
+        entry.maintenanceExpense += Number(e.amount)
+      }
+    }
     // Petakan Booking ke Hari WIB
     for (const b of bookings) {
       const bWibStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(b.createdAt))
@@ -212,11 +242,19 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
       date: dateKey,
       formattedDate: formatDayMonthWib(dateKey),
       cashInflow: Math.round(val.cashInflow),
+      maintenanceExpense: Math.round(val.maintenanceExpense),
+      netCashFlow: Math.round(val.cashInflow - val.maintenanceExpense),
       rentalValue: Math.round(val.rentalValue),
       bookingsCount: val.bookingsCount
     }))
 
     // 5. Performa Armada & Utilisasi (Mengelompokkan berdasarkan identitas fisik plat nomor)
+    const expenseByPlate = new Map<string, number>()
+    for (const e of expenses) {
+      const plate = e.vehicle.plateNumber
+      expenseByPlate.set(plate, (expenseByPlate.get(plate) || 0) + Number(e.amount))
+    }
+
     const vehicles = await prisma.vehicle.findMany({
       where: {
         ...(targetBranchId ? { branchId: targetBranchId } : {}),
@@ -258,6 +296,8 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
 
       totalRentedHoursAllFleet += vehicleRentedHours
       const utilizationRate = Math.min(100, Math.round((vehicleRentedHours / totalWindowHours) * 100))
+      const vehicleExpenses = expenseByPlate.get(v.plateNumber) || 0
+      const unitProfitMargin = Math.round(vehicleRevenue - vehicleExpenses)
 
       return {
         plateNumber: v.plateNumber,
@@ -267,6 +307,8 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
         totalRentalHours: Math.round(vehicleRentedHours),
         totalRentalDays: Number((vehicleRentedHours / 24).toFixed(1)),
         revenueGenerated: Math.round(vehicleRevenue),
+        maintenanceExpenses: Math.round(vehicleExpenses),
+        unitProfitMargin,
         utilizationRate,
         currentOdometerKm: v.currentOdometerKm != null ? Number(v.currentOdometerKm) : null
       }
@@ -299,12 +341,15 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
         const branchPayments = payments.filter(p => p.booking?.pickupBranchId === b.id)
         const branchLateFees = lateFeeBookings.filter(l => l.pickupBranchId === b.id)
         const bCashInflow = branchPayments.reduce((s, p) => s + Number(p.amount), 0) + branchLateFees.reduce((s, l) => s + Number(l.lateFeeAmount || 0), 0)
+        const bExpenses = expenses.filter(e => e.branchId === b.id).reduce((s, e) => s + Number(e.amount), 0)
         
         branchComparisons.push({
           branchId: b.id,
           branchName: b.name,
           city: b.city,
           cashInflow: bCashInflow,
+          maintenanceExpenses: Math.round(bExpenses),
+          netCashFlow: Math.round(bCashInflow - bExpenses),
           totalBookings: b.pickups.length,
           activeVehicles: b.vehicles.length,
           utilizationRate: 0 // Placeholder agregasi
@@ -315,6 +360,8 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
 
     const kpi: KpiMetrics = {
       netCashInflow: Math.round(netCashInflow),
+      totalMaintenanceExpenses: Math.round(totalMaintenanceExpenses),
+      netOperatingCashFlow: Math.round(netOperatingCashFlow),
       grossRentalValue: Math.round(grossRentalValue),
       totalBookings,
       completedBookings,
@@ -371,6 +418,8 @@ export async function exportAnalyticsCsvAction(params: {
       const headers = [
         'Tanggal (WIB)',
         'Arus Kas Masuk (IDR)',
+        'Biaya Perawatan (IDR)',
+        'Arus Kas Bersih (IDR)',
         'Nilai Kontrak Sewa (IDR)',
         'Jumlah Pesanan Dibuat'
       ]
@@ -379,6 +428,8 @@ export async function exportAnalyticsCsvAction(params: {
         rows.push([
           escapeCsv(item.date),
           escapeCsv(item.cashInflow),
+          escapeCsv(item.maintenanceExpense),
+          escapeCsv(item.netCashFlow),
           escapeCsv(item.rentalValue),
           escapeCsv(item.bookingsCount)
         ].join(','))
@@ -394,6 +445,8 @@ export async function exportAnalyticsCsvAction(params: {
         'Cabang',
         'Total Hari Disewa',
         'Pendapatan Dihasilkan (IDR)',
+        'Biaya Perawatan (IDR)',
+        'Margin Laba Unit (IDR)',
         'Tingkat Utilisasi (%)',
         'Odometer Terkini (KM)'
       ]
@@ -406,6 +459,8 @@ export async function exportAnalyticsCsvAction(params: {
           escapeCsv(item.branchName),
           escapeCsv(item.totalRentalDays),
           escapeCsv(item.revenueGenerated),
+          escapeCsv(item.maintenanceExpenses),
+          escapeCsv(item.unitProfitMargin),
           escapeCsv(`${item.utilizationRate}%`),
           escapeCsv(item.currentOdometerKm != null ? `${item.currentOdometerKm} km` : '-')
         ].join(','))

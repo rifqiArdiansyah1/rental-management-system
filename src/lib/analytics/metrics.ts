@@ -10,6 +10,8 @@ export interface AnalyticsDateRange {
 
 export interface KpiMetrics {
   netCashInflow: number
+  totalMaintenanceExpenses: number
+  netOperatingCashFlow: number
   grossRentalValue: number
   totalBookings: number
   completedBookings: number
@@ -25,6 +27,8 @@ export interface DailyTrendItem {
   date: string // 'YYYY-MM-DD'
   formattedDate: string // e.g. "12 Okt"
   cashInflow: number
+  maintenanceExpense: number
+  netCashFlow: number
   rentalValue: number
   bookingsCount: number
 }
@@ -37,6 +41,8 @@ export interface FleetPerformanceItem {
   totalRentalHours: number
   totalRentalDays: number
   revenueGenerated: number
+  maintenanceExpenses: number
+  unitProfitMargin: number // revenueGenerated - maintenanceExpenses
   utilizationRate: number // 0 - 100%
   currentOdometerKm: number | null
 }
@@ -56,6 +62,8 @@ export interface BranchComparisonItem {
   branchName: string
   city: string
   cashInflow: number
+  maintenanceExpenses: number
+  netCashFlow: number
   totalBookings: number
   activeVehicles: number
   utilizationRate: number

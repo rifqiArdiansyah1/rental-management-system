@@ -996,6 +996,9 @@ export async function recordVehicleServiceAction(
   data?: {
     servicedAtKm?: number
     note?: string
+    amount?: number
+    vendorName?: string
+    invoiceNumber?: string
     actor?: { id: string; role: UserRole; branchId?: string | null }
   }
 ): Promise<{ success?: boolean; error?: string }> {
@@ -1053,7 +1056,28 @@ export async function recordVehicleServiceAction(
         }
       })
 
-      return { vehicle, servicedKm, nextCurrentKm }
+      // Jika ada nominal biaya servis, catat sebagai VehicleExpense
+      let createdExpenseId: string | null = null
+      const amountNum = Number(data?.amount || 0)
+      if (amountNum > 0) {
+        const expense = await tx.vehicleExpense.create({
+          data: {
+            vehicleId: vehicle.id,
+            branchId: vehicle.branchId,
+            category: 'routine_service',
+            amount: new Prisma.Decimal(amountNum),
+            odometerKm: servicedKm,
+            vendorName: data?.vendorName?.trim() || null,
+            invoiceNumber: data?.invoiceNumber?.trim() || null,
+            description: data?.note?.trim() || 'Servis berkala armada',
+            expenseDate: new Date(),
+            recordedById: adminUser.id
+          }
+        })
+        createdExpenseId = expense.id
+      }
+
+      return { vehicle, servicedKm, nextCurrentKm, createdExpenseId, amount: amountNum }
     })
 
     logAudit({
@@ -1069,10 +1093,13 @@ export async function recordVehicleServiceAction(
         previousLastServiceOdometerKm: result.vehicle.lastServiceOdometerKm,
         updatedCurrentOdometerKm: result.nextCurrentKm,
         note: data?.note?.trim() || null,
+        expenseId: result.createdExpenseId,
+        amount: result.amount
       }
     })
 
     safeRevalidatePath('/admin/vehicles')
+    safeRevalidatePath('/admin/analytics')
     safeRevalidatePath('/admin/dashboard')
 
     return { success: true }
