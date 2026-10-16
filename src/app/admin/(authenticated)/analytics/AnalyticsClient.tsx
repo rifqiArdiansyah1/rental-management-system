@@ -8,7 +8,7 @@ import { KpiCardGrid } from '@/components/admin/analytics/KpiCardGrid'
 import { TrendAreaChart } from '@/components/admin/analytics/TrendAreaChart'
 import { FleetPerformanceTable } from '@/components/admin/analytics/FleetPerformanceTable'
 import { RentalFunnelChart } from '@/components/admin/analytics/RentalFunnelChart'
-import { Building2, AlertCircle } from 'lucide-react'
+import { Building2, AlertCircle, Info } from 'lucide-react'
 
 interface BranchOption {
   id: string
@@ -111,6 +111,16 @@ export function AnalyticsClient({ initialData, branches, userRole }: AnalyticsCl
         <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Partial Cost Data Notice */}
+      {data.hasPartialCostData && (
+        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2.5" data-testid="partial-cost-banner">
+          <Info className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>
+            <strong>Data Biaya Parsial:</strong> Pelacakan biaya armada resmi dimulai sejak {data.costTrackingStartDate}. Periode sewa sebelum tanggal ini mungkin belum merefleksikan seluruh biaya riil armada.
+          </span>
         </div>
       )}
 

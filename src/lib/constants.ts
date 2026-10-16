@@ -153,4 +153,15 @@ export type IncidentCategory = (typeof VALID_INCIDENT_CATEGORIES)[number]
 export const WALK_IN_REVIEW_AGING_HOURS = 24
 export const WALK_IN_REVIEW_AGING_MS = WALK_IN_REVIEW_AGING_HOURS * 60 * 60 * 1000
 
+/**
+ * Konstanta modul pelacakan biaya pemeliharaan armada dan analitik finansial.
+ */
+export const COST_TRACKING_START_DATE = '2026-10-16'
+export const ODOMETER_SERVICE_TOLERANCE_KM = 500
+export const EXPENSE_BACKDATE_LIMIT_STAFF_DAYS = 7
+export const EXPENSE_BACKDATE_LIMIT_ADMIN_DAYS = 60
+export const DEFICIT_MIN_PERIOD_DAYS = 90
+export const DEFICIT_MIN_FLEET_AGE_DAYS = 90
+
+
 

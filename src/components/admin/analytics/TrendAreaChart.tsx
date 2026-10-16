@@ -61,7 +61,7 @@ export function TrendAreaChart({ dailyTrends }: TrendAreaChartProps) {
       activeClass: 'bg-indigo-50 text-indigo-700 border-indigo-300 font-semibold'
     },
     rentalValue: {
-      label: 'Nilai Kontrak Sewa',
+      label: 'Pendapatan Akrual',
       color: '#f59e0b', // amber-500
       strokeColor: '#d97706', // amber-600
       gradientId: 'rentalGrad',
@@ -129,7 +129,7 @@ export function TrendAreaChart({ dailyTrends }: TrendAreaChartProps) {
                 {metric === 'cashInflow' && 'Kas Masuk'}
                 {metric === 'maintenanceExpense' && 'Biaya Perawatan'}
                 {metric === 'netCashFlow' && 'Kas Bersih'}
-                {metric === 'rentalValue' && 'Nilai Sewa'}
+                {metric === 'rentalValue' && 'Pendapatan Akrual'}
                 {metric === 'bookingsCount' && 'Volume Pesanan'}
               </button>
             )

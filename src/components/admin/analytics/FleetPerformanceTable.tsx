@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import { FleetPerformanceItem } from '@/lib/analytics/metrics'
-import { Search, Gauge, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
+import { Search, Gauge, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle, Info } from 'lucide-react'
 
 interface FleetPerformanceTableProps {
   fleetPerformance: FleetPerformanceItem[]
@@ -12,7 +12,7 @@ type SortField = 'revenue' | 'utilization' | 'days' | 'expense' | 'margin'
 
 export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [sortBy, setSortBy] = useState<SortField>('revenue')
+  const [sortBy, setSortBy] = useState<SortField>('margin')
   const [sortAsc, setSortAsc] = useState(false)
   const [page, setPage] = useState(1)
   const pageSize = 8
@@ -40,15 +40,15 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
     result.sort((a, b) => {
       let diff = 0
       if (sortBy === 'revenue') {
-        diff = a.revenueGenerated - b.revenueGenerated
+        diff = a.accruedRealizedRevenue - b.accruedRealizedRevenue
       } else if (sortBy === 'utilization') {
         diff = a.utilizationRate - b.utilizationRate
       } else if (sortBy === 'days') {
         diff = a.totalRentalDays - b.totalRentalDays
       } else if (sortBy === 'expense') {
-        diff = a.maintenanceExpenses - b.maintenanceExpenses
+        diff = a.physicalMaintenanceExpenses - b.physicalMaintenanceExpenses
       } else if (sortBy === 'margin') {
-        diff = a.unitProfitMargin - b.unitProfitMargin
+        diff = a.operatingProfitMargin - b.operatingProfitMargin
       }
       return sortAsc ? diff : -diff
     })
@@ -83,9 +83,9 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
       {/* Table Header Controls */}
       <div className="p-5 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold text-zinc-900 tracking-tight">Performa & Utilisasi Armada</h2>
+          <h2 className="text-base font-bold text-zinc-900 tracking-tight">Kinerja Finansial Armada</h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Analisis kontribusi pendapatan, biaya pemeliharaan riil, dan margin laba tiap unit armada
+            Pendapatan akrual sewa terealisasi dikurangi beban pemeliharaan fisik unit armada
           </p>
         </div>
 
@@ -121,19 +121,19 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
               </th>
               <th className="py-3 px-4 cursor-pointer hover:text-zinc-800 select-none" onClick={() => handleSort('revenue')}>
                 <div className="flex items-center gap-1">
-                  <span>Pendapatan</span>
+                  <span>Pendapatan Akrual</span>
                   <ArrowUpDown className="w-3 h-3 text-zinc-400" />
                 </div>
               </th>
               <th className="py-3 px-4 cursor-pointer hover:text-zinc-800 select-none" onClick={() => handleSort('expense')}>
                 <div className="flex items-center gap-1">
-                  <span>Biaya Servis</span>
+                  <span>Biaya Fisik</span>
                   <ArrowUpDown className="w-3 h-3 text-zinc-400" />
                 </div>
               </th>
               <th className="py-3 px-4 cursor-pointer hover:text-zinc-800 select-none" onClick={() => handleSort('margin')}>
                 <div className="flex items-center gap-1">
-                  <span>Margin Unit</span>
+                  <span>Margin Operasional</span>
                   <ArrowUpDown className="w-3 h-3 text-zinc-400" />
                 </div>
               </th>
@@ -156,7 +156,8 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
             ) : (
               paginatedItems.map((item) => {
                 const badge = getUtilizationBadge(item.utilizationRate)
-                const isDeficit = item.unitProfitMargin < 0
+                const isDeficit = item.operatingProfitMargin < 0
+
                 return (
                   <tr key={item.plateNumber} className="hover:bg-zinc-50/80 transition-colors">
                     <td className="py-3.5 px-4">
@@ -175,27 +176,56 @@ export function FleetPerformanceTable({ fleetPerformance }: FleetPerformanceTabl
                       <div>{item.totalRentalDays} hari</div>
                       <div className="text-[10px] text-zinc-400">({item.totalRentalHours} jam)</div>
                     </td>
-                    <td className="py-3.5 px-4 font-mono font-semibold text-zinc-900">
-                      Rp {item.revenueGenerated.toLocaleString('id-ID')}
+                    <td className="py-3.5 px-4 font-mono">
+                      <div className="font-semibold text-zinc-900">
+                        Rp {item.accruedRealizedRevenue.toLocaleString('id-ID')}
+                      </div>
+                      {item.accruedScheduledRevenue > 0 && (
+                        <div className="text-[10px] text-zinc-400">
+                          Pipeline: Rp {item.accruedScheduledRevenue.toLocaleString('id-ID')}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 font-mono text-zinc-700">
-                      {item.maintenanceExpenses > 0 ? (
+                      {item.physicalMaintenanceExpenses > 0 ? (
                         <span className="text-rose-600 font-medium">
-                          Rp {item.maintenanceExpenses.toLocaleString('id-ID')}
+                          Rp {item.physicalMaintenanceExpenses.toLocaleString('id-ID')}
                         </span>
                       ) : (
                         <span className="text-zinc-400 italic">Rp 0</span>
                       )}
+                      {item.ownershipExpenses > 0 && (
+                        <div className="text-[10px] text-zinc-400">
+                          Legal: Rp {item.ownershipExpenses.toLocaleString('id-ID')}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 font-mono">
                       {isDeficit ? (
-                        <div className="flex items-center gap-1.5 text-rose-600 font-bold">
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                          <span>-Rp {Math.abs(item.unitProfitMargin).toLocaleString('id-ID')}</span>
+                        <div>
+                          <div className="flex items-center gap-1.5 text-rose-600 font-bold">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            <span>-Rp {Math.abs(item.operatingProfitMargin).toLocaleString('id-ID')}</span>
+                          </div>
+                          {item.isDeficitQualified ? (
+                            <span className="inline-block mt-1 px-1.5 py-0.5 text-[9px] font-semibold bg-rose-100 text-rose-800 rounded border border-rose-200">
+                              Unit Defisit (≥90 hari)
+                            </span>
+                          ) : (
+                            <div className="mt-0.5 text-[10px] text-zinc-500 flex items-center gap-1">
+                              <Info className="w-3 h-3 text-zinc-400 shrink-0" />
+                              <span>Margin negatif periode ini</span>
+                            </div>
+                          )}
+                          {item.largestExpenseCategory && (
+                            <div className="text-[10px] text-zinc-400">
+                              Biaya utama: {item.largestExpenseCategory} (Rp {item.largestExpenseAmount?.toLocaleString('id-ID')})
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-emerald-700 font-bold">
-                          +Rp {item.unitProfitMargin.toLocaleString('id-ID')}
+                          +Rp {item.operatingProfitMargin.toLocaleString('id-ID')}
                         </span>
                       )}
                     </td>

@@ -3,6 +3,9 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { createClient } from '@supabase/supabase-js';
+import { recordVehicleExpenseAction, getVehicleExpensesAction } from '../../src/actions/adminExpense';
+import { getAnalyticsData } from '../../src/actions/adminAnalytics';
+import { calculateAccrualRevenueProration } from '../../src/lib/analytics/metrics';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -20,7 +23,12 @@ let adminCabangPassword = 'Password123!';
 let adminPusatEmail = 'admin_pusat_analytics@test.com';
 let adminPusatPassword = 'Password123!';
 
-test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
+let staffId: string | undefined;
+let adminCabangId: string | undefined;
+let adminPusatId: string | undefined;
+let vehicleAlphaId = 'v0000000-0000-0000-0000-00000000000a';
+
+test.describe('Admin Analytics Dashboard (Tahap 1 & Finansial Dua Pilar)', () => {
 
   test.beforeAll(async () => {
     // 1. Setup Branches
@@ -42,10 +50,9 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
       create: { id: 'c0000000-0000-0000-0000-00000000000a', name: 'Premium Sedan', capacity: 5, transmission: 'Auto', features: [] }
     });
 
-    let vehicleAlphaId = 'v0000000-0000-0000-0000-00000000000a';
     const v1 = await prisma.vehicle.upsert({
       where: { id: vehicleAlphaId },
-      update: { branchId: branchAlphaId, currentOdometerKm: 25400 },
+      update: { branchId: branchAlphaId, currentOdometerKm: 25400, lastServiceOdometerKm: 20000 },
       create: {
         id: vehicleAlphaId,
         plateNumber: 'B 8888 ANL',
@@ -53,7 +60,8 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
         branchId: branchAlphaId,
         categoryId: cat.id,
         dailyRate: 1500000,
-        currentOdometerKm: 25400
+        currentOdometerKm: 25400,
+        lastServiceOdometerKm: 20000
       }
     });
 
@@ -77,7 +85,9 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
 
     const testBookingId = 'b0000000-0000-0000-0000-00000000000a';
     const testPaymentId = 'p0000000-0000-0000-0000-00000000000a';
-    await prisma.payment.deleteMany({ where: { id: testPaymentId } });
+    const testLateFeePaymentId = 'p0000000-0000-0000-0000-00000000000b';
+
+    await prisma.payment.deleteMany({ where: { id: { in: [testPaymentId, testLateFeePaymentId] } } });
     await prisma.booking.deleteMany({ where: { id: testBookingId } });
 
     const booking = await prisma.booking.create({
@@ -98,14 +108,23 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
       }
     });
 
-    await prisma.payment.create({
-      data: {
-        id: testPaymentId,
-        bookingId: booking.id,
-        amount: 3000000,
-        method: 'bank_transfer',
-        status: 'success'
-      }
+    await prisma.payment.createMany({
+      data: [
+        {
+          id: testPaymentId,
+          bookingId: booking.id,
+          amount: 3000000,
+          method: 'bank_transfer',
+          status: 'success'
+        },
+        {
+          id: testLateFeePaymentId,
+          bookingId: booking.id,
+          amount: 150000,
+          method: 'cash_late_fee',
+          status: 'success'
+        }
+      ]
     });
 
     // 4. Setup Auth Users via Supabase Admin
@@ -122,7 +141,7 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
       email_confirm: true,
       app_metadata: { role: 'staff_cabang', branchId: branchAlphaId }
     });
-    let staffId = authStaff.user?.id;
+    staffId = authStaff.user?.id;
     if (!staffId) {
       const { data } = await supabaseAdmin.auth.admin.listUsers();
       staffId = data.users.find(u => u.email === staffEmail)?.id;
@@ -143,7 +162,7 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
       email_confirm: true,
       app_metadata: { role: 'admin_cabang', branchId: branchAlphaId }
     });
-    let adminCabangId = authAdminCabang.user?.id;
+    adminCabangId = authAdminCabang.user?.id;
     if (!adminCabangId) {
       const { data } = await supabaseAdmin.auth.admin.listUsers();
       adminCabangId = data.users.find(u => u.email === adminCabangEmail)?.id;
@@ -164,7 +183,7 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
       email_confirm: true,
       app_metadata: { role: 'admin_pusat' }
     });
-    let adminPusatId = authAdminPusat.user?.id;
+    adminPusatId = authAdminPusat.user?.id;
     if (!adminPusatId) {
       const { data } = await supabaseAdmin.auth.admin.listUsers();
       adminPusatId = data.users.find(u => u.email === adminPusatEmail)?.id;
@@ -235,11 +254,12 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
     await expect(page.getByTestId('analytics-page')).toBeVisible();
     await expect(page.getByTestId('kpi-card-grid')).toBeVisible();
 
-    // Check 5 KPI cards
+    // Check KPI cards (Pilar Kas & Akrual terealisasi)
     await expect(page.getByTestId('kpi-net-cash')).toContainText('3.150.000');
     await expect(page.getByTestId('kpi-maintenance-expenses')).toContainText('500.000');
     await expect(page.getByTestId('kpi-operating-cash')).toContainText('2.650.000');
-    await expect(page.getByTestId('kpi-rental-value')).toContainText('3.000.000');
+    await expect(page.getByTestId('kpi-realized-revenue')).toContainText('3.150.000');
+    await expect(page.getByTestId('kpi-operating-margin')).toContainText('2.650.000');
     await expect(page.getByTestId('kpi-utilization-rate')).toBeVisible();
 
     // Verify charts
@@ -254,12 +274,12 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
     await page.getByTestId('metric-tab-netCashFlow').click();
     await page.getByTestId('metric-tab-cashInflow').click();
 
-    // Verify fleet table displays vehicle, odometer, maintenance expenses, and unit margin
+    // Verify fleet table displays vehicle, odometer, maintenance expenses, and unit margin (+Rp 2.650.000)
     const fleetTable = page.getByTestId('fleet-performance-table');
     await expect(fleetTable).toContainText('B 8888 ANL');
     await expect(fleetTable).toContainText('25.400 km');
     await expect(fleetTable).toContainText('500.000');
-    await expect(fleetTable).toContainText('+Rp 2.500.000');
+    await expect(fleetTable).toContainText('+Rp 2.650.000');
   });
 
   test('admin_pusat can see branch filter and CSV export logs audit entry', async ({ page }) => {
@@ -372,6 +392,153 @@ test.describe('Admin Analytics Dashboard (Tahap 1)', () => {
 
     // Clean up
     await prisma.vehicleExpense.deleteMany({ where: { id: createdExpense!.id } });
+  });
+
+  test('Odometer Skip-and-Audit: servis dengan KM tidak wajar tetap tersimpan dan anomali dicatat di audit tanpa merusak currentOdometerKm', async () => {
+    const actorCabang = { id: adminCabangId!, role: 'admin_cabang' as const, branchId: branchAlphaId };
+
+    const initialVehicle = await prisma.vehicle.findUnique({ where: { id: vehicleAlphaId } });
+    const initialOdo = initialVehicle?.currentOdometerKm;
+    const initialLastServiceOdo = initialVehicle?.lastServiceOdometerKm;
+
+    // Catat servis berkala dengan kilometer di luar batas wajar (999.999 km)
+    const anomalyRes = await recordVehicleExpenseAction({
+      vehicleId: vehicleAlphaId,
+      category: 'routine_service',
+      amount: 450000,
+      odometerKm: 999999, // Terlalu tinggi dibanding currentOdometerKm (25.400)
+      vendorName: 'Bengkel Ekstrem',
+      invoiceNumber: 'INV-ANOMALY-1',
+      actor: actorCabang
+    });
+
+    // Biaya HARUS tetap tersimpan (Non-Blocking Finansial)
+    expect(anomalyRes.success).toBe(true);
+    expect(anomalyRes.expenseId).toBeDefined();
+    expect(anomalyRes.warning).toContain('melebihi batas wajar');
+
+    // Verifikasi meter pada Vehicle TIDAK dirusak
+    const vehicleAfter = await prisma.vehicle.findUnique({ where: { id: vehicleAlphaId } });
+    expect(vehicleAfter?.currentOdometerKm).toBe(initialOdo);
+    expect(vehicleAfter?.lastServiceOdometerKm).toBe(initialLastServiceOdo);
+
+    // Verifikasi catatan anomali di AuditLog
+    const auditRecord = await prisma.auditLog.findFirst({
+      where: { entityId: anomalyRes.expenseId },
+      orderBy: { createdAt: 'desc' }
+    });
+    expect(auditRecord).not.toBeNull();
+    expect(auditRecord?.metadata).toMatchObject({
+      isOdometerAnomaly: true,
+      amount: 450000
+    });
+
+    // Cleanup
+    await prisma.vehicleExpense.deleteMany({ where: { id: anomalyRes.expenseId } });
+  });
+
+  test('Unit tanpa currentOdometerKm tidak memblokir pencatatan servis', async () => {
+    const actorCabang = { id: adminCabangId!, role: 'admin_cabang' as const, branchId: branchAlphaId };
+
+    // Buat kendaraan baru tanpa kilometer (null)
+    const nullOdoVehicle = await prisma.vehicle.create({
+      data: {
+        plateNumber: 'B 9999 NUL',
+        name: 'Unit Tanpa Odometer',
+        branchId: branchAlphaId,
+        categoryId: 'c0000000-0000-0000-0000-00000000000a',
+        dailyRate: 500000,
+        currentOdometerKm: null,
+        lastServiceOdometerKm: null
+      }
+    });
+
+    // Catat servis berkala di 15.000 km
+    const res = await recordVehicleExpenseAction({
+      vehicleId: nullOdoVehicle.id,
+      category: 'routine_service',
+      amount: 300000,
+      odometerKm: 15000,
+      vendorName: 'Bengkel Perdana',
+      invoiceNumber: 'INV-NULL-1',
+      actor: actorCabang
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.error).toBeUndefined();
+
+    // lastServiceOdometerKm berhasil diupdate
+    const updated = await prisma.vehicle.findUnique({ where: { id: nullOdoVehicle.id } });
+    expect(updated?.lastServiceOdometerKm).toBe(15000);
+
+    // Cleanup
+    await prisma.vehicleExpense.deleteMany({ where: { vehicleId: nullOdoVehicle.id } });
+    await prisma.vehicle.delete({ where: { id: nullOdoVehicle.id } });
+  });
+
+  test('Prorata sewa lintas batas waktu/bulan menghasilkan total yang presisi sama dengan totalPrice', () => {
+    const bookingStart = new Date('2026-10-01T00:00:00Z');
+    const bookingEnd = new Date('2026-10-05T00:00:00Z'); // 4 hari (96 jam)
+    const totalPrice = 4000000;
+
+    // Window 1: 2 hari pertama
+    const win1Start = new Date('2026-10-01T00:00:00Z');
+    const win1End = new Date('2026-10-03T00:00:00Z');
+    const p1 = calculateAccrualRevenueProration(bookingStart, bookingEnd, totalPrice, win1Start, win1End, new Date('2026-10-10T00:00:00Z'));
+
+    // Window 2: 2 hari kedua
+    const win2Start = new Date('2026-10-03T00:00:00Z');
+    const win2End = new Date('2026-10-05T00:00:00Z');
+    const p2 = calculateAccrualRevenueProration(bookingStart, bookingEnd, totalPrice, win2Start, win2End, new Date('2026-10-10T00:00:00Z'));
+
+    expect(p1.realizedRevenue + p2.realizedRevenue).toBe(totalPrice);
+    expect(p1.totalOverlapHours + p2.totalOverlapHours).toBe(96);
+  });
+
+  test('Deteksi nota ganda mewajibkan konfirmasi', async () => {
+    const actorCabang = { id: adminCabangId!, role: 'admin_cabang' as const, branchId: branchAlphaId };
+
+    // Input pertama
+    const firstRes = await recordVehicleExpenseAction({
+      vehicleId: vehicleAlphaId,
+      category: 'repair',
+      amount: 200000,
+      vendorName: 'Bengkel Cermat',
+      invoiceNumber: 'INV-DUP-TEST',
+      actor: actorCabang
+    });
+    expect(firstRes.success).toBe(true);
+
+    // Input kedua dengan nomor nota dan vendor sama tanpa konfirmasi
+    const dupRes = await recordVehicleExpenseAction({
+      vehicleId: vehicleAlphaId,
+      category: 'repair',
+      amount: 200000,
+      vendorName: 'Bengkel Cermat',
+      invoiceNumber: 'INV-DUP-TEST',
+      allowDuplicateInvoice: false,
+      actor: actorCabang
+    });
+    expect(dupRes.requiresConfirmation).toBe(true);
+    expect(dupRes.warning).toContain('sudah pernah dicatat di cabang ini');
+
+    // Input kedua dengan allowDuplicateInvoice = true -> Berhasil
+    const confirmRes = await recordVehicleExpenseAction({
+      vehicleId: vehicleAlphaId,
+      category: 'repair',
+      amount: 200000,
+      vendorName: 'Bengkel Cermat',
+      invoiceNumber: 'INV-DUP-TEST',
+      allowDuplicateInvoice: true,
+      duplicateReason: 'Nota mencakup perbaikan 2 item terpisah',
+      actor: actorCabang
+    });
+    expect(confirmRes.success).toBe(true);
+
+    // Cleanup
+    await prisma.vehicleExpense.deleteMany({
+      where: { vehicleId: vehicleAlphaId, invoiceNumber: 'INV-DUP-TEST' }
+    });
   });
 
 });

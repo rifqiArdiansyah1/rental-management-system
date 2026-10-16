@@ -3,11 +3,12 @@
 import { prisma } from '@/utils/prisma'
 import { requireAdminSession } from '@/actions/admin'
 import { getStaffScope, assertInScope } from '@/lib/auth/scope'
-import { VehicleStatus, Prisma, FuelType, UserRole } from '@prisma/client'
+import { VehicleStatus, Prisma, FuelType, UserRole, VehicleExpenseCategory } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { logAudit } from '@/lib/audit'
 import { MIN_VEHICLE_DAILY_RATE, TURNOVER_BUFFER_MS } from '@/lib/constants'
 import { checkIntervalOverlap } from '@/lib/booking'
+import { recordVehicleExpenseAction } from '@/actions/adminExpense'
 
 function safeRevalidatePath(path: string) {
   try {
@@ -1001,109 +1002,16 @@ export async function recordVehicleServiceAction(
     invoiceNumber?: string
     actor?: { id: string; role: UserRole; branchId?: string | null }
   }
-): Promise<{ success?: boolean; error?: string }> {
-  try {
-    const adminUser = (process.env.NODE_ENV !== 'production' && data?.actor)
-      ? data.actor
-      : await requireAdminSession()
-
-    const scope = (process.env.NODE_ENV !== 'production' && data?.actor)
-      ? (data.actor.role === 'admin_pusat' ? { scope: 'all' as const } : { scope: 'branch' as const, branchId: data.actor.branchId! })
-      : await getStaffScope()
-
-    const result = await prisma.$transaction(async (tx) => {
-      // Defense-in-depth: explicit row lock on Vehicle to prevent race conditions with concurrent endRental / status change
-      await tx.$queryRawUnsafe('SELECT id FROM "Vehicle" WHERE id = $1 FOR UPDATE', vehicleId)
-
-      const vehicle = await tx.vehicle.findUnique({
-        where: { id: vehicleId }
-      })
-
-      if (!vehicle) {
-        throw new Error('Kendaraan tidak ditemukan.')
-      }
-
-      if (!vehicle.isActive) {
-        throw new Error('Kendaraan nonaktif tidak dapat dicatat servisnya.')
-      }
-
-      assertInScope([vehicle.branchId], scope)
-
-      const rawKm = data?.servicedAtKm
-      let servicedKm: number
-
-      if (rawKm !== undefined && rawKm !== null) {
-        if (isNaN(Number(rawKm)) || Number(rawKm) < 0) {
-          throw new Error('Kilometer servis harus berupa angka non-negatif.')
-        }
-        servicedKm = Math.round(Number(rawKm))
-        if (vehicle.lastServiceOdometerKm != null && servicedKm < vehicle.lastServiceOdometerKm) {
-          throw new Error(`Kilometer servis (${servicedKm.toLocaleString('id-ID')} km) tidak boleh lebih kecil dari servis sebelumnya (${vehicle.lastServiceOdometerKm.toLocaleString('id-ID')} km).`)
-        }
-      } else {
-        servicedKm = vehicle.currentOdometerKm ?? vehicle.initialOdometerKm ?? 0
-      }
-
-      const nextCurrentKm = (vehicle.currentOdometerKm == null || servicedKm > vehicle.currentOdometerKm)
-        ? servicedKm
-        : vehicle.currentOdometerKm
-
-      await tx.vehicle.update({
-        where: { id: vehicleId },
-        data: {
-          lastServiceOdometerKm: servicedKm,
-          currentOdometerKm: nextCurrentKm,
-        }
-      })
-
-      // Jika ada nominal biaya servis, catat sebagai VehicleExpense
-      let createdExpenseId: string | null = null
-      const amountNum = Number(data?.amount || 0)
-      if (amountNum > 0) {
-        const expense = await tx.vehicleExpense.create({
-          data: {
-            vehicleId: vehicle.id,
-            branchId: vehicle.branchId,
-            category: 'routine_service',
-            amount: new Prisma.Decimal(amountNum),
-            odometerKm: servicedKm,
-            vendorName: data?.vendorName?.trim() || null,
-            invoiceNumber: data?.invoiceNumber?.trim() || null,
-            description: data?.note?.trim() || 'Servis berkala armada',
-            expenseDate: new Date(),
-            recordedById: adminUser.id
-          }
-        })
-        createdExpenseId = expense.id
-      }
-
-      return { vehicle, servicedKm, nextCurrentKm, createdExpenseId, amount: amountNum }
-    })
-
-    logAudit({
-      actorId: adminUser.id,
-      actorRole: adminUser.role,
-      branchId: result.vehicle.branchId,
-      action: 'vehicle.service_recorded',
-      entityType: 'Vehicle',
-      entityId: result.vehicle.id,
-      metadata: {
-        plateNumber: result.vehicle.plateNumber,
-        servicedAtKm: result.servicedKm,
-        previousLastServiceOdometerKm: result.vehicle.lastServiceOdometerKm,
-        updatedCurrentOdometerKm: result.nextCurrentKm,
-        note: data?.note?.trim() || null,
-        expenseId: result.createdExpenseId,
-        amount: result.amount
-      }
-    })
-
-    safeRevalidatePath('/admin/vehicles')
-    safeRevalidatePath('/admin/analytics')
-    safeRevalidatePath('/admin/dashboard')
-
-    return { success: true }
-  } catch (error: any) {
-    return { error: error.message || 'Terjadi kesalahan sistem.' }
-  }
+): Promise<{ success?: boolean; error?: string; warning?: string }> {
+  // Single Write Path: Delegasikan sepenuhnya ke recordVehicleExpenseAction dengan kategori routine_service
+  return recordVehicleExpenseAction({
+    vehicleId,
+    amount: data?.amount && Number(data.amount) >= 0 ? Number(data.amount) : 0,
+    category: VehicleExpenseCategory.routine_service,
+    odometerKm: data?.servicedAtKm,
+    vendorName: data?.vendorName,
+    invoiceNumber: data?.invoiceNumber,
+    description: data?.note || 'Servis berkala armada',
+    actor: data?.actor
+  })
 }

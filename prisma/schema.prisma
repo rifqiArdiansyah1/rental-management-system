@@ -29,6 +29,7 @@ enum VehicleExpenseCategory {
   tires
   detailing
   tax_registration
+  insurance
   other
 }
 
@@ -531,7 +532,7 @@ model VehicleExpense {
   odometerKm    Int?
   vendorName    String?
   invoiceNumber String?
-  receiptUrl    String?
+  receiptPath   String?
   description   String?
   expenseDate   DateTime               @default(now()) @db.Timestamptz(6)
   recordedById  String
@@ -549,7 +550,8 @@ model VehicleExpense {
 
   @@index([vehicleId, expenseDate])
   @@index([branchId, expenseDate])
-  @@index([branchId, isVoided])
+  @@index([branchId, isVoided, expenseDate])
+  @@index([branchId, vendorName, invoiceNumber])
   @@index([category])
 }
 

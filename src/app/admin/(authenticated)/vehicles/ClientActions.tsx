@@ -577,6 +577,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
   const [expenseInvoice, setExpenseInvoice] = useState<string>('')
   const [expenseOdo, setExpenseOdo] = useState<string>('')
   const [expenseDescription, setExpenseDescription] = useState<string>('')
+  const [duplicatePrompt, setDuplicatePrompt] = useState<string | null>(null)
   
   const [form, setForm] = useState({
     name: vehicle.name || '',
@@ -760,6 +761,9 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
       })
       if (res.error) setError(res.error)
       else {
+        if (res.warning) {
+          alert(res.warning)
+        }
         setModalType(null)
         router.refresh()
       }
@@ -774,11 +778,12 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
     setExpenseInvoice('')
     setExpenseOdo(vehicle.currentOdometerKm != null ? String(vehicle.currentOdometerKm) : '')
     setExpenseDescription('')
+    setDuplicatePrompt(null)
     setError(null)
     setModalType('expense')
   }
 
-  const handleRecordExpense = () => {
+  const handleRecordExpense = (allowDuplicate = false) => {
     startTransition(async () => {
       setError(null)
       if (!expenseAmount || Number(expenseAmount) <= 0) {
@@ -793,10 +798,18 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
         invoiceNumber: expenseInvoice.trim() || undefined,
         odometerKm: expenseOdo ? Number(expenseOdo) : undefined,
         description: expenseDescription.trim() || undefined,
+        allowDuplicateInvoice: allowDuplicate
       })
-      if (res.error) setError(res.error)
-      else {
+      if (res.requiresConfirmation) {
+        setDuplicatePrompt(res.warning || 'Nomor nota sudah pernah dicatat di cabang ini.')
+      } else if (res.error) {
+        setError(res.error)
+      } else {
+        if (res.warning) {
+          alert(res.warning)
+        }
         setModalType(null)
+        setDuplicatePrompt(null)
         router.refresh()
       }
     })
@@ -1333,6 +1346,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                   <option value={VehicleExpenseCategory.tires}>Ganti Ban / Spooring / Balancing</option>
                   <option value={VehicleExpenseCategory.detailing}>Cuci / Salon / Detailing</option>
                   <option value={VehicleExpenseCategory.tax_registration}>Pajak STNK / Kir / Dokumen</option>
+                  <option value={VehicleExpenseCategory.insurance}>Asuransi Armada</option>
                   <option value={VehicleExpenseCategory.other}>Lain-lain</option>
                 </select>
               </div>
@@ -1401,6 +1415,20 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
               </div>
             </div>
 
+            {duplicatePrompt && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-md space-y-2">
+                <p className="font-semibold">{duplicatePrompt}</p>
+                <button
+                  type="button"
+                  onClick={() => handleRecordExpense(true)}
+                  disabled={isPending}
+                  className="px-3 py-1.5 bg-amber-600 text-white font-medium rounded hover:bg-amber-700 text-xs shadow-xs"
+                >
+                  {isPending ? 'Menyimpan...' : 'Konfirmasi & Tetap Simpan'}
+                </button>
+              </div>
+            )}
+
             {error && <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded-md">{error}</div>}
 
             <div className="mt-6 flex justify-end gap-2">
@@ -1412,7 +1440,7 @@ export function VehicleRowActions({ vehicle, categories, branches, userRole, use
                 Batal
               </button>
               <button 
-                onClick={handleRecordExpense}
+                onClick={() => handleRecordExpense(false)}
                 disabled={isPending}
                 className="px-4 py-2 text-sm font-medium bg-rose-600 text-white hover:bg-rose-700 rounded-md disabled:opacity-50 shadow-xs"
                 data-testid="submit-expense-btn"

@@ -14,10 +14,15 @@ import {
   BranchComparisonItem,
   getDefaultAnalyticsDateRange,
   calculateIntervalOverlapHours,
-  formatDayMonthWib
+  calculateAccrualRevenueProration,
+  formatDayMonthWib,
+  isPhysicalMaintenanceCategory,
+  COST_TRACKING_START_DATE,
+  DEFICIT_MIN_PERIOD_DAYS,
+  DEFICIT_MIN_FLEET_AGE_DAYS
 } from '@/lib/analytics/metrics'
-import { parseWibDateBoundary, formatWibDateTime } from '@/lib/bookingFilters'
-import { BookingStatus, PaymentStatus, BookingChannel } from '@prisma/client'
+import { parseWibDateBoundary } from '@/lib/bookingFilters'
+import { BookingStatus, PaymentStatus, BookingChannel, VehicleExpenseCategory } from '@prisma/client'
 
 interface GetAnalyticsParams {
   dateFrom?: string
@@ -33,6 +38,7 @@ function escapeCsv(field: any): string {
 
 /**
  * Server Action: Mengambil data analitik terintegrasi untuk Dashboard Analisis.
+ * Memisahkan secara tegas Pilar Akrual (Kinerja Armada) vs Pilar Kas (Likuiditas).
  * Otorisasi: Hanya admin_cabang dan admin_pusat (staff_cabang dilarang).
  */
 export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<AnalyticsSummaryResult | { error: string }> {
@@ -69,9 +75,15 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
       endBoundary
     }
 
-    const totalWindowHours = Math.max(1, (endBoundary.getTime() - startBoundary.getTime()) / (1000 * 60 * 60))
+    const now = new Date()
+    const totalWindowMs = Math.max(1, endBoundary.getTime() - startBoundary.getTime())
+    const totalWindowHours = totalWindowMs / (1000 * 60 * 60)
+    const windowDays = Math.round(totalWindowMs / (1000 * 60 * 60 * 24))
+    const hasPartialCostData = dateFromStr < COST_TRACKING_START_DATE
 
-    // 1. Ambil data Pembayaran (Basis Kas) & Pengeluaran Kas
+    // -------------------------------------------------------------
+    // 1. PILAR KAS (LIKUIDITAS): Murni dari Payment sukses & Pengeluaran Kas
+    // -------------------------------------------------------------
     const paymentsWhere: any = {
       createdAt: { gte: startBoundary, lte: endBoundary },
       status: PaymentStatus.success
@@ -88,40 +100,18 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
       expensesWhere.branchId = targetBranchId
     }
 
-    const [payments, lateFeeBookings, refundedPayments, expenses] = await Promise.all([
+    const [payments, expenses] = await Promise.all([
       prisma.payment.findMany({
         where: paymentsWhere,
         select: {
           id: true,
           amount: true,
           createdAt: true,
+          method: true,
           booking: {
             select: { pickupBranchId: true }
           }
         }
-      }),
-      prisma.booking.findMany({
-        where: {
-          ...(targetBranchId ? { pickupBranchId: targetBranchId } : {}),
-          status: BookingStatus.completed,
-          actualReturnAt: { gte: startBoundary, lte: endBoundary },
-          lateFeeWaived: false,
-          lateFeeAmount: { gt: 0 }
-        },
-        select: {
-          id: true,
-          lateFeeAmount: true,
-          actualReturnAt: true,
-          pickupBranchId: true
-        }
-      }),
-      prisma.payment.findMany({
-        where: {
-          ...(targetBranchId ? { booking: { pickupBranchId: targetBranchId } } : {}),
-          status: PaymentStatus.refunded,
-          updatedAt: { gte: startBoundary, lte: endBoundary }
-        },
-        select: { amount: true }
       }),
       prisma.vehicleExpense.findMany({
         where: expensesWhere,
@@ -132,20 +122,34 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
           expenseDate: true,
           branchId: true,
           vehicleId: true,
-          vehicle: { select: { plateNumber: true } }
+          vendorName: true,
+          description: true,
+          vehicle: { select: { id: true, plateNumber: true, branchId: true } }
         }
       })
     ])
 
-    const totalSettledPayments = payments.reduce((sum, p) => sum + Number(p.amount), 0)
-    const totalLateFeeRevenue = lateFeeBookings.reduce((sum, b) => sum + Number(b.lateFeeAmount || 0), 0)
-    const totalRefunds = refundedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
-    const netCashInflow = totalSettledPayments + totalLateFeeRevenue - totalRefunds
-    const totalMaintenanceExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
-    const netOperatingCashFlow = netCashInflow - totalMaintenanceExpenses
+    // Kas Masuk Murni (Σ Payment sukses) - Denda lunas sudah tercatat sebagai row Payment terpisah
+    const cashInflow = payments.reduce((sum, p) => sum + Number(p.amount), 0)
 
-    // 2. Ambil data Booking dalam rentang waktu
-    const bookings = await prisma.booking.findMany({
+    // Pengeluaran Kas: Pisahkan Beban Pemeliharaan Fisik vs Beban Kepemilikan
+    let physicalMaintenanceExpenses = 0
+    let ownershipExpenses = 0
+    for (const e of expenses) {
+      const amt = Number(e.amount)
+      if (isPhysicalMaintenanceCategory(e.category)) {
+        physicalMaintenanceExpenses += amt
+      } else {
+        ownershipExpenses += amt
+      }
+    }
+    const totalCashExpenses = physicalMaintenanceExpenses + ownershipExpenses
+    const netCashFlow = cashInflow - totalCashExpenses
+
+    // -------------------------------------------------------------
+    // 2. DATA BOOKING: Dibuat dalam periode (Sinyal Permintaan & Funnel)
+    // -------------------------------------------------------------
+    const createdBookings = await prisma.booking.findMany({
       where: {
         ...(targetBranchId ? { pickupBranchId: targetBranchId } : {}),
         createdAt: { gte: startBoundary, lte: endBoundary }
@@ -164,78 +168,176 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
       }
     })
 
-    const totalBookings = bookings.length
-    const completedBookings = bookings.filter(b => b.status === BookingStatus.completed).length
-    const grossRentalValue = bookings
-      .filter(b => b.status !== BookingStatus.cancelled && b.status !== BookingStatus.pending_payment)
-      .reduce((sum, b) => sum + Number(b.totalPrice), 0)
+    const totalBookings = createdBookings.length
+    const completedCreated = createdBookings.filter(b => b.status === BookingStatus.completed).length
+    const validCreated = createdBookings.filter(
+      b => b.status !== BookingStatus.cancelled && b.status !== BookingStatus.pending_payment
+    )
+    const newBookingsValue = validCreated.reduce((sum, b) => sum + Number(b.totalPrice), 0)
+    const averageOrderValue = validCreated.length > 0 ? Math.round(newBookingsValue / validCreated.length) : 0
 
-    const onlineBookings = bookings.filter(b => b.bookingChannel === BookingChannel.online).length
-    const walkInBookings = bookings.filter(b => b.bookingChannel === BookingChannel.walk_in).length
+    const onlineBookings = createdBookings.filter(b => b.bookingChannel === BookingChannel.online).length
+    const walkInBookings = createdBookings.filter(b => b.bookingChannel === BookingChannel.walk_in).length
     const onlinePercentage = totalBookings > 0 ? Math.round((onlineBookings / totalBookings) * 100) : 0
-    const averageOrderValue = (completedBookings + bookings.filter(b => b.status === BookingStatus.ongoing || b.status === BookingStatus.confirmed).length) > 0
-      ? Math.round(grossRentalValue / (completedBookings + bookings.filter(b => b.status === BookingStatus.ongoing || b.status === BookingStatus.confirmed).length))
-      : 0
 
-    // 3. Funnel Konversi Sewa
     const funnel: ConversionFunnelData = {
       created: totalBookings,
-      paid: bookings.filter(b => b.status !== BookingStatus.pending_payment).length,
-      kycVerified: bookings.filter(b => b.customer.verificationStatus === 'verified').length,
-      ongoingOrCompleted: bookings.filter(b => b.status === BookingStatus.ongoing || b.status === BookingStatus.completed).length,
-      completed: completedBookings,
-      cancelledExpired: bookings.filter(b => b.status === BookingStatus.cancelled && (b.cancellationNote?.includes('60 menit') || b.cancelledBy === 'SYSTEM_CRON_AUTO_CANCEL')).length,
-      cancelledManual: bookings.filter(b => b.status === BookingStatus.cancelled && !(b.cancellationNote?.includes('60 menit') || b.cancelledBy === 'SYSTEM_CRON_AUTO_CANCEL')).length
+      paid: createdBookings.filter(b => b.status !== BookingStatus.pending_payment).length,
+      kycVerified: createdBookings.filter(b => b.customer.verificationStatus === 'verified').length,
+      ongoingOrCompleted: createdBookings.filter(b => b.status === BookingStatus.ongoing || b.status === BookingStatus.completed).length,
+      completed: completedCreated,
+      cancelledExpired: createdBookings.filter(b => b.status === BookingStatus.cancelled && (b.cancellationNote?.includes('60 menit') || b.cancelledBy === 'SYSTEM_CRON_AUTO_CANCEL')).length,
+      cancelledManual: createdBookings.filter(b => b.status === BookingStatus.cancelled && !(b.cancellationNote?.includes('60 menit') || b.cancelledBy === 'SYSTEM_CRON_AUTO_CANCEL')).length
     }
 
-    // 4. Tren Harian (Daily Trends dalam Timezone WIB)
-    const dailyMap = new Map<string, { cashInflow: number; maintenanceExpense: number; rentalValue: number; bookingsCount: number }>()
+    // -------------------------------------------------------------
+    // 3. PILAR AKRUAL: Prorata Sewa Beririsan (Status: confirmed, ongoing, completed)
+    // -------------------------------------------------------------
+    const accrualBookings = await prisma.booking.findMany({
+      where: {
+        ...(targetBranchId ? { pickupBranchId: targetBranchId } : {}),
+        status: { in: [BookingStatus.confirmed, BookingStatus.ongoing, BookingStatus.completed] },
+        startDate: { lte: endBoundary },
+        endDate: { gte: startBoundary }
+      },
+      select: {
+        id: true,
+        vehicleId: true,
+        startDate: true,
+        endDate: true,
+        totalPrice: true,
+        status: true,
+        actualReturnAt: true,
+        lateFeeAmount: true,
+        lateFeeWaived: true,
+        pickupBranchId: true
+      }
+    })
+
+    let accruedRealizedRevenue = 0
+    let accruedScheduledRevenue = 0
+    let lateFeeAccrued = 0
+
+    // Map agregasi akrual per kendaraan
+    const vehicleAccrualMap = new Map<string, {
+      realized: number
+      scheduled: number
+      hours: number
+      lateFee: number
+    }>()
+
+    // Map denda harian (WIB)
+    const dailyLateFeeMap = new Map<string, number>()
+
+    for (const b of accrualBookings) {
+      const proration = calculateAccrualRevenueProration(
+        b.startDate,
+        b.endDate,
+        Number(b.totalPrice),
+        startBoundary,
+        endBoundary,
+        now
+      )
+
+      accruedRealizedRevenue += proration.realizedRevenue
+      accruedScheduledRevenue += proration.scheduledRevenue
+
+      let vEntry = vehicleAccrualMap.get(b.vehicleId)
+      if (!vEntry) {
+        vEntry = { realized: 0, scheduled: 0, hours: 0, lateFee: 0 }
+        vehicleAccrualMap.set(b.vehicleId, vEntry)
+      }
+      vEntry.realized += proration.realizedRevenue
+      vEntry.scheduled += proration.scheduledRevenue
+      vEntry.hours += proration.totalOverlapHours
+
+      // Akrual Denda: Diakui pada tanggal actualReturnAt jika jatuh dalam rentang filter
+      if (
+        b.status === BookingStatus.completed &&
+        b.actualReturnAt &&
+        b.actualReturnAt >= startBoundary &&
+        b.actualReturnAt <= endBoundary &&
+        !b.lateFeeWaived &&
+        b.lateFeeAmount &&
+        Number(b.lateFeeAmount) > 0
+      ) {
+        const lf = Number(b.lateFeeAmount)
+        lateFeeAccrued += lf
+        accruedRealizedRevenue += lf
+        vEntry.realized += lf
+        vEntry.lateFee += lf
+
+        const returnDateWib = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(b.actualReturnAt))
+        dailyLateFeeMap.set(returnDateWib, (dailyLateFeeMap.get(returnDateWib) || 0) + lf)
+      }
+    }
+
+    const totalAccruedRevenue = accruedRealizedRevenue + accruedScheduledRevenue
+    const operatingProfitMargin = accruedRealizedRevenue - physicalMaintenanceExpenses
+
+    // -------------------------------------------------------------
+    // 4. TREN HARIAN (Daily Trends dalam Timezone WIB)
+    // -------------------------------------------------------------
+    const dailyMap = new Map<string, {
+      cashInflow: number
+      maintenanceExpense: number
+      accruedRevenue: number
+      bookingsCount: number
+    }>()
     
-    // Inisialisasi setiap hari dalam rentang kalender
+    // Inisialisasi kalender harian
     const curDate = new Date(dateFromStr + 'T00:00:00Z')
     const endDateObj = new Date(dateToStr + 'T00:00:00Z')
     while (curDate <= endDateObj) {
       const key = curDate.toISOString().split('T')[0]
-      dailyMap.set(key, { cashInflow: 0, maintenanceExpense: 0, rentalValue: 0, bookingsCount: 0 })
+      dailyMap.set(key, { cashInflow: 0, maintenanceExpense: 0, accruedRevenue: 0, bookingsCount: 0 })
       curDate.setUTCDate(curDate.getUTCDate() + 1)
     }
 
-    // Petakan Pembayaran ke Hari WIB
+    // Kas Masuk ke Hari WIB
     for (const p of payments) {
-      const pWibStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(p.createdAt))
-      const entry = dailyMap.get(pWibStr)
-      if (entry) {
-        entry.cashInflow += Number(p.amount)
-      }
+      const pWib = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(p.createdAt))
+      const entry = dailyMap.get(pWib)
+      if (entry) entry.cashInflow += Number(p.amount)
     }
-    // Petakan Denda ke Hari WIB
-    for (const b of lateFeeBookings) {
-      if (b.actualReturnAt) {
-        const bWibStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(b.actualReturnAt))
-        const entry = dailyMap.get(bWibStr)
-        if (entry) {
-          entry.cashInflow += Number(b.lateFeeAmount || 0)
-        }
-      }
-    }
-    // Petakan Pengeluaran Perawatan ke Hari WIB
+
+    // Pengeluaran Pemeliharaan ke Hari WIB
     for (const e of expenses) {
-      const eWibStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(e.expenseDate))
-      const entry = dailyMap.get(eWibStr)
-      if (entry) {
-        entry.maintenanceExpense += Number(e.amount)
-      }
+      const eWib = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(e.expenseDate))
+      const entry = dailyMap.get(eWib)
+      if (entry) entry.maintenanceExpense += Number(e.amount)
     }
-    // Petakan Booking ke Hari WIB
-    for (const b of bookings) {
-      const bWibStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(b.createdAt))
-      const entry = dailyMap.get(bWibStr)
-      if (entry) {
-        entry.bookingsCount += 1
-        if (b.status !== BookingStatus.cancelled && b.status !== BookingStatus.pending_payment) {
-          entry.rentalValue += Number(b.totalPrice)
-        }
+
+    // Booking dibuat ke Hari WIB
+    for (const b of createdBookings) {
+      const bWib = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(b.createdAt))
+      const entry = dailyMap.get(bWib)
+      if (entry) entry.bookingsCount += 1
+    }
+
+    // Akrual Sewa per Hari WIB (prorata per 24 jam)
+    for (const [dateKey, entry] of dailyMap.entries()) {
+      const dayStart = parseWibDateBoundary(dateKey, false)
+      const dayEnd = parseWibDateBoundary(dateKey, true)
+      
+      let dayAccrued = 0
+      for (const b of accrualBookings) {
+        const p = calculateAccrualRevenueProration(
+          b.startDate,
+          b.endDate,
+          Number(b.totalPrice),
+          dayStart,
+          dayEnd,
+          now
+        )
+        dayAccrued += p.realizedRevenue
       }
+
+      // Tambahkan denda yang jatuh pada hari ini
+      const dayLf = dailyLateFeeMap.get(dateKey) || 0
+      dayAccrued += dayLf
+
+      entry.accruedRevenue = dayAccrued
     }
 
     const dailyTrends: DailyTrendItem[] = Array.from(dailyMap.entries()).map(([dateKey, val]) => ({
@@ -244,17 +346,14 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
       cashInflow: Math.round(val.cashInflow),
       maintenanceExpense: Math.round(val.maintenanceExpense),
       netCashFlow: Math.round(val.cashInflow - val.maintenanceExpense),
-      rentalValue: Math.round(val.rentalValue),
+      accruedRevenue: Math.round(val.accruedRevenue),
+      rentalValue: Math.round(val.accruedRevenue), // alias
       bookingsCount: val.bookingsCount
     }))
 
-    // 5. Performa Armada & Utilisasi (Mengelompokkan berdasarkan identitas fisik plat nomor)
-    const expenseByPlate = new Map<string, number>()
-    for (const e of expenses) {
-      const plate = e.vehicle.plateNumber
-      expenseByPlate.set(plate, (expenseByPlate.get(plate) || 0) + Number(e.amount))
-    }
-
+    // -------------------------------------------------------------
+    // 5. PERFORMA ARMADA & UTILISASI (Tingkat Unit Individu)
+    // -------------------------------------------------------------
     const vehicles = await prisma.vehicle.findMany({
       where: {
         ...(targetBranchId ? { branchId: targetBranchId } : {}),
@@ -262,66 +361,92 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
       },
       include: {
         category: true,
-        branch: true,
-        bookings: {
-          where: {
-            status: { in: [BookingStatus.confirmed, BookingStatus.ongoing, BookingStatus.completed] },
-            startDate: { lte: endBoundary },
-            endDate: { gte: startBoundary }
-          },
-          select: {
-            startDate: true,
-            endDate: true,
-            totalPrice: true,
-            status: true
-          }
-        }
+        branch: true
       }
     })
 
+    // Agregasi biaya per kendaraan (pisahkan fisik vs kepemilikan)
+    const expenseByVehicle = new Map<string, {
+      physical: number
+      ownership: number
+      largestCategory?: string
+      largestAmount: number
+    }>()
+
+    for (const e of expenses) {
+      let vExp = expenseByVehicle.get(e.vehicleId)
+      if (!vExp) {
+        vExp = { physical: 0, ownership: 0, largestAmount: 0 }
+        expenseByVehicle.set(e.vehicleId, vExp)
+      }
+      const amt = Number(e.amount)
+      if (isPhysicalMaintenanceCategory(e.category)) {
+        vExp.physical += amt
+      } else {
+        vExp.ownership += amt
+      }
+      if (amt > vExp.largestAmount) {
+        vExp.largestAmount = amt
+        vExp.largestCategory = e.category
+      }
+    }
+
     let totalRentedHoursAllFleet = 0
-    let totalCapacityHoursAllFleet = vehicles.length * totalWindowHours
+    const totalCapacityHoursAllFleet = vehicles.length * totalWindowHours
 
     const fleetPerformance: FleetPerformanceItem[] = vehicles.map(v => {
-      let vehicleRentedHours = 0
-      let vehicleRevenue = 0
+      const vAccrual = vehicleAccrualMap.get(v.id) || { realized: 0, scheduled: 0, hours: 0, lateFee: 0 }
+      const vExp = expenseByVehicle.get(v.id) || { physical: 0, ownership: 0, largestAmount: 0 }
 
-      for (const b of v.bookings) {
-        const overlap = calculateIntervalOverlapHours(b.startDate, b.endDate, startBoundary, endBoundary)
-        vehicleRentedHours += overlap
-        if (b.status !== BookingStatus.cancelled) {
-          vehicleRevenue += Number(b.totalPrice)
-        }
-      }
+      const vRealizedRev = Math.round(vAccrual.realized)
+      const vScheduledRev = Math.round(vAccrual.scheduled)
+      const vPhysicalExp = Math.round(vExp.physical)
+      const vOwnershipExp = Math.round(vExp.ownership)
+      const vOperatingMargin = vRealizedRev - vPhysicalExp
 
-      totalRentedHoursAllFleet += vehicleRentedHours
-      const utilizationRate = Math.min(100, Math.round((vehicleRentedHours / totalWindowHours) * 100))
-      const vehicleExpenses = expenseByPlate.get(v.plateNumber) || 0
-      const unitProfitMargin = Math.round(vehicleRevenue - vehicleExpenses)
+      totalRentedHoursAllFleet += vAccrual.hours
+      const utilizationRate = Math.min(100, Math.round((vAccrual.hours / totalWindowHours) * 100))
+
+      const vehicleAgeDays = Math.max(0, Math.floor((now.getTime() - new Date(v.createdAt).getTime()) / (1000 * 60 * 60 * 24)))
+      const isDeficitQualified = windowDays >= DEFICIT_MIN_PERIOD_DAYS && vehicleAgeDays >= DEFICIT_MIN_FLEET_AGE_DAYS
+      const isDeficit = vOperatingMargin < 0
 
       return {
         plateNumber: v.plateNumber,
         vehicleName: v.name || v.category.name,
         categoryName: v.category.name,
         branchName: v.branch.name,
-        totalRentalHours: Math.round(vehicleRentedHours),
-        totalRentalDays: Number((vehicleRentedHours / 24).toFixed(1)),
-        revenueGenerated: Math.round(vehicleRevenue),
-        maintenanceExpenses: Math.round(vehicleExpenses),
-        unitProfitMargin,
+        totalRentalHours: Math.round(vAccrual.hours),
+        totalRentalDays: Number((vAccrual.hours / 24).toFixed(1)),
+        accruedRealizedRevenue: vRealizedRev,
+        accruedScheduledRevenue: vScheduledRev,
+        physicalMaintenanceExpenses: vPhysicalExp,
+        ownershipExpenses: vOwnershipExp,
+        operatingProfitMargin: vOperatingMargin,
         utilizationRate,
-        currentOdometerKm: v.currentOdometerKm != null ? Number(v.currentOdometerKm) : null
+        currentOdometerKm: v.currentOdometerKm != null ? Number(v.currentOdometerKm) : null,
+        vehicleAgeDays,
+        isDeficitQualified,
+        isDeficit,
+        largestExpenseCategory: vExp.largestCategory,
+        largestExpenseAmount: vExp.largestAmount > 0 ? vExp.largestAmount : undefined,
+        // Backwards compatibility
+        revenueGenerated: vRealizedRev,
+        maintenanceExpenses: vPhysicalExp,
+        unitProfitMargin: vOperatingMargin
       }
     })
 
-    // Urutkan armada dari revenue tertinggi
-    fleetPerformance.sort((a, b) => b.revenueGenerated - a.revenueGenerated)
+    // Urutkan performa armada dari margin operasional tertinggi
+    fleetPerformance.sort((a, b) => b.operatingProfitMargin - a.operatingProfitMargin)
 
     const overallUtilizationRate = totalCapacityHoursAllFleet > 0
       ? Math.min(100, Math.round((totalRentedHoursAllFleet / totalCapacityHoursAllFleet) * 100))
       : 0
 
-    // 6. Perbandingan Antar Cabang (Khusus admin_pusat)
+    // -------------------------------------------------------------
+    // 6. PERBANDINGAN ANTAR CABANG (Khusus admin_pusat)
+    // -------------------------------------------------------------
     const branchComparisons: BranchComparisonItem[] = []
     if (scope.scope === 'all') {
       const branches = await prisma.branch.findMany({
@@ -338,9 +463,8 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
       })
 
       for (const b of branches) {
-        const branchPayments = payments.filter(p => p.booking?.pickupBranchId === b.id)
-        const branchLateFees = lateFeeBookings.filter(l => l.pickupBranchId === b.id)
-        const bCashInflow = branchPayments.reduce((s, p) => s + Number(p.amount), 0) + branchLateFees.reduce((s, l) => s + Number(l.lateFeeAmount || 0), 0)
+        const bPayments = payments.filter(p => p.booking?.pickupBranchId === b.id)
+        const bCashInflow = bPayments.reduce((s, p) => s + Number(p.amount), 0)
         const bExpenses = expenses.filter(e => e.branchId === b.id).reduce((s, e) => s + Number(e.amount), 0)
         
         branchComparisons.push({
@@ -352,25 +476,43 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
           netCashFlow: Math.round(bCashInflow - bExpenses),
           totalBookings: b.pickups.length,
           activeVehicles: b.vehicles.length,
-          utilizationRate: 0 // Placeholder agregasi
+          utilizationRate: 0
         })
       }
       branchComparisons.sort((a, b) => b.cashInflow - a.cashInflow)
     }
 
     const kpi: KpiMetrics = {
-      netCashInflow: Math.round(netCashInflow),
-      totalMaintenanceExpenses: Math.round(totalMaintenanceExpenses),
-      netOperatingCashFlow: Math.round(netOperatingCashFlow),
-      grossRentalValue: Math.round(grossRentalValue),
+      // Pilar Akrual
+      accruedRealizedRevenue: Math.round(accruedRealizedRevenue),
+      accruedScheduledRevenue: Math.round(accruedScheduledRevenue),
+      totalAccruedRevenue: Math.round(totalAccruedRevenue),
+      physicalMaintenanceExpenses: Math.round(physicalMaintenanceExpenses),
+      operatingProfitMargin: Math.round(operatingProfitMargin),
+      ownershipExpenses: Math.round(ownershipExpenses),
+      newBookingsValue: Math.round(newBookingsValue),
+      lateFeeAccrued: Math.round(lateFeeAccrued),
+
+      // Pilar Kas
+      cashInflow: Math.round(cashInflow),
+      totalCashExpenses: Math.round(totalCashExpenses),
+      netCashFlow: Math.round(netCashFlow),
+
+      // Operasional
       totalBookings,
-      completedBookings,
+      completedBookings: completedCreated,
       averageOrderValue,
       overallUtilizationRate,
       onlineBookings,
       walkInBookings,
       onlinePercentage,
-      lateFeeRevenue: Math.round(totalLateFeeRevenue)
+
+      // Aliases
+      netCashInflow: Math.round(cashInflow),
+      totalMaintenanceExpenses: Math.round(physicalMaintenanceExpenses),
+      netOperatingCashFlow: Math.round(netCashFlow),
+      grossRentalValue: Math.round(newBookingsValue),
+      lateFeeRevenue: Math.round(lateFeeAccrued)
     }
 
     return {
@@ -379,7 +521,10 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
       dailyTrends,
       fleetPerformance,
       funnel,
-      branchComparisons
+      branchComparisons,
+      hasPartialCostData,
+      costTrackingStartDate: COST_TRACKING_START_DATE,
+      windowDays
     }
   } catch (error: any) {
     console.error('[ANALYTICS_ERROR] getAnalyticsData failed:', error)
@@ -389,8 +534,8 @@ export async function getAnalyticsData(params?: GetAnalyticsParams): Promise<Ana
 
 /**
  * Server Action: Ekspor Data Analitik CSV Terlindungi Kepatuhan UU PDP
- * - Nomor NIK dan SIM mutlak dihapus/tidak dimasukkan.
- * - Nama, email, dan telepon pelanggan ditampilkan penuh untuk admin.
+ * - Nomor NIK dan SIM mutlak tidak dimasukkan.
+ * - Format kolom memisahkan Akrual & Kas secara transparan.
  * - Setiap ekspor wajib tercatat di AuditLog.
  */
 export async function exportAnalyticsCsvAction(params: {
@@ -417,11 +562,11 @@ export async function exportAnalyticsCsvAction(params: {
     if (params.type === 'daily_summary') {
       const headers = [
         'Tanggal (WIB)',
-        'Arus Kas Masuk (IDR)',
-        'Biaya Perawatan (IDR)',
+        'Kas Masuk (IDR)',
+        'Kas Keluar Biaya Armada (IDR)',
         'Arus Kas Bersih (IDR)',
-        'Nilai Kontrak Sewa (IDR)',
-        'Jumlah Pesanan Dibuat'
+        'Pendapatan Akrual (IDR)',
+        'Volume Pesanan Dibuat'
       ]
       const rows = [headers.join(',')]
       for (const item of analyticsData.dailyTrends) {
@@ -430,7 +575,7 @@ export async function exportAnalyticsCsvAction(params: {
           escapeCsv(item.cashInflow),
           escapeCsv(item.maintenanceExpense),
           escapeCsv(item.netCashFlow),
-          escapeCsv(item.rentalValue),
+          escapeCsv(item.accruedRevenue),
           escapeCsv(item.bookingsCount)
         ].join(','))
       }
@@ -444,9 +589,10 @@ export async function exportAnalyticsCsvAction(params: {
         'Kategori',
         'Cabang',
         'Total Hari Disewa',
-        'Pendapatan Dihasilkan (IDR)',
-        'Biaya Perawatan (IDR)',
-        'Margin Laba Unit (IDR)',
+        'Pendapatan Akrual Terealisasi (IDR)',
+        'Biaya Pemeliharaan Fisik (IDR)',
+        'Beban Kepemilikan (IDR)',
+        'Margin Operasional Armada (IDR)',
         'Tingkat Utilisasi (%)',
         'Odometer Terkini (KM)'
       ]
@@ -458,9 +604,10 @@ export async function exportAnalyticsCsvAction(params: {
           escapeCsv(item.categoryName),
           escapeCsv(item.branchName),
           escapeCsv(item.totalRentalDays),
-          escapeCsv(item.revenueGenerated),
-          escapeCsv(item.maintenanceExpenses),
-          escapeCsv(item.unitProfitMargin),
+          escapeCsv(item.accruedRealizedRevenue),
+          escapeCsv(item.physicalMaintenanceExpenses),
+          escapeCsv(item.ownershipExpenses),
+          escapeCsv(item.operatingProfitMargin),
           escapeCsv(`${item.utilizationRate}%`),
           escapeCsv(item.currentOdometerKm != null ? `${item.currentOdometerKm} km` : '-')
         ].join(','))

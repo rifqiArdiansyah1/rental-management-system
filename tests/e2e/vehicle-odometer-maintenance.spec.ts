@@ -136,6 +136,7 @@ test.describe('Pelacakan Odometer Armada & Preventive Maintenance (Non-Blocking 
     await prisma.payment.deleteMany({ where: { booking: { customerId } } })
     await prisma.booking.deleteMany({ where: { customerId } })
     await prisma.vehicleUnavailability.deleteMany({ where: { vehicle: { branchId: { in: [branchAId, branchBId] } } } })
+    await prisma.vehicleExpense.deleteMany({ where: { branchId: { in: [branchAId, branchBId] } } })
     await prisma.vehicle.deleteMany({ where: { branchId: { in: [branchAId, branchBId] } } })
     await prisma.vehicleCategory.deleteMany({ where: { id: categoryId } })
     await prisma.user.deleteMany({ where: { id: { in: [adminPusatId, adminCabangId, staffCabangId] } } })
